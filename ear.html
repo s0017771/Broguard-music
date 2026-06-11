@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ABC 귀 ver.2 — 듣고 악보로</title>
+<title>ABC 귀 ver.3 — 듣고 악보로</title>
 <style>
   :root {
     --ink: #1c2b3a; --ink-soft: #46586b;
@@ -72,7 +72,7 @@
 
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
-  <h1><span class="clef">&#119070;</span>ABC 귀 (Ear) <span style="font-size:.75rem;color:var(--brass);">VER.2</span></h1>
+  <h1><span class="clef">&#119070;</span>ABC 귀 (Ear) <span style="font-size:.75rem;color:var(--brass);">VER.3</span></h1>
   <p>피아노 단음·콧노래·휘파람을 듣고 ABC 악보로 변환합니다</p>
 </header>
 
@@ -101,6 +101,7 @@
       <label>BPM <input type="number" id="bpmInput" value="100" min="40" max="220"></label>
       <label><input type="checkbox" id="optOct" checked> 옥타브 보정</label>
       <label><input type="checkbox" id="optSnap" checked> 조성 스냅</label>
+      <label><input type="checkbox" id="optRest" checked> 쉼표 압축</label>
     </div>
     <p id="status">1단계: 마이크를 켜고 피아노 음 하나를 쳐서 감지되는지 확인하세요. 2단계: 녹음을 누르고 연주하세요.</p>
     <textarea id="abcOut" spellcheck="false" placeholder="녹음을 정지하면 여기에 ABC 악보가 생성됩니다"></textarea>
@@ -111,7 +112,7 @@
     </div>
     <p class="hint">
       &#8226; 단음 전용입니다 (화음 불가). 콧노래·휘파람도 됩니다 — '옥타브 보정'이 낮은 목소리를 가운데 음역으로 올리고, '조성 스냅'이 다장조 근처로 자동 조옮김해요.<br>
-      &#8226; 조용한 환경에서, 태블릿을 피아노 가까이 두세요. 잡음이 많으면 감도 슬라이더를 오른쪽으로.<br>
+      &#8226; 음이 뚝뚝 끊겨 잡히면 감도 슬라이더를 <b>왼쪽으로</b>(더 민감하게), 잡음이 끼면 오른쪽으로. 부르는 동안 레벨바가 빨간 선을 계속 넘는지 확인하세요.<br>
       &#8226; 변환 결과는 '악보 연구소'에 붙여넣어 재생·수정·반주 입히기가 가능합니다.
     </p>
   </section>
@@ -128,7 +129,7 @@
   var listening = false, recording = false;
   var events = [], currentNote = null;
   var candidateMidi = -1, candidateCount = 0, silenceCount = 0;
-  var STABLE_FRAMES = 3, SILENCE_FRAMES = 5, HYST_FRAMES = 6;
+  var STABLE_FRAMES = 3, SILENCE_FRAMES = 12, HYST_FRAMES = 6;
   var lastAbc = "";
 
   function setStatus(msg, isError) {
@@ -260,7 +261,8 @@
     $("meterFill").style.width = pct + "%";
 
     var midi = -1;
-    if (r.rms >= threshold && r.freq > 0) {
+    var gate = currentNote ? threshold * 0.45 : threshold; /* 시작은 기준 감도, 유지는 45%면 충분 */
+    if (r.rms >= gate && r.freq > 0) {
       midi = freqToMidi(r.freq);
       if (midi < 24 || midi > 96) midi = -1;
     }
@@ -283,7 +285,10 @@
         var now = performance.now();
         closeCurrent(now);
         currentNote = { m: midi, t0: now, t1: 0, frames: [] };
-        if (recording) events.push(currentNote);
+        if (recording) {
+          events.push(currentNote);
+          setStatus("녹음 중 — " + events.length + "음 감지됨");
+        }
       }
       if (currentNote) currentNote.frames.push(midi);
     } else {
@@ -331,7 +336,7 @@
     var merged = [];
     out.forEach(function (e) {
       var p = merged[merged.length - 1];
-      if (p && p.m === e.m && e.t0 - p.t1 < eighth * 0.4) p.t1 = Math.max(p.t1, e.t1);
+      if (p && p.m === e.m && e.t0 - p.t1 < eighth * 0.8) p.t1 = Math.max(p.t1, e.t1);
       else merged.push(e);
     });
 
@@ -393,7 +398,8 @@
     var prevEnd = done[0].t0;
     done.forEach(function (e) {
       var gap = Math.round((e.t0 - prevEnd) / eighth);
-      if (gap >= 1) tokens.push({ rest: true, len: Math.min(gap, 8) });
+      var gapCap = $("optRest").checked ? 2 : 8; /* 쉼표 압축: 긴 공백을 최대 4분쉼표로 */
+      if (gap >= 1) tokens.push({ rest: true, len: Math.min(gap, gapCap) });
       var len = Math.round((e.t1 - e.t0) / eighth);
       len = Math.max(1, Math.min(8, len));
       tokens.push({ m: e.m, len: len });
