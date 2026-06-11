@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ABC 귀 — 피아노 소리를 듣고 악보로</title>
+<title>ABC 귀 ver.2 — 듣고 악보로</title>
 <style>
   :root {
     --ink: #1c2b3a; --ink-soft: #46586b;
@@ -72,8 +72,8 @@
 
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
-  <h1><span class="clef">&#119070;</span>ABC 귀 (Ear) <span style="font-size:.75rem;color:var(--brass);">VER.1</span></h1>
-  <p>마이크로 피아노 단음 멜로디를 듣고 ABC 악보로 변환합니다</p>
+  <h1><span class="clef">&#119070;</span>ABC 귀 (Ear) <span style="font-size:.75rem;color:var(--brass);">VER.2</span></h1>
+  <p>피아노 단음·콧노래·휘파람을 듣고 ABC 악보로 변환합니다</p>
 </header>
 
 <main>
@@ -99,6 +99,8 @@
       <button id="recBtn" class="btn-rec" disabled>&#9210; 녹음</button>
       <input type="text" id="titleInput" placeholder="곡 제목">
       <label>BPM <input type="number" id="bpmInput" value="100" min="40" max="220"></label>
+      <label><input type="checkbox" id="optOct" checked> 옥타브 보정</label>
+      <label><input type="checkbox" id="optSnap" checked> 조성 스냅</label>
     </div>
     <p id="status">1단계: 마이크를 켜고 피아노 음 하나를 쳐서 감지되는지 확인하세요. 2단계: 녹음을 누르고 연주하세요.</p>
     <textarea id="abcOut" spellcheck="false" placeholder="녹음을 정지하면 여기에 ABC 악보가 생성됩니다"></textarea>
@@ -108,7 +110,7 @@
       <button id="clearBtn" class="btn-ghost">&#128465; 지우기</button>
     </div>
     <p class="hint">
-      &#8226; 단음 멜로디 전용입니다 (화음은 인식 불가). 한 음씩 또박또박, BPM에 맞춰 연주할수록 정확해요.<br>
+      &#8226; 단음 전용입니다 (화음 불가). 콧노래·휘파람도 됩니다 — '옥타브 보정'이 낮은 목소리를 가운데 음역으로 올리고, '조성 스냅'이 다장조 근처로 자동 조옮김해요.<br>
       &#8226; 조용한 환경에서, 태블릿을 피아노 가까이 두세요. 잡음이 많으면 감도 슬라이더를 오른쪽으로.<br>
       &#8226; 변환 결과는 '악보 연구소'에 붙여넣어 재생·수정·반주 입히기가 가능합니다.
     </p>
@@ -126,7 +128,7 @@
   var listening = false, recording = false;
   var events = [], currentNote = null;
   var candidateMidi = -1, candidateCount = 0, silenceCount = 0;
-  var STABLE_FRAMES = 3, SILENCE_FRAMES = 5;
+  var STABLE_FRAMES = 3, SILENCE_FRAMES = 5, HYST_FRAMES = 6;
   var lastAbc = "";
 
   function setStatus(msg, isError) {
@@ -239,11 +241,21 @@
   }
 
   /* ════════ 감지 루프 + 음 분절 ════════ */
+  function modeOf(arr) {
+    var cnt = {}, best = arr[0], bc = 0;
+    arr.forEach(function (v) { cnt[v] = (cnt[v] || 0) + 1; if (cnt[v] > bc) { bc = cnt[v]; best = v; } });
+    return +best;
+  }
+  function closeCurrent(now) {
+    if (!currentNote) return;
+    currentNote.t1 = now;
+    if (currentNote.frames && currentNote.frames.length) currentNote.m = modeOf(currentNote.frames);
+    currentNote = null;
+  }
   function loop() {
     if (!listening) return;
     analyser.getFloatTimeDomainData(buf);
     var r = detectPitch(buf, audioCtx.sampleRate);
-    /* 레벨 미터 */
     var pct = Math.min(100, r.rms * 1500);
     $("meterFill").style.width = pct + "%";
 
@@ -265,24 +277,20 @@
 
       if (midi === candidateMidi) candidateCount++;
       else { candidateMidi = midi; candidateCount = 1; }
-      if (candidateCount === STABLE_FRAMES) {
-        /* 안정된 새 음 확정 */
+      /* 히스테리시스: 반음 이웃으로의 전환은 더 오래 유지돼야 인정 (목소리 떨림 흡수) */
+      var need = (currentNote && Math.abs(midi - currentNote.m) === 1) ? HYST_FRAMES : STABLE_FRAMES;
+      if (candidateCount >= need && (!currentNote || currentNote.m !== midi)) {
         var now = performance.now();
-        if (!currentNote || currentNote.m !== midi) {
-          if (currentNote) { currentNote.t1 = now; currentNote = null; }
-          if (recording) {
-            currentNote = { m: midi, t0: now, t1: 0 };
-            events.push(currentNote);
-          } else {
-            currentNote = { m: midi, t0: now, t1: 0 };
-          }
-        }
+        closeCurrent(now);
+        currentNote = { m: midi, t0: now, t1: 0, frames: [] };
+        if (recording) events.push(currentNote);
       }
+      if (currentNote) currentNote.frames.push(midi);
     } else {
       silenceCount++;
       candidateMidi = -1; candidateCount = 0;
       if (silenceCount >= SILENCE_FRAMES) {
-        if (currentNote) { currentNote.t1 = performance.now(); currentNote = null; }
+        closeCurrent(performance.now());
         $("bigNote").textContent = "\u2014";
         $("bigNote").className = "silent";
         $("noteSub").textContent = "...";
@@ -296,24 +304,91 @@
   function toggleRec() {
     if (!recording) {
       recording = true;
-      events = []; currentNote = null;
+      events = []; closeCurrent(performance.now());
       $("recBtn").textContent = "\u23F9 정지";
       $("recBtn").classList.add("on");
-      setStatus("녹음 중 — 한 음씩 또박또박 연주하세요. 정지하면 악보로 변환됩니다.");
+      setStatus("녹음 중 — 한 음씩 또박또박. 콧노래라면 '음-' 하고 음 사이를 살짝 끊어주세요.");
     } else {
       recording = false;
-      if (currentNote) { currentNote.t1 = performance.now(); currentNote = null; }
+      closeCurrent(performance.now());
       $("recBtn").innerHTML = "&#9210; 녹음";
       $("recBtn").classList.remove("on");
       buildAbc();
     }
   }
+
+  /* PIPELINE-START */
+  /* 후처리 파이프라인: 잡음 제거 → 병합 → 글라이드 흡수 → 옥타브 보정 → 조성 스냅 */
+  function postProcess(evs, eighth, useOct, useSnap) {
+    var out = evs.map(function (e) { return { m: e.m, t0: e.t0, t1: e.t1 }; })
+      .filter(function (e) { return e.t1 > e.t0; })
+      .sort(function (a, b) { return a.t0 - b.t0; });
+
+    /* 1) 최소 음길이 필터 (8분음표의 35% 또는 90ms) */
+    var minDur = Math.max(90, eighth * 0.35);
+
+    /* 2) 같은 음 병합: 짧은 공백(<eighth*0.4)으로 끊긴 동일 음 잇기 */
+    var merged = [];
+    out.forEach(function (e) {
+      var p = merged[merged.length - 1];
+      if (p && p.m === e.m && e.t0 - p.t1 < eighth * 0.4) p.t1 = Math.max(p.t1, e.t1);
+      else merged.push(e);
+    });
+
+    /* 3) 글라이드 흡수: 짧은 음(<eighth*0.7)이 이웃과 1~2반음 차이면 긴 이웃에 흡수 */
+    var cleaned = [];
+    for (var i = 0; i < merged.length; i++) {
+      var e = merged[i];
+      var dur = e.t1 - e.t0;
+      if (dur < Math.max(minDur, eighth * 0.7)) {
+        var prev = cleaned[cleaned.length - 1];
+        var next = merged[i + 1];
+        var nearPrev = prev && Math.abs(prev.m - e.m) <= 2 && e.t0 - prev.t1 < eighth * 0.5;
+        var nearNext = next && Math.abs(next.m - e.m) <= 2 && next.t0 - e.t1 < eighth * 0.5;
+        if (nearPrev && (!nearNext || (prev.t1 - prev.t0) >= (next.t1 - next.t0))) { prev.t1 = e.t1; continue; }
+        if (nearNext) { next.t0 = e.t0; continue; }
+        if (dur < minDur) continue; /* 외딴 초단음 = 잡음 */
+      }
+      cleaned.push(e);
+    }
+    if (!cleaned.length) return { events: [], octShift: 0, keyShift: 0 };
+
+    /* 4) 옥타브 보정: 중앙값 음높이를 가운데 음역(E4 부근)으로 */
+    var octShift = 0;
+    if (useOct) {
+      var ms = cleaned.map(function (e) { return e.m; }).sort(function (a, b) { return a - b; });
+      var median = ms[Math.floor(ms.length / 2)];
+      octShift = Math.round((64 - median) / 12);
+      if (octShift !== 0) cleaned.forEach(function (e) { e.m += 12 * octShift; });
+    }
+
+    /* 5) 조성 스냅: -5~+6 반음 이동 중 다장조 이탈음이 최소인 위치로 */
+    var keyShift = 0;
+    if (useSnap) {
+      var SCALE = { 0: 1, 2: 1, 4: 1, 5: 1, 7: 1, 9: 1, 11: 1 };
+      var bestCost = Infinity;
+      for (var sh = -5; sh <= 6; sh++) {
+        var cost = 0;
+        cleaned.forEach(function (e) {
+          var pc = ((e.m + sh) % 12 + 12) % 12;
+          var w = (e.t1 - e.t0) / eighth;
+          if (!SCALE[pc]) cost += w;
+        });
+        cost += Math.abs(sh) * 0.05; /* 동률이면 이동 적은 쪽 */
+        if (cost < bestCost) { bestCost = cost; keyShift = sh; }
+      }
+      if (keyShift !== 0) cleaned.forEach(function (e) { e.m += keyShift; });
+    }
+    return { events: cleaned, octShift: octShift, keyShift: keyShift };
+  }
+  /* PIPELINE-END */
+
   function buildAbc() {
-    var done = events.filter(function (e) { return e.t1 > e.t0 + 60; }); /* 60ms 미만 = 잡음 제거 */
-    if (!done.length) { setStatus("녹음된 음이 없습니다. 감도를 조절하거나 더 크게 연주해보세요.", true); return; }
     var bpm = parseInt($("bpmInput").value, 10) || 100;
     var eighth = 60000 / bpm / 2;
-    done.sort(function (a, b) { return a.t0 - b.t0; });
+    var pp = postProcess(events, eighth, $("optOct").checked, $("optSnap").checked);
+    var done = pp.events;
+    if (!done.length) { setStatus("인식된 음이 없습니다. 감도를 조절하거나 음 사이를 더 끊어 연주/노래해보세요.", true); return; }
     var tokens = [];
     var prevEnd = done[0].t0;
     done.forEach(function (e) {
@@ -346,7 +421,12 @@
     var title = ($("titleInput").value || "귀로 들은 멜로디").trim();
     lastAbc = "X:1\nT:" + title + "\nC:ABC Ear\nM:4/4\nL:1/8\nQ:1/4=" + bpm + "\nK:C\n" + bodyStr;
     $("abcOut").value = lastAbc;
-    setStatus("변환 완료: " + barCount + "마디, " + done.length + "음 — 악보 연구소에 붙여넣어 들어보고 틀린 음을 고치세요.");
+    var fix = [];
+    if (pp.octShift) fix.push("옥타브 " + (pp.octShift > 0 ? "+" : "") + pp.octShift);
+    if (pp.keyShift) fix.push("조옮김 " + (pp.keyShift > 0 ? "+" : "") + pp.keyShift + "반음");
+    setStatus("변환 완료: " + barCount + "마디, " + done.length + "음" +
+      (fix.length ? " · 자동 보정: " + fix.join(", ") : "") +
+      " — 연구소에 붙여넣어 들어보세요.");
   }
 
   /* ════════ 저장/복사/지우기 ════════ */
