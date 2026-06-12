@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ABC 악보 연구소 ver.9.1</title>
+<title>ABC 악보 연구소 ver.10</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js"></script>
 <style>
   :root {
@@ -92,7 +92,7 @@
 
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
-  <h1><span class="clef">&#119070;</span>ABC 악보 연구소<span class="ver">VER.9.1</span></h1>
+  <h1><span class="clef">&#119070;</span>ABC 악보 연구소<span class="ver">VER.10</span></h1>
   <p>레이어 작곡 스튜디오 &mdash; 코드진행 &middot; 리듬 &middot; 멜로디 &middot; 베이스를 따로 만들고 조합</p>
 </header>
 
@@ -213,6 +213,13 @@
         </div>
       </div>
 
+      <p class="layer-label">&#9315; 멜로디 음형</p>
+      <div class="row">
+        <select id="melodySel" class="grow">
+          <option value="">모티프 엔진 (기본)</option>
+        </select>
+      </div>
+
       <label class="check" style="margin:6px 0 10px;"><input type="checkbox" id="optChords" checked> 코드 기호 표시</label>
 
       <button id="genBtn" class="btn-brass btn-wide" type="button">&#127922; 전체 생성 (선택한 레이어 조합)</button>
@@ -221,6 +228,24 @@
         <button id="regenBassBtn" class="btn-ghost" type="button">&#127926; 베이스만 다시</button>
         <button id="regenChordBtn" class="btn-ghost" type="button">&#127928; 코드만 다시</button>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>&#127891; 스타일 학습</h2>
+      <div class="row">
+        <div class="grow"><input type="text" id="styleName" placeholder="스타일 이름 (예: 서정, 경쾌)"></div>
+        <button id="learnBtn" class="btn-brass btn-icon" type="button">&#128193; 곡 선택해 학습</button>
+        <input type="file" id="styleFiles" accept=".abc,.txt" multiple hidden>
+      </div>
+      <div class="row">
+        <select id="styleList" class="grow">
+          <option value="">&#9472; 학습된 스타일 &#9472;</option>
+        </select>
+        <button id="delStyleBtn" class="btn-ghost btn-icon" type="button" title="선택한 스타일 삭제">&#128465;</button>
+      </div>
+      <p class="hint">.abc 여러 개를 한 번에 선택하세요. 같은 이름으로 다시 학습하면 추가 학습됩니다.
+        도수 기반이라 어떤 조성으로든 생성 가능 (장조/단조 자동 분리).
+        학습 후 코드·리듬·멜로디 칸에 &#127891; 항목이 생깁니다. (지원: 4/4·3/4·6/8 장단조 곡)</p>
     </section>
   </div>
 
@@ -317,7 +342,7 @@
   function randInt(min, max) { return min + Math.floor(Math.random() * (max - min + 1)); }
 
   /* ════════ 저장소 (브라우저 localStorage, 차단 환경은 세션 메모리) ════════ */
-  var store = { rhythms: [], chords: [], basses: [] };
+  var store = { rhythms: [], chords: [], basses: [], styles: [] };
   function loadStore() {
     try {
       var raw = window.localStorage.getItem("abclab_store_v4");
@@ -326,15 +351,42 @@
     if (!store.rhythms) store.rhythms = [];
     if (!store.chords) store.chords = [];
     if (!store.basses) store.basses = [];
+    if (!store.styles) store.styles = [];
     refreshSelects();
   }
   function persistStore() {
     try { window.localStorage.setItem("abclab_store_v4", JSON.stringify(store)); } catch (e) {}
   }
+  function appendStyles(sel, prefix) {
+    store.styles.forEach(function (st, i) {
+      var opt = document.createElement("option");
+      opt.value = prefix + i;
+      opt.textContent = "\uD83C\uDF93 " + st.name;
+      sel.appendChild(opt);
+    });
+  }
   function refreshSelects() {
+    var keeps = [chordSel.value, rhythmSel.value, $("melodySel").value, $("styleList").value];
     fillSaved(chordSel, store.chords, "c", 2);
+    appendStyles(chordSel, "sc");
     fillSaved(rhythmSel, store.rhythms, "r", 1);
+    appendStyles(rhythmSel, "sr");
     fillSaved(bassSel, store.basses, "b", 8);
+    var mSel = $("melodySel");
+    while (mSel.options.length > 1) mSel.remove(1);
+    appendStyles(mSel, "sm");
+    var sList = $("styleList");
+    while (sList.options.length > 1) sList.remove(1);
+    store.styles.forEach(function (st, i) {
+      var o = document.createElement("option");
+      o.value = "s" + i;
+      o.textContent = st.name + " (" + st.songs + "곡)";
+      sList.appendChild(o);
+    });
+    [chordSel, rhythmSel, mSel, sList].forEach(function (sel, k) {
+      sel.value = keeps[k];
+      if (sel.selectedIndex < 0) sel.selectedIndex = 0;
+    });
   }
   function fillSaved(sel, items, prefix, fixedCount) {
     var keep = sel.value;
@@ -556,6 +608,234 @@
     return { bars: bars };
   }
 
+  /* STYLE-LEARN-START */
+  /* ════════ 스타일 학습 엔진: .abc 곡들에서 멜로디 전이/리듬/코드를 도수 기반으로 추출 ════════ */
+  var PCMAP = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  var SCALE_MAJ = [0, 2, 4, 5, 7, 9, 11], SCALE_MIN = [0, 2, 3, 5, 7, 8, 10];
+  var SHARP_ORDER = ["F", "C", "G", "D", "A", "E", "B"];
+  var FLAT_ORDER = ["B", "E", "A", "D", "G", "C", "F"];
+  var MAJ_SHARPS = { 0: 0, 7: 1, 2: 2, 9: 3, 4: 4, 11: 5, 6: 6 };
+  var MAJ_FLATS = { 5: 1, 10: 2, 3: 3, 8: 4, 1: 5, 6: 6 };
+  function sigOf(pc, minor) {
+    var mp = minor ? (pc + 3) % 12 : pc;
+    var alt = {};
+    var nSharp = MAJ_SHARPS[mp], nFlat = MAJ_FLATS[mp];
+    if (nSharp !== undefined && (nFlat === undefined || nSharp <= nFlat)) {
+      for (var i = 0; i < nSharp; i++) alt[SHARP_ORDER[i]] = 1;
+    } else if (nFlat !== undefined) {
+      for (var j = 0; j < nFlat; j++) alt[FLAT_ORDER[j]] = -1;
+    } else return null;
+    return alt;
+  }
+  function snapStep(sem, scale) {
+    var best = 0, bd = 99;
+    for (var i = 0; i < 7; i++) {
+      var d = Math.min(Math.abs(sem - scale[i]), 12 - Math.abs(sem - scale[i]));
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+  function learnOneTune(text) {
+    var km = text.match(/^K:[ \t]*([A-Ga-g])([#b]?)[ \t]*(major|minor|maj|min|m)?[ \t\r]*$/im);
+    if (!km) return { error: "조성(K:) 해석 불가 — 선법 곡(mix/dor 등)일 수 있음" };
+    var tonicPc = PCMAP[km[1].toUpperCase()];
+    if (km[2] === "#") tonicPc = (tonicPc + 1) % 12;
+    if (km[2] === "b") tonicPc = (tonicPc + 11) % 12;
+    var suf = (km[3] || "").toLowerCase();
+    var minor = suf === "m" || suf === "min" || suf === "minor";
+    var sig = sigOf(tonicPc, minor);
+    if (!sig) return { error: "조표 계산 불가" };
+    var scale = minor ? SCALE_MIN : SCALE_MAJ;
+    var mm = text.match(/^M:[ \t]*(\d+)\/(\d+)/m);
+    var a = mm ? +mm[1] : 4, bDen = mm ? +mm[2] : 4;
+    var meter = a + "/" + bDen;
+    if (meter !== "4/4" && meter !== "3/4" && meter !== "6/8") return { error: "미지원 박자 " + meter };
+    var lmm = text.match(/^L:[ \t]*1\/(\d+)/m);
+    var lden = lmm ? +lmm[1] : 8;
+    var unitF = 8 / lden;
+    var barUnits = a * 8 / bDen;
+
+    /* 본문: 첫 성부 추출 */
+    var lines = text.split(/\r?\n/);
+    var kIdx = -1;
+    for (var li = 0; li < lines.length; li++) { if (/^K:/.test(lines[li].trim())) { kIdx = li; break; } }
+    if (kIdx < 0) return { error: "K: 줄 없음" };
+    var body;
+    if (/%%score|^\[?V:/m.test(text)) {
+      var firstVoice = null, parts = [];
+      for (var vi = 0; vi < lines.length; vi++) {
+        var vm = lines[vi].match(/^\[V:([^\]]+)\]\s*(.*)$/);
+        if (vm) {
+          if (!firstVoice) firstVoice = vm[1];
+          if (vm[1] === firstVoice) parts.push(vm[2]);
+        }
+      }
+      if (!parts.length) return { error: "다중 성부 형식 해석 불가" };
+      body = parts.join(" ");
+    } else {
+      body = lines.slice(kIdx + 1).join(" ");
+    }
+    body = body.replace(/%[^\n]*/g, " ").replace(/\{[^}]*\}/g, " ").replace(/~/g, "")
+      .replace(/\|\]/g, "|").replace(/\|:|:\|/g, "|").replace(/\|\|/g, "|").replace(/\[[12]/g, " ");
+    var rawBars = body.split("|").map(function (x) { return x.trim(); }).filter(Boolean);
+    if (rawBars.length < 2) return { error: "마디 인식 불가" };
+
+    var pairs = [], starts = [], patterns = [], chordDegSeq = [];
+    var noteRe = /([_^=]+)?([A-Ga-g])([,']*)(\d*\/?\d*)/g;
+    var prevState = null;
+
+    rawBars.forEach(function (barRaw) {
+      /* 코드 라벨 */
+      var lm2 = barRaw.match(/"([^"]+)"/);
+      var chordDeg = null;
+      if (lm2) {
+        var cm = lm2[1].match(/^([A-G])([#b]?)/);
+        if (cm) {
+          var cpc = PCMAP[cm[1]];
+          if (cm[2] === "#") cpc = (cpc + 1) % 12;
+          if (cm[2] === "b") cpc = (cpc + 11) % 12;
+          var rel = ((cpc - tonicPc) % 12 + 12) % 12;
+          var di = scale.indexOf(rel);
+          if (di >= 0) chordDeg = di;
+        }
+      }
+      chordDegSeq.push(chordDeg);
+      var bar = barRaw.replace(/"[^"]*"/g, " ");
+      var hasTriplet = bar.indexOf("(") >= 0;
+      var hasTie = bar.indexOf("-") >= 0;
+      var hasRest = /z/i.test(bar);
+      var barAcc = {};
+      var lens = [], states = [];
+      var mt;
+      noteRe.lastIndex = 0;
+      while ((mt = noteRe.exec(bar)) !== null) {
+        var accTok = mt[1] || "";
+        var letter = mt[2].toUpperCase();
+        var lower = mt[2] !== letter;
+        var octMarks = mt[3] || "";
+        var lenTok = mt[4] || "";
+        var len = 1;
+        if (lenTok) {
+          if (lenTok.indexOf("/") >= 0) { var pr = lenTok.split("/"); len = (+pr[0] || 1) / (+pr[1] || 2); }
+          else len = +lenTok;
+        }
+        len = len * unitF;
+        /* 음높이: 명시 임시표 > 마디 임시표 > 조표 */
+        var acc;
+        if (accTok.indexOf("=") >= 0) acc = 0;
+        else if (accTok.indexOf("^") >= 0) acc = (accTok.match(/\^/g) || []).length;
+        else if (accTok.indexOf("_") >= 0) acc = -((accTok.match(/_/g) || []).length);
+        else acc = (barAcc[letter] !== undefined) ? barAcc[letter] : (sig[letter] || 0);
+        if (accTok) barAcc[letter] = acc;
+        var pc = ((PCMAP[letter] + acc) % 12 + 12) % 12;
+        var oct = lower ? 5 : 4;
+        for (var ci = 0; ci < octMarks.length; ci++) oct += octMarks[ci] === "'" ? 1 : -1;
+        var absSem = oct * 12 + pc;
+        var diff = absSem - (48 + tonicPc);
+        var octOff = Math.floor(diff / 12);
+        var within = ((diff % 12) + 12) % 12;
+        var state = octOff * 7 + snapStep(within, scale);
+        if (state < -7) state = state + 7;
+        if (state > 10) state = state - 7;
+        states.push(state);
+        lens.push(Math.round(len));
+      }
+      /* 멜로디 전이 */
+      states.forEach(function (st2, i2) {
+        if (i2 === 0) starts.push(st2);
+        if (prevState !== null) pairs.push([prevState, st2]);
+        prevState = st2;
+      });
+      /* 리듬 패턴: 쉼표/셋잇단/타이 없는 정량 마디만 */
+      if (!hasRest && !hasTriplet && !hasTie && lens.length &&
+          lens.every(function (x) { return x >= 1; }) &&
+          lens.reduce(function (x, y) { return x + y; }, 0) === barUnits) {
+        patterns.push(lens);
+      }
+    });
+    /* 코드 4마디 창 */
+    var wins = [];
+    for (var w = 0; w + 3 < chordDegSeq.length; w += 4) {
+      var win = chordDegSeq.slice(w, w + 4);
+      if (win.every(function (x) { return x !== null; })) wins.push(win);
+    }
+    return { minor: minor, meter: meter, pairs: pairs, starts: starts, patterns: patterns, chordWins: wins };
+  }
+  function emptyBucket() { return { starts: {}, trans: {} }; }
+  function newStyle(name) {
+    return { name: name, songs: 0, maj: emptyBucket(), min: emptyBucket(),
+      rhythms: { "4/4": {}, "3/4": {}, "6/8": {} }, chords: [], chordKeys: {} };
+  }
+  function learnIntoStyle(style, tuneResults) {
+    var ok = 0;
+    tuneResults.forEach(function (r) {
+      if (r.error) return;
+      ok++;
+      var bucket = r.minor ? style.min : style.maj;
+      r.starts.forEach(function (st2) { bucket.starts[st2] = (bucket.starts[st2] || 0) + 1; });
+      r.pairs.forEach(function (pp) {
+        var row = bucket.trans[pp[0]] || (bucket.trans[pp[0]] = {});
+        row[pp[1]] = (row[pp[1]] || 0) + 1;
+      });
+      var pool = style.rhythms[r.meter];
+      r.patterns.forEach(function (pt) {
+        var k = pt.join(",");
+        pool[k] = (pool[k] || 0) + 1;
+      });
+      r.chordWins.forEach(function (wn) {
+        var k2 = wn.join("-");
+        if (!style.chordKeys[k2] && style.chords.length < 80) {
+          style.chordKeys[k2] = 1;
+          style.chords.push(wn);
+        }
+      });
+    });
+    style.songs += ok;
+    return ok;
+  }
+  function weightedKey(obj) {
+    var total = 0, k;
+    for (k in obj) total += obj[k];
+    if (!total) return null;
+    var r = Math.random() * total;
+    for (k in obj) { r -= obj[k]; if (r <= 0) return k; }
+    return k;
+  }
+  function genMelodyStyle(c, st) {
+    var K = KEYS[c.keyName];
+    var bucket = K.minor ? st.min : st.maj;
+    if (!bucket || !Object.keys(bucket.starts).length) return null;
+    var tonic = K.tonic, lo = tonic - 5, hi = tonic + 9;
+    var prevState = 0;
+    var out = [];
+    for (var m = 0; m < c.bars; m++) {
+      var notes = [];
+      if (m === c.bars - 1) {
+        var half = beatsOf(c.meter) / 2;
+        notes.push({ idx: tonic + (Math.random() < 0.5 ? 1 : -1), len: half });
+        notes.push({ idx: tonic, len: half });
+        c.rhythms[m] = [half, half];
+      } else {
+        var tones = chordToneIdxs(tonic, c.chordDegs[m]);
+        var pat = c.rhythms[m];
+        for (var i = 0; i < pat.length; i++) {
+          var row = bucket.trans[prevState];
+          var key = (row && Object.keys(row).length) ? weightedKey(row) : weightedKey(bucket.starts);
+          var stt = parseInt(key, 10);
+          var idx = tonic + stt;
+          if (idx < lo) idx = lo;
+          if (idx > hi) idx = hi;
+          if (pat[i] >= 4) idx = nearestTone(tones, idx, lo, hi);
+          prevState = idx - tonic;
+          notes.push({ idx: idx, len: pat[i] });
+        }
+      }
+      out.push(notes);
+    }
+    return out;
+  }
+  /* STYLE-LEARN-END */
+
   /* 코드 진행 레이어 */
   function parseChordText(text, K) {
     var toks = text.split(/[\s,>\-]+/).filter(Boolean);
@@ -583,6 +863,12 @@
       if (parsed.error) { setStatus("'" + parsed.error + "'는 " + (K.minor ? "이 단조" : "이 장조") + " 조성에서 인식할 수 없는 코드입니다.", true); return null; }
       return parsed.degs;
     }
+    if (sel.indexOf("sc") === 0) {
+      var stc = store.styles[+sel.slice(2)];
+      if (stc && stc.chords.length) return rand(stc.chords).slice();
+      setStatus("'" + (stc ? stc.name : "?") + "' 스타일에 학습된 코드 진행이 없어 랜덤 진행을 사용합니다.");
+      return rand(KEYS[$("genKey").value].minor ? PROG_MIN : PROG_MAJ).slice();
+    }
     if (sel.indexOf("c") === 0 && store.chords[+sel.slice(1)]) {
       return store.chords[+sel.slice(1)].degs.slice();
     }
@@ -598,6 +884,20 @@
   /* 리듬 레이어 */
   function genRhythms(meter, bars, mood) {
     var sel = rhythmSel.value;
+    if (sel.indexOf("sr") === 0) {
+      var str2 = store.styles[+sel.slice(2)];
+      var pool = str2 && str2.rhythms[meter];
+      var keys2 = pool ? Object.keys(pool) : [];
+      if (!keys2.length) {
+        setStatus("'" + (str2 ? str2.name : "?") + "' 스타일에 " + meter + " 리듬 데이터가 없습니다. 박자를 바꾸거나 다른 리듬을 선택하세요.", true);
+        return null;
+      }
+      var arr2 = [];
+      for (var b4 = 0; b4 < bars; b4++) {
+        arr2.push(weightedKey(pool).split(",").map(Number));
+      }
+      return arr2;
+    }
     if (sel.indexOf("r") === 0 && store.rhythms[+sel.slice(1)]) {
       var saved = store.rhythms[+sel.slice(1)];
       if (saved.meter !== meter) {
@@ -691,6 +991,19 @@
       out.push(notes);
     }
     return out;
+  }
+
+  function genMelodyDispatch(c) {
+    var sel = $("melodySel").value;
+    if (sel.indexOf("sm") === 0) {
+      var st = store.styles[+sel.slice(2)];
+      if (st) {
+        var r = genMelodyStyle(c, st);
+        if (r) return r;
+        setStatus("'" + st.name + "' 스타일에 " + (KEYS[c.keyName].minor ? "단조" : "장조") + " 멜로디 데이터가 없어 모티프 엔진을 사용합니다.");
+      }
+    }
+    return genMelody(c);
   }
 
   /* 베이스 레이어 */
@@ -907,14 +1220,14 @@
 
     cur = {
       keyName: keyName, meter: meter, bars: bars, mood: mood,
-      rhythmLocked: rhythmSel.value.indexOf("r") === 0,
+      rhythmLocked: rhythmSel.value !== "",
       chordBase: chordBase,
       chordDegs: expandChords(chordBase, bars),
       rhythms: rhythms,
       tempo: (mood === "calm" || mood === "ballad") ? randInt(76, 100) : randInt(100, 138),
       title: rand(TITLE_A) + " " + rand(TITLE_B) + " No." + randInt(1, 99)
     };
-    cur.melodyBars = genMelody(cur);
+    cur.melodyBars = genMelodyDispatch(cur);
     var bs = genBassStyles(cur, mood);
     if (bs === undefined) return;
     cur.bassStyles = bs;
@@ -961,8 +1274,8 @@
       return;
     }
     var wasLocked = cur.rhythmLocked;
-    cur.rhythmLocked = true; /* 멜로디만 다시: 리듬은 그대로 두고 새 모티프만 */
-    cur.melodyBars = genMelody(cur);
+    cur.rhythmLocked = true; /* 멜로디만 다시: 리듬은 그대로 두고 새 음형만 */
+    cur.melodyBars = genMelodyDispatch(cur);
     cur.rhythmLocked = wasLocked;
     applyCur("새 모티프로 멜로디를 다시 만들었습니다 (코드·리듬·베이스 유지).");
   }
@@ -995,7 +1308,7 @@
     if (!base) return;
     cur.chordBase = base;
     cur.chordDegs = expandChords(base, cur.bars);
-    cur.melodyBars = genMelody(cur); /* 멜로디를 새 코드에 맞게 재배치 (리듬은 유지) */
+    cur.melodyBars = genMelodyDispatch(cur); /* 멜로디를 새 코드에 맞게 재배치 (리듬은 유지) */
     applyCur("코드 진행을 바꿨습니다: " + base.map(function (d) { return chordName(K, d); }).join("-") +
       " (리듬·베이스 스타일 유지, 멜로디는 새 코드에 맞게 재배치)");
   }
@@ -1226,6 +1539,55 @@
       setStatus("조옮김 실패: " + (e.message || "이 악보 형식은 지원되지 않습니다."), true);
     }
   }
+
+  /* ════════ 스타일 학습 UI ════════ */
+  $("learnBtn").addEventListener("click", function () {
+    var name = $("styleName").value.trim();
+    if (!name) { setStatus("스타일 이름을 먼저 입력해주세요. 예: 서정, 경쾌", true); return; }
+    $("styleFiles").click();
+  });
+  $("styleFiles").addEventListener("change", function (e) {
+    var files = Array.prototype.slice.call(e.target.files || []);
+    e.target.value = "";
+    if (!files.length) return;
+    var name = $("styleName").value.trim();
+    setStatus("학습 중... (" + files.length + "개 파일)");
+    Promise.all(files.map(function (f) {
+      return f.text().then(function (t) { return { name: f.name, text: t }; });
+    })).then(function (loaded) {
+      var results = loaded.map(function (l) {
+        var r = learnOneTune(l.text);
+        r.file = l.name;
+        return r;
+      });
+      var idx = -1;
+      store.styles.forEach(function (st, i) { if (st.name === name) idx = i; });
+      var style = idx >= 0 ? store.styles[idx] : newStyle(name);
+      var ok = learnIntoStyle(style, results);
+      if (idx < 0 && ok > 0) store.styles.push(style);
+      persistStore();
+      refreshSelects();
+      var skipped = results.filter(function (r) { return r.error; });
+      var msg = "'" + name + "' 학습 완료: " + ok + "곡 추가 (누적 " + style.songs + "곡)";
+      if (skipped.length) {
+        msg += " · 건너뜀 " + skipped.length + "곡: " +
+          skipped.slice(0, 2).map(function (r) { return r.file + " (" + r.error + ")"; }).join(", ") +
+          (skipped.length > 2 ? " 외" : "");
+      }
+      setStatus(msg, ok === 0);
+    }).catch(function () { setStatus("파일을 읽는 중 오류가 발생했습니다.", true); });
+  });
+  $("delStyleBtn").addEventListener("click", function () {
+    var v = $("styleList").value;
+    if (v.indexOf("s") !== 0) { setStatus("삭제할 스타일을 목록에서 선택하세요.", true); return; }
+    var i = +v.slice(1);
+    var nm = store.styles[i] ? store.styles[i].name : "";
+    store.styles.splice(i, 1);
+    persistStore();
+    refreshSelects();
+    $("styleList").selectedIndex = 0;
+    setStatus("'" + nm + "' 스타일을 삭제했습니다.");
+  });
 
   /* ════════ 빠른 입력 팔레트 ════════ */
   var caret = { st: 0, en: 0 };
