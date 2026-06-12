@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ABC 악보 연구소 ver.8</title>
+<title>ABC 악보 연구소 ver.9.1</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js"></script>
 <style>
   :root {
@@ -52,6 +52,14 @@
     font-size: .85rem; line-height: 1.6; font-family: 'SF Mono', 'Consolas', 'D2Coding', monospace;
     color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; outline: none; }
   textarea:focus { border-color: var(--brass); box-shadow: 0 0 0 3px rgba(176,138,46,.15); }
+  .pal { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .pal button {
+    flex: 1 0 32px; min-width: 32px; padding: 9px 0;
+    font-size: .85rem; font-weight: 700; font-family: 'Consolas', monospace;
+    background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 7px;
+  }
+  .pal button:active { background: #ead9ad; }
+  .pal button.fn { color: var(--brass-deep); }
   .hint { margin-top: 9px; font-size: .76rem; color: var(--ink-soft); }
 
   .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -84,7 +92,7 @@
 
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
-  <h1><span class="clef">&#119070;</span>ABC 악보 연구소<span class="ver">VER.8</span></h1>
+  <h1><span class="clef">&#119070;</span>ABC 악보 연구소<span class="ver">VER.9.1</span></h1>
   <p>레이어 작곡 스튜디오 &mdash; 코드진행 &middot; 리듬 &middot; 멜로디 &middot; 베이스를 따로 만들고 조합</p>
 </header>
 
@@ -103,6 +111,15 @@
         <input type="file" id="fileInput" accept=".abc,.txt" hidden>
       </div>
       <textarea id="abcInput" spellcheck="false" aria-label="ABC notation 입력창"></textarea>
+      <div class="pal" id="palette" aria-label="빠른 입력 팔레트">
+        <button type="button" data-ins="C">C</button><button type="button" data-ins="D">D</button><button type="button" data-ins="E">E</button><button type="button" data-ins="F">F</button><button type="button" data-ins="G">G</button><button type="button" data-ins="A">A</button><button type="button" data-ins="B">B</button><button type="button" data-ins="z">z</button>
+      </div>
+      <div class="pal">
+        <button type="button" data-ins="c">c</button><button type="button" data-ins="d">d</button><button type="button" data-ins="e">e</button><button type="button" data-ins="f">f</button><button type="button" data-ins="g">g</button><button type="button" data-ins="a">a</button><button type="button" data-ins="b">b</button><button type="button" data-ins="|" class="fn">|</button>
+      </div>
+      <div class="pal">
+        <button type="button" data-ins="2">2</button><button type="button" data-ins="3">3</button><button type="button" data-ins="4">4</button><button type="button" data-ins="^" class="fn">^</button><button type="button" data-ins="_" class="fn">_</button><button type="button" data-ins="," class="fn">,</button><button type="button" data-ins="&#39;" class="fn">&#39;</button><button type="button" data-ins="SP" class="fn">&#9251;</button><button type="button" data-act="bs" class="fn">&#9003;</button>
+      </div>
       <div class="row" style="margin-top:9px;">
         <button id="arrangeBtn" class="btn-ink btn-wide" type="button">&#127929; 자동 반주 / 재분석 (레이어 버튼 활성화)</button>
       </div>
@@ -596,38 +613,84 @@
     return arr;
   }
 
-  /* 멜로디 레이어: 코드+리듬 위에 음을 얹음 */
+  /* 멜로디 레이어 (모티프 엔진): 동기를 만들고 변형하며 A-A'-B 프레이즈를 구성 */
+  function makeShape(len) {
+    var STEPS2 = [-2, -1, -1, 0, 1, 1, 2];
+    var shape = [0];
+    for (var i = 1; i < len; i++) shape.push(STEPS2[Math.floor(Math.random() * STEPS2.length)]);
+    return shape;
+  }
+  function mutateShape(shape) {
+    var sp = shape.slice();
+    if (sp.length > 1) {
+      var i = 1 + Math.floor(Math.random() * (sp.length - 1));
+      sp[i] = [-2, -1, 1, 2][Math.floor(Math.random() * 4)];
+    }
+    return sp;
+  }
+  function invertShape(shape) {
+    return shape.map(function (x, i) { return i === 0 ? 0 : -x; });
+  }
+  function phrasePlan(bars) {
+    if (bars <= 4) return ["A", "A'", "B", "CAD"];
+    if (bars === 8) return ["A", "A'", "B", "A", "A", "R", "B'", "CAD"];
+    return ["A", "A'", "B", "A", "A", "R", "B'", "A", "B", "B'", "A", "A'", "R", "B", "A", "CAD"];
+  }
   function genMelody(c) {
     var K = KEYS[c.keyName];
     var tonic = K.tonic, lo = tonic - 5, hi = tonic + 9;
-    var STEPS = [-2,-1,-1,-1,0,1,1,1,2,3,-3];
+    var plan = phrasePlan(c.bars);
+    /* 리듬 레이어가 고정(저장 리듬 선택)이 아니면, 모티프 글자별로 리듬을 통일해 응집감 부여 */
+    if (!c.rhythmLocked) {
+      var rhyA = pickPattern(c.meter, c.mood);
+      var rhyB = pickPattern(c.meter, c.mood);
+      var guard = 0;
+      while (rhyB.join() === rhyA.join() && guard++ < 6) rhyB = pickPattern(c.meter, c.mood);
+      for (var m0 = 0; m0 < c.bars; m0++) {
+        if (plan[m0] === "CAD") continue;
+        c.rhythms[m0] = plan[m0].charAt(0) === "B" ? rhyB : rhyA;
+      }
+    }
+    var shapes = {};
+    function shapeFor(tag, len) {
+      var key = tag.charAt(0) + "_" + len;
+      if (!shapes[key]) shapes[key] = makeShape(len);
+      if (tag === "A'" || tag === "B'") return mutateShape(shapes[key]);
+      if (tag === "R") return invertShape(shapes[key]);
+      return shapes[key];
+    }
     var idx = tonic;
-    var bars = [];
+    var out = [];
     for (var m = 0; m < c.bars; m++) {
+      var tag = plan[m];
       var tones = chordToneIdxs(tonic, c.chordDegs[m]);
       var notes = [];
-      if (m === c.bars - 1) {
+      if (tag === "CAD" || m === c.bars - 1) {
         var half = beatsOf(c.meter) / 2;
         notes.push({ idx: tonic + (Math.random() < 0.5 ? 1 : -1), len: half });
         notes.push({ idx: tonic, len: half });
+        c.rhythms[m] = [half, half];
       } else {
         var pat = c.rhythms[m];
+        var shape = shapeFor(tag, pat.length);
+        /* 앵커: 코드음에서 시작. B 구간은 음역을 올려 대비를 만든다 */
+        var bias = tag.charAt(0) === "B" ? 3 : 0;
+        idx = nearestTone(tones, idx + bias + (Math.random() < 0.5 ? 1 : -1), lo, hi);
+        var pos = idx;
         for (var i = 0; i < pat.length; i++) {
-          if (i === 0 || (pat[i] >= 4 && Math.random() < 0.6)) {
-            idx = nearestTone(tones, idx + (Math.random() < 0.5 ? 1 : -1), lo, hi);
-          } else {
-            var step = STEPS[Math.floor(Math.random() * STEPS.length)];
-            if (pat[i] >= 4 && Math.abs(step) > 2) step = step > 0 ? 1 : -1;
-            idx += step;
-            if (idx < lo) idx = lo + Math.abs(step);
-            if (idx > hi) idx = hi - Math.abs(step);
+          if (i > 0) {
+            pos += shape[i] || 0;
+            if (pos < lo) pos = lo + 1;
+            if (pos > hi) pos = hi - 1;
+            if (pat[i] >= 4) pos = nearestTone(tones, pos, lo, hi); /* 긴 음표는 코드음으로 안정화 */
           }
-          notes.push({ idx: idx, len: pat[i] });
+          notes.push({ idx: pos, len: pat[i] });
         }
+        idx = pos;
       }
-      bars.push(notes);
+      out.push(notes);
     }
-    return bars;
+    return out;
   }
 
   /* 베이스 레이어 */
@@ -844,6 +907,7 @@
 
     cur = {
       keyName: keyName, meter: meter, bars: bars, mood: mood,
+      rhythmLocked: rhythmSel.value.indexOf("r") === 0,
       chordBase: chordBase,
       chordDegs: expandChords(chordBase, bars),
       rhythms: rhythms,
@@ -857,7 +921,7 @@
 
     applyCur("'" + cur.title + "' 생성 완료 — 진행: " +
       chordBase.map(function (d) { return chordName(K, d); }).join("-") +
-      " · 레이어별 버튼으로 부분만 다시 만들 수 있어요.");
+      " · 구조: A-A\u2032-B 모티프 전개 · 레이어별 버튼으로 부분만 다시 만들 수 있어요.");
   }
   function regenMelody() {
     if (!cur) { setStatus("레이어가 등록되지 않았습니다. 먼저 '전체 생성' 또는 '자동 반주 / 재분석'을 눌러주세요.", true); return; }
@@ -896,8 +960,11 @@
       applyCur("가져온 곡의 코드 위에 새 멜로디를 입혔습니다. 원곡 멜로디는 대체되니, 되돌리려면 파일을 다시 여세요.");
       return;
     }
+    var wasLocked = cur.rhythmLocked;
+    cur.rhythmLocked = true; /* 멜로디만 다시: 리듬은 그대로 두고 새 모티프만 */
     cur.melodyBars = genMelody(cur);
-    applyCur("멜로디만 새로 만들었습니다 (코드·리듬·베이스 유지).");
+    cur.rhythmLocked = wasLocked;
+    applyCur("새 모티프로 멜로디를 다시 만들었습니다 (코드·리듬·베이스 유지).");
   }
   function regenBass() {
     if (!cur) { setStatus("레이어가 등록되지 않았습니다. 먼저 '전체 생성' 또는 '자동 반주 / 재분석'을 눌러주세요.", true); return; }
@@ -1160,6 +1227,41 @@
     }
   }
 
+  /* ════════ 빠른 입력 팔레트 ════════ */
+  var caret = { st: 0, en: 0 };
+  function trackCaret() { caret.st = input.selectionStart; caret.en = input.selectionEnd; }
+  ["keyup", "mouseup", "touchend", "focus"].forEach(function (ev) {
+    input.addEventListener(ev, trackCaret);
+  });
+  $("palette").parentNode.querySelectorAll(".pal").forEach(function (row) {
+    row.addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("button") : e.target;
+      if (!b || !b.getAttribute) return;
+      var ins = b.getAttribute("data-ins");
+      var act = b.getAttribute("data-act");
+      var v = input.value;
+      if (caret.st > v.length) caret.st = v.length;
+      if (caret.en > v.length) caret.en = v.length;
+      if (act === "bs") {
+        if (caret.st !== caret.en) {
+          input.value = v.slice(0, caret.st) + v.slice(caret.en);
+          caret.en = caret.st;
+        } else if (caret.st > 0) {
+          input.value = v.slice(0, caret.st - 1) + v.slice(caret.st);
+          caret.st = caret.en = caret.st - 1;
+        } else return;
+      } else if (ins) {
+        var t = ins === "SP" ? " " : ins;
+        input.value = v.slice(0, caret.st) + t + v.slice(caret.en);
+        caret.st = caret.en = caret.st + t.length;
+      } else return;
+      try { input.setSelectionRange(caret.st, caret.en); } catch (err) {}
+      stopPlay();
+      cur = null;
+      scheduleRender();
+    });
+  });
+
   /* ════════ 이벤트 ════════ */
   input.addEventListener("input", function () { stopPlay(); cur = null; scheduleRender(); });
   preset.addEventListener("change", function () {
@@ -1208,6 +1310,7 @@
   loadStore();
   preset.value = "nocturne";
   input.value = PRESETS.nocturne;
+  caret.st = caret.en = input.value.length;
   render();
 })();
 </script>
