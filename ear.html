@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ABC 귀 ver.3 — 듣고 악보로</title>
+<title>ABC 귀 ver.4 — 듣고 악보로</title>
 <style>
   :root {
     --ink: #1c2b3a; --ink-soft: #46586b;
@@ -72,7 +72,7 @@
 
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
-  <h1><span class="clef">&#119070;</span>ABC 귀 (Ear) <span style="font-size:.75rem;color:var(--brass);">VER.3</span></h1>
+  <h1><span class="clef">&#119070;</span>ABC 귀 (Ear) <span style="font-size:.75rem;color:var(--brass);">VER.4</span></h1>
   <p>피아노 단음·콧노래·휘파람을 듣고 ABC 악보로 변환합니다</p>
 </header>
 
@@ -121,6 +121,10 @@
 <script>
 (function () {
   "use strict";
+  function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && !/Windows/i.test(navigator.userAgent));
+  }
 
   var $ = function (id) { return document.getElementById(id); };
   var audioCtx = null, analyser = null, micStream = null, rafId = null;
@@ -356,7 +360,7 @@
       }
       cleaned.push(e);
     }
-    if (!cleaned.length) return { events: [], octShift: 0, keyShift: 0 };
+    if (!cleaned.length) return { events: [], octShift: 0, keyShift: 0, tuned: 0 };
 
     /* 4) 옥타브 보정: 중앙값 음높이를 가운데 음역(E4 부근)으로 */
     var octShift = 0;
@@ -367,10 +371,10 @@
       if (octShift !== 0) cleaned.forEach(function (e) { e.m += 12 * octShift; });
     }
 
-    /* 5) 조성 스냅: -5~+6 반음 이동 중 다장조 이탈음이 최소인 위치로 */
-    var keyShift = 0;
+    /* 5) 조성 스냅 1단계: -5~+6 반음 이동 중 다장조 이탈음이 최소인 위치로 */
+    var keyShift = 0, tuned = 0;
+    var SCALE = { 0: 1, 2: 1, 4: 1, 5: 1, 7: 1, 9: 1, 11: 1 };
     if (useSnap) {
-      var SCALE = { 0: 1, 2: 1, 4: 1, 5: 1, 7: 1, 9: 1, 11: 1 };
       var bestCost = Infinity;
       for (var sh = -5; sh <= 6; sh++) {
         var cost = 0;
@@ -383,8 +387,24 @@
         if (cost < bestCost) { bestCost = cost; keyShift = sh; }
       }
       if (keyShift !== 0) cleaned.forEach(function (e) { e.m += keyShift; });
+
+      /* 5-2) 2단계 (오토튠): 남은 검은건반 음을 가장 가까운 흰건반 음으로 개별 보정.
+         위/아래 거리가 같으면 직전 음과의 진행이 부드러운 쪽을 선택 */
+      var prevM = null;
+      cleaned.forEach(function (e) {
+        var pc = ((e.m % 12) + 12) % 12;
+        if (!SCALE[pc]) {
+          var up = e.m + 1, down = e.m - 1;
+          var pick;
+          if (prevM === null) pick = down;
+          else pick = Math.abs(up - prevM) < Math.abs(down - prevM) ? up : down;
+          e.m = pick;
+          tuned++;
+        }
+        prevM = e.m;
+      });
     }
-    return { events: cleaned, octShift: octShift, keyShift: keyShift };
+    return { events: cleaned, octShift: octShift, keyShift: keyShift, tuned: tuned };
   }
   /* PIPELINE-END */
 
@@ -430,6 +450,7 @@
     var fix = [];
     if (pp.octShift) fix.push("옥타브 " + (pp.octShift > 0 ? "+" : "") + pp.octShift);
     if (pp.keyShift) fix.push("조옮김 " + (pp.keyShift > 0 ? "+" : "") + pp.keyShift + "반음");
+    if (pp.tuned) fix.push("음정 보정 " + pp.tuned + "음");
     setStatus("변환 완료: " + barCount + "마디, " + done.length + "음" +
       (fix.length ? " · 자동 보정: " + fix.join(", ") : "") +
       " — 연구소에 붙여넣어 들어보세요.");
@@ -440,7 +461,7 @@
     var abc = $("abcOut").value.trim();
     if (!abc) { setStatus("저장할 악보가 없습니다.", true); return; }
     var name = ($("titleInput").value || "귀로 들은 멜로디").trim().replace(/[\\/:*?"<>|]/g, "_");
-    if (window.showSaveFilePicker) {
+    if (window.showSaveFilePicker && !isMobileDevice()) {
       try {
         var handle = await window.showSaveFilePicker({
           suggestedName: name + ".abc",

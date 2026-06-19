@@ -136,6 +136,11 @@
 <script>
 (function () {
   "use strict";
+  /* 모바일(안드로이드/iOS) 감지: File System Access API가 불안정하므로 다운로드 방식 강제 */
+  function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && !/Windows/i.test(navigator.userAgent));
+  }
 
   /* ════════ 오디오 (외부 음원 불필요: Web Audio 합성) ════════ */
   var audioCtx = null;
@@ -305,7 +310,7 @@
   async function saveAbc() {
     if (!lastAbc) { setStatus("저장할 악보가 없습니다. 녹음 후 정지를 눌러 변환부터 해주세요.", true); return; }
     var name = (document.getElementById("titleInput").value || "피아노 스케치").trim().replace(/[\\/:*?"<>|]/g, "_");
-    if (window.showSaveFilePicker) {
+    if (window.showSaveFilePicker && !isMobileDevice()) {
       try {
         var handle = await window.showSaveFilePicker({
           suggestedName: name + ".abc",
