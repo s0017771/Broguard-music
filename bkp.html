@@ -223,6 +223,23 @@
   /* ════════ 오디오 (외부 음원 불필요: Web Audio 합성) ════════ */
   var audioCtx = null;
   var voices = {}; /* midi -> {oscs, gain} */
+  /* 첫 사용자 제스처(클릭·키·터치)에서 오디오 잠금 해제 — 브라우저 자동재생 정책 대응 */
+  var warmedUp = false;
+  function warmUpAudio() {
+    /* 무음(거의 0 볼륨)을 아주 짧게 울려 오디오 엔진을 완전히 깨움.
+       일부 PC는 오디오 장치가 절전 상태라 첫 소리가 7~8초 늦는데, 미리 깨워두면 완화됨. */
+    if (warmedUp || !audioCtx) return;
+    try {
+      var osc = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      g.gain.value = 0.0001;            /* 사실상 무음 */
+      osc.frequency.value = 440;
+      osc.connect(g); g.connect(audioCtx.destination);
+      var now = audioCtx.currentTime;
+      osc.start(now); osc.stop(now + 0.05);
+      warmedUp = true;
+    } catch (e) {}
+  }
   function ensureAudio() {
     if (!audioCtx) {
       var AC = window.AudioContext || window.webkitAudioContext;
@@ -231,13 +248,17 @@
     if (audioCtx.state === "suspended") audioCtx.resume();
     return audioCtx;
   }
-  /* 첫 사용자 제스처(클릭·키·터치)에서 오디오 잠금 해제 — 브라우저 자동재생 정책 대응 */
   function unlockAudio() {
     ensureAudio();
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    warmUpAudio(); /* 첫 제스처에서 엔진 워밍업 */
   }
   ["pointerdown", "keydown", "touchstart"].forEach(function (evt) {
     document.addEventListener(evt, unlockAudio, { once: false });
+  });
+  /* 페이지 로드 직후에도 한 번 시도 (자동재생 정책으로 막히면 첫 제스처 때 다시 시도) */
+  window.addEventListener("load", function () {
+    try { ensureAudio(); warmUpAudio(); } catch (e) {}
   });
   /* 악기별 음색 정의 */
   var INSTRUMENTS = {
