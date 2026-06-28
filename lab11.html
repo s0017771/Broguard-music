@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ABC 악보 연구소 ver.11</title>
+<title>ABC 악보 연구소 — 확장실 (16→32)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js"></script>
 <style>
   :root {
@@ -110,7 +110,7 @@
 
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
-  <h1><span class="clef">&#119070;</span>ABC 악보 연구소<span class="ver">VER.11</span></h1>
+  <h1><span class="clef">&#119070;</span>ABC 악보 연구소<span class="ver">확장실</span></h1>
   <p>레이어 작곡 스튜디오 &mdash; 코드진행 &middot; 리듬 &middot; 멜로디 &middot; 베이스를 따로 만들고 조합</p>
 </header>
 
@@ -179,18 +179,6 @@
         </div>
       </div>
 
-      <div id="rhythmPhraseBox" style="margin:10px 0 14px; padding:10px 12px; background:#f3ecdd; border:1px solid var(--line); border-radius:8px;">
-        <label class="fld" for="rhythmPhraseIn" style="margin-bottom:4px;">&#127925; 리듬 프레이즈 불러오기 <span style="font-weight:400; color:var(--ink-soft); font-size:.82rem;">(분리기에서 빼낸 리듬을 넣으면, 그 리듬·마디 수에 맞춰 새 멜로디를 생성해요)</span></label>
-        <textarea id="rhythmPhraseIn" placeholder="예: 2 2 2 2 r 1 1 2 2 2 r 2 1 1 2 2 r 4 4   (마디 구분 r, 비우면 자동 생성)" style="width:100%; min-height:48px; padding:8px; border-radius:6px; border:1px solid var(--line); font-family:'Consolas',monospace; font-size:.9rem; background:#fff; resize:vertical;"></textarea>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; align-items:center;">
-          <button id="useRhythmPhraseBtn" class="btn-brass" type="button" style="font-size:.85rem; padding:8px 14px;">이 리듬으로 곡 만들기</button>
-          <button id="loadRhythmFileBtn" class="btn-ghost" type="button" style="font-size:.85rem; padding:8px 14px;">&#128194; 파일 불러오기</button>
-          <button id="clearRhythmPhraseBtn" class="btn-ghost" type="button" style="font-size:.85rem; padding:8px 14px;">지우기</button>
-          <input type="file" id="rhythmFileInput" accept=".txt,.abc" style="display:none;">
-          <span id="rhythmPhraseInfo" style="font-size:.82rem; color:var(--ink-soft);"></span>
-        </div>
-      </div>
-
       <p class="layer-label">&#9312; 코드 진행</p>
       <div class="row">
         <select id="chordSel" class="grow">
@@ -254,7 +242,11 @@
 
       <label class="check" style="margin:6px 0 10px;"><input type="checkbox" id="optChords" checked> 코드 기호 표시</label>
 
-      <button id="genBtn" class="btn-brass btn-wide" type="button">&#127922; 전체 생성 (선택한 레이어 조합)</button>
+      <button id="expand32Btn" class="btn-brass btn-wide" type="button" style="background:var(--brass-deep);">&#11088; 16마디 곡을 32마디로 확장</button>
+      <button id="reinterpretBtn" class="btn-ink btn-wide" type="button" style="margin-top:6px;">&#128260; 재해석 (강 &rarr; 중 &rarr; 리듬 변화 순환)</button>
+      <p class="hint" style="margin:6px 0 10px;">위 입력창의 16마디 곡(또는 불러온 곡)의 멜로디 느낌을 살려 32마디로 재편합니다. 1~2줄 도입 &middot; 3~4줄 전개 &middot; 5~6줄 절정 &middot; 7~8줄 마무리 흐름으로요. 확장은 중간 옵션으로 시작하고, 재해석으로 강하게/리듬 변화를 번갈아 들어볼 수 있어요.</p>
+
+      <button id="genBtn" class="btn-brass btn-wide" type="button">&#127922; 새로 전체 생성 (선택한 레이어 조합)</button>
       <div class="regen-row">
         <button id="regenMelodyBtn" class="btn-ghost" type="button">&#127925; 멜로디만 다시</button>
         <button id="regenBassBtn" class="btn-ghost" type="button">&#127926; 베이스만 다시</button>
@@ -288,7 +280,7 @@
       <button id="stopBtn" class="btn-ink" disabled>&#9632; 정지</button>
       <button id="quickEditBtn" class="btn-ghost" disabled title="재생을 정지한 음을 수정">&#9999;&#65039; 이 음 수정</button>
       <button id="arrangeBtn2" class="btn-ink" type="button" title="레이어 버튼 활성화">&#127929; 재분석</button>
-      <button id="expandBtn" class="btn-ghost" type="button" title="이 곡을 32마디로 확장 (확장실로 이동)">&#11088; 32마디로 확장 &rarr;</button>
+      <button id="backBtn" class="btn-ghost" type="button" title="작곡실로 돌아가기">&larr; 작곡실</button>
       <button id="saveBtn" class="btn-ghost">.abc 저장</button>
       <button id="transDownBtn" class="btn-ghost" title="반음 내림">&#9837; &minus;1</button>
       <button id="transUpBtn" class="btn-ghost" title="반음 올림">&#9839; +1</button>
@@ -1348,87 +1340,6 @@
       chordBase.map(function (d) { return chordName(K, d); }).join("-") +
       " · 구조: A-A\u2032-B 모티프 전개 · 레이어별 버튼으로 부분만 다시 만들 수 있어요.");
   }
-  /* ════════ 리듬 프레이즈 불러오기 (그 길이만큼 멜로디 생성) ════════ */
-  /* ABC 악보에서 리듬(음 길이)만 추출 → "2 2 2 2 r ..." 형식 */
-  function extractRhythmFromAbc(abc) {
-    var lines = abc.split("\n");
-    var bodyStart = 0;
-    for (var i = 0; i < lines.length; i++) { if (/^K:/.test(lines[i].trim())) { bodyStart = i + 1; break; } }
-    var bodyLines = lines.slice(bodyStart);
-    /* [V:RH] 있으면 그것만, 없으면 [V:LH] 제외 전체 */
-    var rhLines = bodyLines.filter(function (l) { return /\[V:RH\]/.test(l); });
-    var useLines = rhLines.length ? rhLines.map(function (l) { return l.replace(/\[V:RH\]/g, ""); })
-      : bodyLines.filter(function (l) { return !/\[V:LH\]/.test(l); });
-    var body = useLines.join(" ").replace(/\[V:[^\]]*\]/g, "").replace(/%[^\n]*/g, "").replace(/"[^"]*"/g, "");
-    var bars = body.split("|").map(function (b) { return b.trim(); }).filter(function (b) { return b.length; });
-    var re = /([_^=]?)([A-Ga-gz])([,']*)(\d*)(\/(\d+))?/g;
-    var out = [];
-    bars.forEach(function (bar) {
-      var lens = [], m; re.lastIndex = 0;
-      while ((m = re.exec(bar)) !== null) {
-        if (!m[2]) continue;
-        var len = m[4] ? parseInt(m[4], 10) : 1;
-        if (m[6]) len = Math.max(1, Math.round(len / parseInt(m[6], 10)));
-        lens.push(len);
-      }
-      if (lens.length) out.push(lens.join(" "));
-    });
-    return out.join(" r ");
-  }
-  function parseRhythmPhrase(str) {
-    var bars = str.replace(/\|/g, "r").split(/[rR]/).map(function (b) { return b.trim(); }).filter(function (b) { return b.length; });
-    return bars.map(function (bar) {
-      return bar.split(/\s+/).map(Number).filter(function (n) { return !isNaN(n) && n > 0; });
-    }).filter(function (arr) { return arr.length; });
-  }
-  function useRhythmPhrase() {
-    var raw = $("rhythmPhraseIn").value.trim();
-    if (!raw) { setStatus("불러올 리듬을 입력하세요. (분리기에서 빼낸 리듬을 붙여넣으세요)", true); return; }
-    var phrase = parseRhythmPhrase(raw);
-    if (!phrase.length) { setStatus("리듬을 읽지 못했습니다. 예: 2 2 2 2 r 1 1 2 2 2", true); return; }
-
-    var keyName = $("genKey").value;
-    var K = KEYS[keyName];
-    var meter = $("genMeter").value;
-    var units = beatsOf(meter);
-    var bars = phrase.length;
-    var mood = $("genMood").value;
-
-    /* 각 마디 합을 units에 맞게 보정 (안 맞으면 마지막 음 조정) */
-    phrase = phrase.map(function (bar) {
-      var sum = bar.reduce(function (a, b) { return a + b; }, 0);
-      if (sum !== units && bar.length) {
-        var diff = units - sum;
-        bar = bar.slice();
-        bar[bar.length - 1] = Math.max(1, bar[bar.length - 1] + diff);
-      }
-      return bar;
-    });
-
-    /* 코드 진행: 사용자가 코드를 골랐으면 그걸, 아니면 자동 생성 후 마디 수만큼 확장 */
-    var chordBase = genChordBase(K);
-    if (!chordBase) return;
-
-    cur = {
-      keyName: keyName, meter: meter, bars: bars, mood: mood,
-      rhythmLocked: true,          /* 불러온 리듬 고정 */
-      chordBase: chordBase,
-      chordDegs: expandChords(chordBase, bars),
-      rhythms: phrase,             /* 불러온 리듬 그대로 */
-      tempo: (mood === "calm" || mood === "ballad") ? randInt(76, 100) : randInt(100, 138),
-      title: composeTitle(keyName, chordBase, K)
-    };
-    cur.melodyBars = genMelodyDispatch(cur);   /* 그 길이만큼 멜로디 생성 */
-    var bs = genBassStyles(cur, mood);
-    if (bs === undefined) return;
-    cur.bassStyles = bs;
-
-    $("rhythmPhraseInfo").textContent = bars + "마디 리듬을 불러와 멜로디를 입혔어요.";
-    applyCur("불러온 " + bars + "마디 리듬 위에 새 멜로디를 생성했어요 — 진행: " +
-      chordBase.map(function (d) { return chordName(K, d); }).join("-") +
-      ". '멜로디만 다시'로 같은 리듬에 다른 멜로디를 시도하거나, 부분 수정하세요.");
-  }
-
   function regenMelody() {
     if (!cur) { setStatus("레이어가 등록되지 않았습니다. 먼저 '전체 생성' 또는 '자동 반주 / 재분석'을 눌러주세요.", true); return; }
     if (cur.imported) {
@@ -1906,18 +1817,262 @@
   });
   arrangeBtn.addEventListener("click", autoArrange);
   $("arrangeBtn2").addEventListener("click", autoArrange); /* 하단 재분석 버튼 (동일 동작) */
-  $("expandBtn").addEventListener("click", function () {
-    var abc = input.value.trim();
-    if (!abc) { setStatus("확장할 곡이 없습니다. 먼저 곡을 만들거나 불러오세요.", true); return; }
-    try {
-      /* 확장실(lab11)로 곡을 전달: localStorage 경유 (URL보다 안전) */
-      localStorage.setItem("broguard_expand_seed", abc);
-      setStatus("확장실로 이동합니다...");
-      window.location.href = "lab11.html";
-    } catch (e) {
-      setStatus("이동에 실패했습니다. lab11.html이 같은 폴더에 배포되어 있는지 확인하세요.", true);
-    }
+  $("backBtn").addEventListener("click", function () {
+    window.location.href = "lab.html";
   });
+
+  /* ════════ 확장실 전용: 작곡실에서 보낸 곡 로드 ════════ */
+  function loadExpandSeed() {
+    try {
+      var seed = localStorage.getItem("broguard_expand_seed");
+      if (seed) {
+        input.value = seed;
+        localStorage.removeItem("broguard_expand_seed");
+        preset.value = "";
+        render();
+        setStatus("작곡실에서 곡을 가져왔습니다. '⭐ 32마디로 확장'을 누르면 더 긴 곡으로 재편합니다.");
+      }
+    } catch (e) {}
+  }
+
+  /* ════════ 16 → 32 확장: 원곡 멜로디 동기를 살려 32마디로 재편 ════════ */
+  /* ════════ 16→32 확장 엔진 ════════
+     원곡의 코드 진행·리듬·템포·멜로디 동기를 보존하며 32마디로 재편.
+     옵션: 0=강하게(동기 자주 반복), 1=중간(동기 변형 발전), 2=리듬변화(중간+리듬 변주) */
+  var expandMode = 1;            /* 현재 옵션 */
+  var expandSource = null;       /* 원곡 분석 결과 캐시 */
+  var EXPAND_NAMES = ["강하게 (원곡 멜로디 유지)", "중간 (동기 변형·발전)", "리듬 변화 (멜로디 유지·리듬 변주)"];
+
+  /* 원곡 한 마디의 raw 텍스트를 음표 배열로 파싱: [{idx, len, acc, rest}] (idx는 으뜸음 기준 음계 도수) */
+  function parseBarNotes(raw, K) {
+    var tonic = K.tonic;
+    var notes = [];
+    var re = /(\[)?([_^=]*)([A-Ga-gz])([,']*)(\d*\/?\d*)(\])?/g;
+    var mt;
+    while ((mt = re.exec(raw)) !== null) {
+      var letter = mt[3];
+      var lenTok = mt[5];
+      var len = 1;
+      if (lenTok) {
+        if (lenTok.indexOf("/") >= 0) { var pr = lenTok.split("/"); len = (+pr[0] || 1) / (+pr[1] || 2); }
+        else len = +lenTok;
+      }
+      if (letter === "z") { notes.push({ rest: true, len: len }); continue; }
+      /* 음높이를 으뜸음 기준 인덱스로 (lab의 idx 체계: tonic + 도수오프셋) */
+      var up = letter.toUpperCase();
+      var lower = letter !== up;
+      var base = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 }[up];
+      var oct = lower ? 7 : 0;
+      var marks = mt[4] || "";
+      for (var i = 0; i < marks.length; i++) oct += marks[i] === "'" ? 7 : -7;
+      /* K.names에서 이 글자의 도수 찾기 */
+      var deg = 0;
+      for (var d = 0; d < 7; d++) { if (K.names[d][0] === up) { deg = d; break; } }
+      notes.push({ idx: tonic + deg + oct, len: Math.round(len) || 1, rest: false });
+    }
+    return notes;
+  }
+
+  function analyzeSource() {
+    /* autoArrange로 원곡을 cur에 등록 후, 멜로디/리듬/코드/템포를 추출 */
+    autoArrange();
+    if (!cur || !cur.imported) return null;
+    var K = KEYS[cur.keyName];
+    var srcMelodyBars = cur.melody.map(function (mb) { return parseBarNotes(mb.raw, K); });
+    var srcRhythms = srcMelodyBars.map(function (notes) {
+      return notes.map(function (n) { return n.len; });
+    });
+    /* 템포 추출 (원곡 헤더에서) */
+    var tempoMatch = input.value.match(/Q:\s*1\/4\s*=\s*(\d+)/);
+    var tempo = tempoMatch ? +tempoMatch[1] : 110;
+    return {
+      keyName: cur.keyName, meter: cur.meter, units: cur.units,
+      bars: cur.bars, chordDegs: cur.chordDegs.slice(),
+      melodyBars: srcMelodyBars, rhythms: srcRhythms,
+      tempo: tempo, mood: cur.mood,
+      headerPre: cur.headerPre, kLine: cur.kLine
+    };
+  }
+
+  /* 음형(동기) 변형 도구 */
+  function transposeNotes(notes, steps) {
+    return notes.map(function (n) {
+      return n.rest ? { rest: true, len: n.len } : { idx: n.idx + steps, len: n.len, rest: false };
+    });
+  }
+  function clampToRange(notes, lo, hi) {
+    return notes.map(function (n) {
+      if (n.rest) return n;
+      var idx = n.idx;
+      while (idx < lo) idx += 7;
+      while (idx > hi) idx -= 7;
+      return { idx: idx, len: n.len, rest: false };
+    });
+  }
+  /* 코드에 맞춰 음을 살짝 조정 (강한 음만 코드음으로 끌기) */
+  function fitToChord(notes, tones, lo, hi) {
+    return notes.map(function (n) {
+      if (n.rest) return n;
+      if (n.len >= 4) {
+        var idx = nearestTone(tones, n.idx, lo, hi);
+        return { idx: idx, len: n.len, rest: false };
+      }
+      return n;
+    });
+  }
+  /* 리듬만 바꾸기: 같은 음높이 시퀀스에 새 리듬 패턴을 입힘 */
+  function reRhythm(notes, newPattern) {
+    var pitched = notes.filter(function (n) { return !n.rest; });
+    if (!pitched.length) return notes;
+    var out = [];
+    for (var i = 0; i < newPattern.length; i++) {
+      var src = pitched[i % pitched.length];
+      out.push({ idx: src.idx, len: newPattern[i], rest: false });
+    }
+    return out;
+  }
+
+  function buildExpanded(src, mode) {
+    var K = KEYS[src.keyName];
+    var tonic = K.tonic, lo = tonic - 5, hi = tonic + 9;
+    var targetBars = 32;
+    var srcBars = src.bars;
+    /* 원곡 마디를 2배 호흡으로 매핑: 확장본 마디 i → 원곡 마디 floor(i/2 * srcBars/16)... 
+       단순화: 원곡을 4구간(도입/확장/절정/마무리)으로 나눠 각 구간을 2배로 */
+    var quarter = Math.max(1, Math.floor(srcBars / 4));
+    /* 원곡 구간별 대표 마디 인덱스 */
+    function srcBarFor(i) {
+      /* 확장본 32마디를 원곡 srcBars에 비례 매핑 */
+      return Math.min(srcBars - 1, Math.floor(i * srcBars / targetBars));
+    }
+
+    /* 동기: 원곡 첫 2마디 */
+    var motif1 = src.melodyBars[0] || [];
+    var motif2 = src.melodyBars[1] || src.melodyBars[0] || [];
+
+    var newMelody = [], newChords = [], newRhythms = [];
+    for (var i = 0; i < targetBars; i++) {
+      var sb = srcBarFor(i);
+      var chord = src.chordDegs[sb] !== undefined ? src.chordDegs[sb] : 0;
+      newChords.push(chord);
+      var tones = chordToneIdxs(tonic, chord);
+      var section = Math.floor(i / 8); /* 0:도입 1:확장 2:절정 3:마무리 */
+      var notes;
+
+      if (i === targetBars - 1) {
+        /* 종지 */
+        var half = src.units / 2;
+        notes = [{ idx: tonic + (Math.random() < 0.5 ? 1 : -1), len: half }, { idx: tonic, len: half }];
+      } else if (mode === 0) {
+        /* 가 강하게: 원곡 마디를 거의 그대로 가져오되 코드만 맞춤 */
+        notes = (src.melodyBars[sb] || motif1).map(function (n) {
+          return n.rest ? { rest: true, len: n.len } : { idx: n.idx, len: n.len, rest: false };
+        });
+        notes = fitToChord(clampToRange(notes, lo, hi), tones, lo, hi);
+      } else {
+        /* 나 중간 / 다 리듬변화: 동기를 변형·발전 */
+        var baseNotes;
+        if (section === 0) {
+          /* 도입: 원곡 동기 거의 그대로 (1,2마디 번갈아) */
+          baseNotes = (i % 2 === 0) ? motif1 : motif2;
+        } else if (section === 1) {
+          /* 확장: 동기를 2도 올리거나 원곡 해당 마디 */
+          baseNotes = src.melodyBars[sb] || motif1;
+          if (i % 2 === 1) baseNotes = transposeNotes(baseNotes, 1);
+        } else if (section === 2) {
+          /* 절정: 음역 올림 (+3도) */
+          baseNotes = transposeNotes(src.melodyBars[sb] || motif1, 3);
+        } else {
+          /* 마무리: 원곡 마무리 구간 동기로 돌아옴 */
+          baseNotes = src.melodyBars[sb] || motif2;
+        }
+        notes = clampToRange(baseNotes.map(function (n) {
+          return n.rest ? { rest: true, len: n.len } : { idx: n.idx, len: n.len, rest: false };
+        }), lo, hi);
+        notes = fitToChord(notes, tones, lo, hi);
+
+        if (mode === 2) {
+          /* 다 리듬변화: 같은 음높이에 새 리듬 입힘 (원곡과 다른 패턴 풀에서) */
+          var pat = pickPattern(src.meter, src.mood);
+          notes = reRhythm(notes, pat);
+          notes = fitToChord(clampToRange(notes, lo, hi), tones, lo, hi);
+        }
+      }
+      /* 마디 길이 보정: 합이 units가 되도록 마지막 음 조정 */
+      notes = fixBarLength(notes, src.units);
+      newMelody.push({ notes: notes });
+      newRhythms.push(notes.map(function (n) { return n.len; }));
+    }
+    return { melody: newMelody, chords: newChords, rhythms: newRhythms, tempo: src.tempo };
+  }
+
+  /* 마디 음 길이 합을 units에 맞춤 (넘치면 자르고, 모자라면 마지막 음 늘림) */
+  function fixBarLength(notes, units) {
+    var sum = notes.reduce(function (a, n) { return a + n.len; }, 0);
+    if (sum === units) return notes;
+    var out = notes.slice();
+    if (sum > units) {
+      /* 뒤에서부터 줄이기 */
+      var over = sum - units;
+      for (var i = out.length - 1; i >= 0 && over > 0; i--) {
+        var cut = Math.min(over, out[i].len - 1);
+        if (out[i].len - cut >= 1) { out[i] = Object.assign({}, out[i], { len: out[i].len - cut }); over -= cut; }
+        if (out[i].len <= 0) { out.splice(i, 1); }
+      }
+      /* 그래도 넘치면 마지막 음 제거 */
+      while (out.reduce(function (a, n) { return a + n.len; }, 0) > units && out.length > 1) out.pop();
+    } else {
+      /* 모자라면 마지막 음 늘림 */
+      out[out.length - 1] = Object.assign({}, out[out.length - 1], { len: out[out.length - 1].len + (units - sum) });
+    }
+    /* 최종 보정 */
+    var s2 = out.reduce(function (a, n) { return a + n.len; }, 0);
+    if (s2 !== units && out.length) {
+      out[out.length - 1] = Object.assign({}, out[out.length - 1], { len: out[out.length - 1].len + (units - s2) });
+      if (out[out.length - 1].len < 1) out[out.length - 1].len = 1;
+    }
+    return out;
+  }
+
+  /* 확장 결과를 cur로 만들어 화면에 적용 */
+  function applyExpanded(src, built, baseName) {
+    cur = {
+      imported: false,
+      keyName: src.keyName, meter: src.meter, bars: 32,
+      mood: src.mood, tempo: src.tempo,
+      rhythmLocked: true,
+      chordBase: built.chords.slice(0, 8),
+      chordDegs: built.chords,
+      rhythms: built.rhythms,
+      melodyBars: built.melody.map(function (mb) { return mb.notes; }),
+      title: baseName + " (32마디·" + ["강", "중", "리듬"][expandMode] + ")"
+    };
+    var bs = genBassStyles(cur, src.mood);
+    if (bs !== undefined) cur.bassStyles = bs;
+    applyCur("32마디 확장 — 옵션: " + EXPAND_NAMES[expandMode] +
+      ". 🔄 재해석으로 다른 옵션(강→중→리듬)을 들어보세요. 마음에 들면 부분 수정·저장하세요.");
+  }
+
+  function expandTo32() {
+    var text = input.value.trim();
+    if (!text) { setStatus("확장할 곡이 없습니다. 작곡실에서 가져오거나 파일을 불러오세요.", true); return; }
+    expandSource = analyzeSource();
+    if (!expandSource) { setStatus("곡을 분석할 수 없습니다. 멜로디+코드가 있는 두 줄 악보인지 확인하세요.", true); return; }
+    if (expandSource.bars < 4) { setStatus("확장하려면 최소 4마디 이상이어야 합니다.", true); return; }
+    expandMode = 1; /* 기본: 중간 */
+    var baseName = ((text.match(/^T:(.+)$/m) || [])[1] || "곡").replace(/\s*\(32마디.*\)\s*$/, "").trim();
+    expandSource.baseName = baseName;
+    var built = buildExpanded(expandSource, expandMode);
+    applyExpanded(expandSource, built, baseName);
+  }
+  function reinterpretExpand() {
+    if (!expandSource) { setStatus("먼저 '32마디로 확장'을 눌러주세요.", true); return; }
+    expandMode = (expandMode + 1) % 3; /* 가→나→다 순환 (1중→2리듬→0강→1중...) */
+    var built = buildExpanded(expandSource, expandMode);
+    applyExpanded(expandSource, built, expandSource.baseName);
+  }
+  $("expand32Btn").addEventListener("click", expandTo32);
+  $("reinterpretBtn").addEventListener("click", reinterpretExpand);
   $("transUpBtn").addEventListener("click", function () { transposeBy(1); });
   $("transDownBtn").addEventListener("click", function () { transposeBy(-1); });
   playBtn.addEventListener("click", startPlay);
@@ -1925,30 +2080,6 @@
   saveBtn.addEventListener("click", saveAbc);
   genBtn.addEventListener("click", fullGenerate);
   regenMelodyBtn.addEventListener("click", regenMelody);
-  $("useRhythmPhraseBtn").addEventListener("click", useRhythmPhrase);
-  $("loadRhythmFileBtn").addEventListener("click", function () { $("rhythmFileInput").click(); });
-  $("rhythmFileInput").addEventListener("change", function (e) {
-    var f = e.target.files[0];
-    if (!f) return;
-    var reader = new FileReader();
-    reader.onload = function () {
-      var text = String(reader.result).trim();
-      /* ABC 악보(K: 포함)면 리듬만 추출, 아니면 리듬 텍스트 그대로 */
-      if (/^[A-Z]:/m.test(text) && /K:/.test(text)) {
-        var rhythm = extractRhythmFromAbc(text);
-        $("rhythmPhraseIn").value = rhythm;
-        $("rhythmPhraseInfo").textContent = "ABC 악보에서 리듬을 추출했어요. '이 리듬으로 곡 만들기'를 누르세요.";
-      } else {
-        $("rhythmPhraseIn").value = text;
-        $("rhythmPhraseInfo").textContent = "리듬 파일을 불러왔어요. '이 리듬으로 곡 만들기'를 누르세요.";
-      }
-    };
-    reader.readAsText(f);
-    e.target.value = ""; /* 같은 파일 다시 선택 가능하게 */
-  });
-  $("clearRhythmPhraseBtn").addEventListener("click", function () {
-    $("rhythmPhraseIn").value = ""; $("rhythmPhraseInfo").textContent = "";
-  });
   regenBassBtn.addEventListener("click", regenBass);
   regenChordBtn.addEventListener("click", regenChords);
   saveChordBtn.addEventListener("click", saveChordLayer);
@@ -1960,10 +2091,16 @@
 
   /* 초기화 */
   loadStore();
-  preset.value = "nocturne";
-  input.value = PRESETS.nocturne;
+  var hasSeed = false;
+  try { hasSeed = !!localStorage.getItem("broguard_expand_seed"); } catch (e) {}
+  if (hasSeed) {
+    loadExpandSeed(); /* 작곡실에서 보낸 곡을 불러옴 */
+  } else {
+    preset.value = "nocturne";
+    input.value = PRESETS.nocturne;
+    render();
+  }
   caret.st = caret.en = input.value.length;
-  render();
 })();
 </script>
 </body>

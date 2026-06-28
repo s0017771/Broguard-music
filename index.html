@@ -49,6 +49,8 @@
     font-size: .78rem; color: var(--ink-soft); line-height: 1.7;
   }
   .flow b { color: var(--brass-deep); }
+  .section-label { font-size: .8rem; font-weight: 800; color: var(--brass-deep); letter-spacing: .08em; margin: 10px 0 -4px 4px; }
+  .section-label:first-child { margin-top: 0; }
   footer { text-align: center; padding: 14px; font-size: .72rem; color: #b6ae9c; }
 </style>
 </head>
@@ -56,14 +58,22 @@
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
   <h1><span class="clef">&#119070;</span>브로가드 뮤직 랩</h1>
-  <p>작곡 &middot; 연주 &middot; 채보 &mdash; ABC notation 도구 모음</p>
+  <p>작곡 &middot; 연주 &middot; 채보 &middot; 리듬 빌려 새 곡 만들기 &mdash; ABC notation 도구 모음</p>
 </header>
 <main>
+  <p class="section-label">&#127925; 작곡</p>
   <a class="tool" href="lab.html">
     <div class="icon">&#127932;</div>
     <div>
       <h2>악보 연구소 <small>8분음표</small></h2>
-      <p>표준 작곡 도구 &middot; 레이어(코드/리듬/멜로디/베이스) &middot; 스타일 학습 &middot; 자동 반주 &middot; 조옮김 &middot; .abc 저장<br><b>대부분의 곡 — 발라드·트로트·포크·캐럴 등</b></p>
+      <p>표준 작곡 도구 &middot; 레이어(코드/리듬/멜로디/베이스) &middot; 스타일 학습 &middot; 퀵 편집 &middot; 자동 반주 &middot; 조옮김 &middot; <b>리듬 프레이즈 불러오기</b><br><b>대부분의 곡 — 발라드·트로트·포크·캐럴 등</b></p>
+    </div>
+  </a>
+  <a class="tool" href="lab11.html">
+    <div class="icon">&#11088;</div>
+    <div>
+      <h2>확장실 <small>16→32</small></h2>
+      <p>16마디로 고른 좋은 곡을 32마디로 확장 &middot; 원곡 멜로디 느낌을 살려 더 긴 기승전결로 재편<br><b>마음에 든 곡을 더 길게 키울 때</b></p>
     </div>
   </a>
   <a class="tool" href="lab16.html">
@@ -73,23 +83,56 @@
       <p>세밀한 리듬용 &middot; 한 마디에 음을 촘촘히 &middot; 16분 당김음 &middot; 기능은 8분판과 동일<br><b>빠르고 톡톡 튀는 곡 — 탑팝·댄스·신나는 리듬</b></p>
     </div>
   </a>
+
+  <p class="section-label">&#127929; 연주 &middot; 채보</p>
+  <a class="tool" href="bkp.html">
+    <div class="icon">&#127928;</div>
+    <div>
+      <h2>BKP 키보드 피아노 <small>NEW</small></h2>
+      <p>숫자패드로 피아노 연주(19음) &middot; 메트로놈 &middot; 탭 템포 &middot; 조성 자동 샵/플랫 &middot; 악기 5종 &middot; 연음 &middot; 녹음하면 자동 ABC 변환<br><b>건반을 쳐서 곡을 악보로</b></p>
+    </div>
+  </a>
   <a class="tool" href="piano.html">
     <div class="icon">&#127929;</div>
     <div>
-      <h2>ABC 피아노<small>VER.1.1</small></h2>
+      <h2>ABC 피아노 <small>VER.1.2</small></h2>
       <p>두 줄 건반(2옥타브) 터치 연주 &middot; 옥타브 슬라이더 &middot; 녹음하면 자동 ABC 변환 &middot; 화음 지원</p>
     </div>
   </a>
   <a class="tool" href="ear.html">
     <div class="icon">&#127908;</div>
     <div>
-      <h2>ABC 귀 (Ear)<small>VER.4</small></h2>
+      <h2>ABC 귀 (Ear) <small>VER.4</small></h2>
       <p>피아노 단음·콧노래·휘파람 채보 &middot; 옥타브 보정·조성 스냅·오토튠 &middot; 튜너(cents) 포함</p>
     </div>
   </a>
+
+  <p class="section-label">&#9986;&#65039; 리듬 빌려 새 곡 만들기</p>
+  <a class="tool" href="split.html">
+    <div class="icon">&#9986;&#65039;</div>
+    <div>
+      <h2>분리기 <small>NEW</small></h2>
+      <p>ABC 악보를 <b>리듬</b>과 <b>멜로디</b>로 분리 &middot; 악보 미리보기 &middot; 마디는 그대로 음만 좌우로 밀기(박자 보정) &middot; 파일 저장<br><b>곡에서 리듬만 빼내 연구소로</b></p>
+    </div>
+  </a>
+  <a class="tool" href="combine.html">
+    <div class="icon">&#127911;</div>
+    <div>
+      <h2>합치기 <small>NEW</small></h2>
+      <p>리듬 + 멜로디(계이름)를 합쳐 ABC로 &middot; 자동 개수 맞춤 &middot; 마디 길이 자유 &middot; 파일 불러오기 &middot; 엑셀/ABC 저장<br><b>리듬과 멜로디를 따로 만들어 조합</b></p>
+    </div>
+  </a>
+
   <div class="flow">
-    <b>추천 워크플로우</b><br>
-    &#9312; 피아노/귀로 멜로디 스케치 &rarr; &#9313; 복사 또는 .abc 저장 &rarr; &#9314; 악보 연구소에서 열기 &rarr; 재분석으로 코드+베이스 입히기 &rarr; 조옮김으로 색 비교 &rarr; 완성본 저장
+    <b>&#127925; 리듬 빌려 새 곡 만들기 (이 랩의 핵심)</b><br>
+    &#9312; <b>BKP</b>에서 탭 템포로 곡 빠르기 맞추고, 메트로놈 켜고 연주 &rarr; 녹음 &rarr; ABC<br>
+    &#9313; <b>분리기</b>에서 악보 보며 음 좌우로 밀어 박자 맞추고, 리듬 추출·저장<br>
+    &#9314; <b>악보 연구소</b>에서 그 리듬 불러오기 &rarr; 위에 새 멜로디 생성<br>
+    &#9315; &lsquo;멜로디만 다시&rsquo;로 마음에 들 때까지 &mdash; <b>리듬은 빌리고 멜로디는 내 것인 새 곡</b>
+  </div>
+  <div class="flow">
+    <b>&#127932; 기본 작곡 워크플로우</b><br>
+    &#9312; 피아노/귀로 멜로디 스케치 &rarr; &#9313; .abc 저장 &rarr; &#9314; 악보 연구소에서 열기 &rarr; 재분석으로 코드+베이스 입히기 &rarr; 조옮김으로 색 비교 &rarr; 완성본 저장
   </div>
 </main>
 <footer>Broguard Music Lab &middot; Built with Claude</footer>

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABC 분리기 — 브로가드 뮤직 랩</title>
+<style>
+  :root {
+    --paper: #f3ecdd; --card: #fbf7ee; --ink: #1c2b3a; --ink-soft: #4a5a68;
+    --brass: #b5894e; --brass-deep: #8a6a3a; --line: #d8d2c4;
+    --rhythm: #3a6bb0; --rhythm-bg: #dce6f2; --mel: #b5894e; --mel-bg: #f2e6dc;
+    --ok: #2e7d4f; --warn: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI', '맑은 고딕', sans-serif;
+    background: var(--paper); color: var(--ink); line-height: 1.5;
+    padding: 16px; max-width: 920px; margin: 0 auto;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h1 .clef { color: var(--brass); margin-right: 6px; }
+  .sub { color: var(--ink-soft); font-size: .9rem; margin: 0 0 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 1.05rem; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: .7rem; padding: 2px 8px; border-radius: 20px; color: #fff; font-weight: 700; }
+  .badge.r { background: var(--rhythm); }
+  .badge.m { background: var(--mel); }
+
+  label.fld { display: block; font-weight: 700; font-size: .85rem; margin-bottom: 5px; }
+  textarea {
+    width: 100%; min-height: 120px; padding: 10px; border-radius: 8px;
+    border: 2px solid var(--line); font-family: 'Consolas', monospace; font-size: .95rem;
+    background: var(--paper); color: var(--ink); resize: vertical;
+  }
+  textarea.out { min-height: 60px; }
+  textarea.r { border-color: var(--rhythm); background: var(--rhythm-bg); }
+  textarea.m { border-color: var(--mel); background: var(--mel-bg); }
+  .drop-hint { font-size: .75rem; color: var(--ink-soft); margin-top: 4px; }
+  .drop-active { outline: 3px dashed var(--brass); outline-offset: 2px; }
+
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  button {
+    padding: 11px 18px; font-size: .95rem; font-weight: 700; border-radius: 9px;
+    border: none; cursor: pointer; font-family: inherit;
+  }
+  .btn-go { background: var(--brass); color: #fff; }
+  .btn-go:hover { background: var(--brass-deep); }
+  .btn-ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+  .btn-ink { background: var(--ink); color: #fff; }
+  .out-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+  .out-head .badge { margin-right: 6px; }
+  .warnbox { margin-top: 10px; border-radius: 8px; padding: 10px 12px; font-size: .88rem; }
+  .warnbox.ok { background: #e6f4ec; color: var(--ok); border: 1px solid #b8dcc6; }
+  .warnbox.bad { background: #fbe6e3; color: var(--warn); border: 1px solid #e8b8b0; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; font-weight: 700; font-size: .9rem; color: var(--brass-deep); }
+  code { background: var(--paper); padding: 1px 5px; border-radius: 4px; font-family: 'Consolas', monospace; }
+  .copy-mini { padding: 5px 12px; font-size: .8rem; }
+</style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js"></script>
+  <h1><span class="clef">&#119070;</span>ABC 분리기</h1>
+  <p class="sub">ABC 악보를 넣으면 <b>리듬</b>과 <b>멜로디</b>로 나눠줍니다. 나온 결과를 합치기(combine)에 넣어 다른 곡과 조합하세요. 합치기의 짝꿍 도구입니다.</p>
+
+  <div class="card">
+    <h2>입력 — ABC 악보</h2>
+    <textarea id="abcIn" placeholder="ABC 악보를 붙여넣으세요. (악보 연구소나 키보드 피아노(BKP)에서 만든 것, 또는 .abc 파일)&#10;예:&#10;K:C&#10;C2 E2 G2 E2 | D2 G2 B2 G2 |"></textarea>
+    <div class="drop-hint">📄 .abc / .txt 파일을 여기로 드래그해도 됩니다. 두 줄 악보(멜로디+베이스)는 멜로디(오른손)만 추출합니다.</div>
+    <div class="btn-row">
+      <button class="btn-go" id="splitBtn">✂️ 리듬 / 멜로디로 분리</button>
+      <button class="btn-ghost" id="fileBtn">📂 .abc 파일 열기</button>
+      <button class="btn-ghost" id="sampleBtn">예시 채우기</button>
+      <input type="file" id="fileInput" accept=".abc,.txt" style="display:none;">
+    </div>
+    <div id="warn"></div>
+  </div>
+
+  <div class="card" id="scoreCard" style="display:none;">
+    <h2>🎼 악보 미리보기 <span style="font-weight:400; font-size:.8rem; color:var(--ink-soft);">— 마디는 그대로 두고 음만 좌우로 밀 수 있어요</span></h2>
+    <div id="score" style="overflow-x:auto; background:#fff; border-radius:8px; padding:8px;"></div>
+    <div class="btn-row" style="align-items:center;">
+      <button class="btn-ghost" id="shiftLeft">⟵ 8분음표 왼쪽</button>
+      <button class="btn-ghost" id="shiftRight">8분음표 오른쪽 ⟶</button>
+      <button class="btn-ghost" id="shiftReset">↺ 처음으로</button>
+      <span id="shiftInfo" style="font-size:.83rem; color:var(--ink-soft);"></span>
+    </div>
+    <p class="drop-hint">BKP 녹음에서 마디가 통째로 밀렸을 때, 음 전체를 좌우로 밀어 박자를 맞추세요. 민 결과가 아래 리듬·멜로디에도 반영됩니다.</p>
+  </div>
+
+  <div class="card">
+    <div class="out-head">
+      <h2 style="margin:0;"><span class="badge r">리듬</span> 음 길이</h2>
+      <span><button class="btn-ink copy-mini" id="copyR">📋 복사</button> <button class="btn-ghost copy-mini" id="saveR">💾 저장</button></span>
+    </div>
+    <textarea id="rhythmOut" class="out r" readonly placeholder="여기에 리듬(음 길이)이 나옵니다. 합치기의 '리듬' 칸에 넣으세요."></textarea>
+  </div>
+
+  <div class="card">
+    <div class="out-head">
+      <h2 style="margin:0;"><span class="badge m">멜로디</span> 계이름</h2>
+      <span><button class="btn-ink copy-mini" id="copyM">📋 복사</button> <button class="btn-ghost copy-mini" id="saveM">💾 저장</button></span>
+    </div>
+    <textarea id="melodyOut" class="out m" readonly placeholder="여기에 멜로디(피아노 키)가 나옵니다. 합치기의 '멜로디' 칸에 넣으세요."></textarea>
+    <details>
+      <summary>🎵 멜로디 계이름 안내</summary>
+      <p style="font-size:.84rem; color:var(--ink-soft); margin:8px 0 0;">
+        계이름으로 나옵니다: <code>도 레 미 파 솔 라 시</code> (가운데 옥타브).
+        낮은 옥타브는 앞에 쉼표 <code>,도</code>, 높은 옥타브는 뒤에 따옴표 <code>도'</code>.
+        쉼표(쉬는 음) = <code>0</code>. 마디 구분 = <code>r</code>. 합치기(combine)에 그대로 넣으면 됩니다.
+      </p>
+    </details>
+  </div>
+
+  <div class="card" style="background:var(--paper);">
+    <p style="margin:0; font-size:.88rem; color:var(--ink-soft);">
+      💡 <b>활용:</b> A곡을 분리해 <b>리듬</b>만, B곡을 분리해 <b>멜로디</b>만 복사한 뒤, 합치기(combine)에 각각 넣으면
+      <b>A의 리듬 + B의 멜로디</b>로 새로운 곡이 됩니다. 음 개수가 안 맞아도 합치기의 '자동 개수 맞춤'이 처리해줘요.
+    </p>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ABC 음이름 → 계이름 (가운데=도, 낮은=,도, 높은=도') */
+  var ABC_TO_SOLFA = { C:"도", D:"레", E:"미", F:"파", G:"솔", A:"라", B:"시" };
+  function abcToSolfa(letter, oct) {
+    if (letter === "z") return "0";
+    if (ABC_TO_SOLFA[letter] !== undefined) {        /* 대문자 = 가운데~낮은 */
+      var s = ABC_TO_SOLFA[letter];
+      var commas = (oct.match(/,/g) || []).length;
+      return (commas ? ",".repeat(commas) : "") + s;
+    } else if (ABC_TO_SOLFA[letter.toUpperCase()] !== undefined) { /* 소문자 = 높은 */
+      var s2 = ABC_TO_SOLFA[letter.toUpperCase()];
+      var apos = (oct.match(/'/g) || []).length;
+      return s2 + "'".repeat(apos + 1);              /* 소문자는 기본 한 옥타브 위 */
+    }
+    return "?";
+  }
+
+  function parseAbcBody(abc) {
+    var lines = abc.split("\n");
+    var bodyStart = 0;
+    for (var i = 0; i < lines.length; i++) {
+      if (/^K:/.test(lines[i].trim())) { bodyStart = i + 1; break; }
+    }
+    var bodyLines = lines.slice(bodyStart);
+    /* [V:RH] 줄이 있으면 멜로디(오른손)만, 없으면 베이스(LH) 제외한 전체 */
+    var rhLines = bodyLines.filter(function (l) { return /\[V:RH\]/.test(l); });
+    var useLines;
+    if (rhLines.length) {
+      useLines = rhLines.map(function (l) { return l.replace(/\[V:RH\]/g, ""); });
+    } else {
+      useLines = bodyLines.filter(function (l) { return !/\[V:LH\]/.test(l); });
+    }
+    var body = useLines.join(" ");
+    /* 음성표기, 주석, 코드기호("C") 제거 */
+    body = body.replace(/\[V:[^\]]*\]/g, "").replace(/%[^\n]*/g, "").replace(/"[^"]*"/g, "");
+    return body;
+  }
+
+  function splitAbc(abc) {
+    var body = parseAbcBody(abc);
+    var bars = body.split("|").map(function (b) { return b.trim(); }).filter(function (b) { return b.length; });
+    var rhythmBars = [], melodyBars = [];
+    var re = /([_^=]?)([A-Ga-gz])([,']*)(\d*)(\/(\d+))?/g;
+    var unknown = [];
+    bars.forEach(function (bar) {
+      var rhy = [], mel = [], m; re.lastIndex = 0;
+      while ((m = re.exec(bar)) !== null) {
+        var letter = m[2], oct = m[3], num = m[4], denom = m[6];
+        if (!letter) continue;
+        var len = num ? parseInt(num, 10) : 1;
+        if (denom) len = Math.max(1, Math.round(len / parseInt(denom, 10))); /* 분수는 반올림 */
+        rhy.push(len);
+        mel.push(abcToSolfa(letter, oct));
+        if (letter !== "z" && abcToSolfa(letter, oct) === "?") unknown.push(letter);
+      }
+      if (rhy.length) { rhythmBars.push(rhy.join(" ")); melodyBars.push(mel.join(" ")); }
+    });
+    return {
+      rhythm: rhythmBars.join(" r "),
+      melody: melodyBars.join(" r "),
+      bars: rhythmBars.length,
+      unknown: unknown
+    };
+  }
+
+  function doSplit() {
+    var abc = $("abcIn").value.trim();
+    var w = $("warn");
+    if (!abc) {
+      w.className = "warnbox bad";
+      w.innerHTML = "ABC 악보를 먼저 넣어주세요.";
+      return;
+    }
+    var res = splitAbc(abc);
+    $("rhythmOut").value = res.rhythm;
+    $("melodyOut").value = res.melody;
+    if (res.bars === 0) {
+      w.className = "warnbox bad";
+      w.innerHTML = "악보에서 음을 찾지 못했어요. K: 줄 아래에 멜로디가 있는 ABC인지 확인하세요.";
+      $("scoreCard").style.display = "none";
+    } else {
+      w.className = "warnbox ok";
+      w.innerHTML = "✅ " + res.bars + "개 마디를 분리했어요. 리듬과 멜로디를 각각 복사해 합치기(combine)에 넣으세요." +
+        (res.unknown.length ? " (일부 음을 못 읽어 ?로 표시됨)" : "");
+      /* 악보 미리보기 준비 */
+      shiftAmount = 0;
+      buildShiftModel();
+      renderScore();
+      $("scoreCard").style.display = "";
+    }
+  }
+
+  /* ════════ 악보 미리보기 + 음 밀기 ════════ */
+  var shiftBars = null;   /* [[{note,oct,len}...]...] 멜로디(RH) 마디별 */
+  var shiftBarLens = [];  /* 각 마디 셀(8분음표) 수 */
+  var shiftKey = "C";
+  var shiftAmount = 0;    /* 누적 이동 칸수 */
+
+  function buildShiftModel() {
+    /* 입력 ABC에서 멜로디(RH) 마디별 음 파싱 */
+    var abc = $("abcIn").value;
+    var keyMatch = abc.match(/^K:\s*(\S+)/m);
+    shiftKey = keyMatch ? keyMatch[1] : "C";
+    var body = parseAbcBody(abc);
+    var bars = body.split("|").map(function (b) { return b.trim(); }).filter(function (b) { return b.length; });
+    var re = /([_^=]?)([A-Ga-gz])([,']*)(\d*)(\/(\d+))?/g;
+    shiftBars = []; shiftBarLens = [];
+    bars.forEach(function (bar) {
+      var notes = [], m, sum = 0; re.lastIndex = 0;
+      while ((m = re.exec(bar)) !== null) {
+        var letter = m[2], oct = m[3], num = m[4], denom = m[6];
+        if (!letter) continue;
+        var len = num ? parseInt(num, 10) : 1;
+        if (denom) len = Math.max(1, Math.round(len / parseInt(denom, 10)));
+        notes.push({ note: letter, oct: oct, len: len });
+        sum += len;
+      }
+      if (notes.length) { shiftBars.push(notes); shiftBarLens.push(sum); }
+    });
+  }
+
+  /* 마디별 음 → 셀(8분음표 단위)로 펼침 → 밀기 → 다시 마디로 */
+  function applyShift(amount) {
+    var cells = [];
+    shiftBars.forEach(function (bar) {
+      bar.forEach(function (n) {
+        for (var i = 0; i < n.len; i++) cells.push({ note: n.note, oct: n.oct });
+      });
+    });
+    if (amount > 0) {
+      for (var i = 0; i < amount; i++) { cells.unshift({ note: "z", oct: "" }); cells.pop(); }
+    } else if (amount < 0) {
+      var a = -amount;
+      for (var j = 0; j < a; j++) { cells.shift(); cells.push({ note: "z", oct: "" }); }
+    }
+    /* 다시 마디로 묶기 (마디 길이 유지, 같은 음 연속은 합침) */
+    var bars = [], idx = 0;
+    shiftBarLens.forEach(function (blen) {
+      var seg = cells.slice(idx, idx + blen); idx += blen;
+      var notes = [], cur = null;
+      seg.forEach(function (c) {
+        if (!cur || cur.note !== c.note || cur.oct !== c.oct) { cur = { note: c.note, oct: c.oct, len: 1 }; notes.push(cur); }
+        else cur.len++;
+      });
+      bars.push(notes);
+    });
+    return bars;
+  }
+
+  function barsToAbc(bars) {
+    return bars.map(function (bar) {
+      return bar.map(function (n) {
+        return n.note + n.oct + (n.len === 1 ? "" : n.len);
+      }).join(" ");
+    }).join(" | ") + " |";
+  }
+
+  function renderScore() {
+    if (!shiftBars) return;
+    var bars = applyShift(shiftAmount);
+    var bodyAbc = barsToAbc(bars);
+    /* 4마디마다 줄바꿈 */
+    var barArr = bodyAbc.replace(/\|$/, "").split("|").map(function (b) { return b.trim(); }).filter(function (b) { return b; });
+    var lines = [];
+    for (var i = 0; i < barArr.length; i += 4) lines.push(barArr.slice(i, i + 4).join(" | ") + " |");
+    var fullAbc = "X:1\nL:1/8\nM:4/4\nK:" + shiftKey + "\n" + lines.join("\n");
+    if (window.ABCJS) {
+      try { ABCJS.renderAbc("score", fullAbc, { responsive: "resize", paddingleft: 4, paddingright: 4 }); }
+      catch (e) { $("score").textContent = "악보를 그릴 수 없습니다."; }
+    }
+    /* 민 결과를 리듬·멜로디 출력에도 반영 */
+    var shiftedAbcForSplit = "K:" + shiftKey + "\n" + bodyAbc;
+    var res = splitAbc(shiftedAbcForSplit);
+    $("rhythmOut").value = res.rhythm;
+    $("melodyOut").value = res.melody;
+    $("shiftInfo").textContent = shiftAmount === 0 ? "원래 위치" :
+      (shiftAmount > 0 ? "오른쪽으로 " : "왼쪽으로 ") + Math.abs(shiftAmount) + "칸 (8분음표 기준)";
+  }
+
+  /* 파일 드래그 */
+  var ta = $("abcIn");
+  ta.addEventListener("dragover", function (e) { e.preventDefault(); ta.classList.add("drop-active"); });
+  ta.addEventListener("dragleave", function () { ta.classList.remove("drop-active"); });
+  ta.addEventListener("drop", function (e) {
+    e.preventDefault(); ta.classList.remove("drop-active");
+    var f = e.dataTransfer.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () { ta.value = String(reader.result).trim(); doSplit(); };
+    reader.readAsText(f);
+  });
+
+  function copyOut(id, btn) {
+    var txt = $(id).value;
+    if (!txt) return;
+    navigator.clipboard.writeText(txt).then(function () {
+      var old = btn.textContent;
+      btn.textContent = "✅ 복사됨!";
+      setTimeout(function () { btn.textContent = old; }, 1400);
+    }, function () {
+      $(id).removeAttribute("readonly"); $(id).select();
+      document.execCommand && document.execCommand("copy");
+      $(id).setAttribute("readonly", "");
+    });
+  }
+  function saveOut(id, filename) {
+    var txt = $(id).value;
+    if (!txt) return;
+    var blob = new Blob([txt], { type: "text/plain" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  $("splitBtn").addEventListener("click", doSplit);
+  $("shiftLeft").addEventListener("click", function () { shiftAmount -= 1; renderScore(); });
+  $("shiftRight").addEventListener("click", function () { shiftAmount += 1; renderScore(); });
+  $("shiftReset").addEventListener("click", function () { shiftAmount = 0; renderScore(); });
+  $("fileBtn").addEventListener("click", function () { $("fileInput").click(); });
+  $("fileInput").addEventListener("change", function (e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () { $("abcIn").value = String(reader.result).trim(); doSplit(); };
+    reader.readAsText(f);
+  });
+  $("copyR").addEventListener("click", function () { copyOut("rhythmOut", this); });
+  $("copyM").addEventListener("click", function () { copyOut("melodyOut", this); });
+  $("saveR").addEventListener("click", function () { saveOut("rhythmOut", "리듬.txt"); });
+  $("saveM").addEventListener("click", function () { saveOut("melodyOut", "멜로디.txt"); });
+  $("sampleBtn").addEventListener("click", function () {
+    $("abcIn").value = "X:1\nT:예시\nM:4/4\nL:1/8\nK:C\n\"C\" C2 E2 G2 E2 | \"G\" D2 G2 B2 G2 | \"Am\" E2 A2 c2 A2 | \"F\" F2 A2 c4 |";
+    doSplit();
+  });
+
+  /* 시작 시 예시 */
+  $("sampleBtn").click();
+})();
+</script>
+</body>
+</html>

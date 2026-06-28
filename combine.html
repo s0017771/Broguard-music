@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>리듬 + 멜로디 합치기 — 브로가드 뮤직 랩</title>
+<style>
+  :root {
+    --paper: #f3ecdd; --card: #fbf7ee; --ink: #1c2b3a; --ink-soft: #4a5a68;
+    --brass: #b5894e; --brass-deep: #8a6a3a; --line: #d8d2c4;
+    --rhythm: #3a6bb0; --rhythm-bg: #dce6f2; --mel: #b5894e; --mel-bg: #f2e6dc;
+    --ok: #2e7d4f; --warn: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI', '맑은 고딕', sans-serif;
+    background: var(--paper); color: var(--ink); line-height: 1.5;
+    padding: 16px; max-width: 920px; margin: 0 auto;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h1 .clef { color: var(--brass); margin-right: 6px; }
+  .sub { color: var(--ink-soft); font-size: .9rem; margin: 0 0 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 1.05rem; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: .7rem; padding: 2px 8px; border-radius: 20px; color: #fff; font-weight: 700; }
+  .badge.r { background: var(--rhythm); }
+  .badge.m { background: var(--mel); }
+
+  .io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .io-grid { grid-template-columns: 1fr; } }
+  .io-box label { display: block; font-weight: 700; font-size: .85rem; margin-bottom: 5px; }
+  textarea {
+    width: 100%; min-height: 90px; padding: 10px; border-radius: 8px;
+    border: 2px solid var(--line); font-family: 'Consolas', monospace; font-size: 1rem;
+    background: var(--paper); color: var(--ink); resize: vertical;
+  }
+  textarea.r { border-color: var(--rhythm); background: var(--rhythm-bg); }
+  textarea.m { border-color: var(--mel); background: var(--mel-bg); }
+  .drop-hint { font-size: .75rem; color: var(--ink-soft); margin-top: 4px; }
+  .drop-active { outline: 3px dashed var(--brass); outline-offset: 2px; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 6px 0 0; font-size: .9rem; }
+  .opts label { font-weight: 600; }
+  input[type="text"], input[type="number"] {
+    padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+    font-family: 'Consolas', monospace; font-size: .9rem; width: 70px;
+  }
+
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  button {
+    padding: 11px 18px; font-size: .95rem; font-weight: 700; border-radius: 9px;
+    border: none; cursor: pointer; font-family: inherit;
+  }
+  .btn-go { background: var(--brass); color: #fff; }
+  .btn-go:hover { background: var(--brass-deep); }
+  .btn-ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+  .btn-ink { background: var(--ink); color: #fff; }
+
+  #result { white-space: pre-wrap; font-family: 'Consolas', monospace; font-size: .95rem;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+    min-height: 40px; }
+  .warnbox { margin-top: 10px; border-radius: 8px; padding: 10px 12px; font-size: .88rem; }
+  .warnbox.ok { background: #e6f4ec; color: var(--ok); border: 1px solid #b8dcc6; }
+  .warnbox.bad { background: #fbe6e3; color: var(--warn); border: 1px solid #e8b8b0; }
+  .warnbox ul { margin: 6px 0 0; padding-left: 20px; }
+
+  details { margin-top: 8px; }
+  summary { cursor: pointer; font-weight: 700; font-size: .9rem; color: var(--brass-deep); }
+  .keymap { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 10px; font-size: .8rem; }
+  .keymap div { text-align: center; padding: 6px 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+  .keymap .hd { font-weight: 700; background: var(--card); }
+  .keymap .key { font-family: 'Consolas', monospace; color: var(--rhythm); font-weight: 700; }
+  code { background: var(--paper); padding: 1px 5px; border-radius: 4px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+  <h1><span class="clef">&#119070;</span>리듬 + 멜로디 합치기</h1>
+  <p class="sub">A곡의 리듬(음 길이) + B곡의 멜로디(피아노식 키 입력)를 ABC 악보로 합쳐줍니다. 마디는 <code>|</code>로 나눠요.</p>
+
+  <div class="card">
+    <h2>입력</h2>
+    <div class="io-grid">
+      <div class="io-box">
+        <label><span class="badge r">리듬</span> 음 길이 (A곡에서)</label>
+        <textarea id="rhythmIn" class="r" placeholder="예: 2 2 2 2 r 1 1 2 2 2 r 2 1 1 2 2 r 4 4&#10;숫자 하나=음 하나(공백 구분). 1=8분 2=4분 4=2분 8=온음표. 마디 구분은 r."></textarea>
+        <div class="drop-hint">📄 음길이 .txt 파일을 여기로 드래그해도 됩니다</div>
+      </div>
+      <div class="io-box">
+        <label><span class="badge m">멜로디</span> 음이름 (B곡에서, 피아노식 키)</label>
+        <textarea id="melodyIn" class="m" placeholder="예: 미 도 레 도 r 도 미 미 미&#10;계이름으로: 도 레 미 파 솔 라 시. 낮은음 ,도  높은음 도'  쉼표 0. 마디 구분 r."></textarea>
+        <div class="drop-hint">📄 멜로디 .txt 파일을 여기로 드래그해도 됩니다</div>
+      </div>
+    </div>
+
+    <div class="opts">
+      <span><label>조표 K:</label> <input type="text" id="keyIn" value="C"></span>
+      <span><label>빠르기 Q:1/4=</label> <input type="number" id="tempoIn" value="100"></span>
+      <span><label>박자 M:</label> <input type="text" id="meterIn" value="4/4"></span>
+      <span><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="autoFitChk" checked> 자동 개수 맞춤</label></span>
+    </div>
+    <p class="hint" style="margin:6px 0 0;">자동 개수 맞춤: 한 마디 안에서 음과 리듬 개수가 다를 때 자동으로 맞춥니다. 음이 모자라면 음을 길게 늘리고, 음이 넘치면 리듬을 쪼개 음을 다 살립니다 (멜로디 순서는 유지). 끄면 개수가 다를 때 경고만 표시합니다.</p>
+
+    <details>
+      <summary>🎵 멜로디 계이름 안내</summary>
+      <p style="font-size:.84rem; color:var(--ink-soft); margin:8px 0 0;">
+        계이름으로 입력합니다: <code>도 레 미 파 솔 라 시</code> (가운데 옥타브, 공백으로 구분).<br>
+        낮은 옥타브 = 앞에 쉼표 <code>,도</code> · 높은 옥타브 = 뒤에 따옴표 <code>도'</code> · 쉼표(쉬는 음) = <code>0</code> · 마디 구분 = <code>r</code><br>
+        예: <code>미 도 레 도 r 도 미 미 미</code> · <code>도'</code>(높은 도) · <code>,솔</code>(낮은 솔)
+      </p>
+    </details>
+
+    <div class="btn-row">
+      <button class="btn-go" id="goBtn">🎵 합쳐서 ABC 만들기</button>
+      <button class="btn-ghost" id="sampleBtn">예시 채우기</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>결과 <span style="font-weight:400; font-size:.8rem; color:var(--ink-soft);">— 4마디마다 줄바꿈</span></h2>
+    <div id="result">여기에 합쳐진 ABC가 나옵니다.</div>
+    <div id="warn"></div>
+    <div class="btn-row">
+      <button class="btn-ink" id="copyBtn">📋 ABC 복사</button>
+      <button class="btn-ghost" id="xlsxBtn">📊 엑셀(.xlsx)로 받기</button>
+      <button class="btn-ghost" id="txtBtn">📄 ABC(.txt) 받기</button>
+    </div>
+    <p style="font-size:.82rem; color:var(--ink-soft); margin:10px 0 0;">
+      복사한 ABC를 악보 연구소(lab.html) 입력창에 붙여넣고 재생하세요. 엑셀은 마디별로 나눠서 수정하기 좋습니다.
+    </p>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ── 계이름 → ABC 음이름 ──
+     도레미파솔라시 = C D E F G A B (가운데). ,도 = 낮은(C,), 도' = 높은(c) */
+  var SOLFA = { "도":"C", "레":"D", "미":"E", "파":"F", "솔":"G", "라":"A", "시":"B" };
+  function solfaToABC(token) {
+    if (token === "0" || token === "z" || token === "Z") return { abc: "z", oct: "" };
+    var lowMark = (token.match(/^,+/) || [""])[0];   /* 앞 쉼표 = 낮은 옥타브 */
+    var highMark = (token.match(/'+$/) || [""])[0];  /* 뒤 따옴표 = 높은 옥타브 */
+    var core = token.replace(/^,+/, "").replace(/'+$/, "");
+    var base = SOLFA[core];
+    if (!base) return { abc: null, raw: token, oct: "" };
+    if (highMark.length >= 1) {
+      /* 높은 옥타브 → 소문자, 추가 따옴표는 그대로 */
+      return { abc: base.toLowerCase(), oct: "'".repeat(highMark.length - 1) };
+    } else if (lowMark.length >= 1) {
+      return { abc: base, oct: ",".repeat(lowMark.length) };
+    }
+    return { abc: base, oct: "" };
+  }
+  /* 계이름 문자열을 음 단위로 파싱 (공백으로 구분된 토큰) */
+  function parseMelodyKeys(str) {
+    var notes = [];
+    var tokens = str.trim().split(/\s+/).filter(function (x) { return x.length; });
+    tokens.forEach(function (tok) {
+      var p = solfaToABC(tok);
+      notes.push(p);
+    });
+    return notes;
+  }
+  function parseLengths(str) {
+    var lens = [];
+    var tokens = str.trim().split(/\s+/).filter(function (x) { return x.length; });
+    tokens.forEach(function (tok) {
+      var n = parseInt(tok, 10);
+      if (!isNaN(n)) lens.push(n);
+    });
+    return lens;
+  }
+
+  /* ── 한 마디 합치기 ── */
+  /* 자동 개수 맞춤: 음과 리듬 칸 수가 다를 때 한 마디 안에서 맞춤 (순서 유지)
+     음 모자람 → 음을 늘림(리듬 칸 합쳐 음을 길게)
+     음 넘침 → 리듬을 늘림(칸을 쪼개 음을 다 받음) */
+  function autoMatchBar(notes, lens) {
+    var nNotes = notes.length, nRhythm = lens.length;
+    if (nNotes === 0 || nRhythm === 0) return lens;
+    if (nNotes === nRhythm) return lens;
+    var total = lens.reduce(function (a, b) { return a + b; }, 0);
+    if (nNotes < nRhythm) {
+      /* 음 모자람: 리듬 칸을 음 개수만큼 그룹으로 묶어 각 음을 길게 */
+      var per = nRhythm / nNotes, out = [];
+      for (var i = 0; i < nNotes; i++) {
+        var start = Math.round(i * per), end = (i === nNotes - 1) ? nRhythm : Math.round((i + 1) * per);
+        if (end <= start) end = start + 1;
+        var sum = 0;
+        for (var j = start; j < end; j++) sum += lens[j] || 0;
+        out.push(sum || 1);
+      }
+      return out;
+    }
+    /* 음 넘침: 총 길이를 음 개수로 나눠 리듬을 쪼갬 (멜로디 다 살림) */
+    var base = Math.floor(total / nNotes);
+    if (base < 1) return notes.map(function () { return 1; }); /* 음이 너무 많으면 각 1칸 */
+    var rem = total - base * nNotes, out2 = [];
+    for (var k = 0; k < nNotes; k++) out2.push(base + (k < rem ? 1 : 0));
+    return out2;
+  }
+
+  function combineBar(melStr, lenStr, idx, autoFit) {
+    var notes = parseMelodyKeys(melStr);
+    var lens = parseLengths(lenStr);
+    var warns = [];
+    var fitted = false;
+    if (notes.length !== lens.length) {
+      if (autoFit && notes.length > 0 && lens.length > 0) {
+        lens = autoMatchBar(notes, lens); /* 자동 맞춤 */
+        fitted = true;
+      } else {
+        warns.push((idx+1) + "마디: 음 개수(" + notes.length + ") ≠ 길이 개수(" + lens.length + ")");
+      }
+    }
+    var unknown = notes.filter(function (n) { return n.abc === null; }).map(function (n) { return n.raw; });
+    if (unknown.length) warns.push((idx+1) + "마디: 모르는 키 '" + unknown.join("','") + "'");
+    var abc = notes.map(function (n, i) {
+      if (n.abc === null) return "?";
+      var len = (lens[i] !== undefined && lens[i] !== 1) ? lens[i] : "";
+      return n.abc + n.oct + len;
+    }).join(" ");
+    var sum = lens.reduce(function (a, b) { return a + b; }, 0);
+    return { abc: abc, sum: sum, warns: warns, noteCount: notes.length, fitted: fitted };
+  }
+
+  var lastABC = "", lastBars = [];
+
+  function build() {
+    /* 'r'/'R'을 마디 구분 |로 대체 (| 키가 누르기 어려워서) */
+    var rRaw = $("rhythmIn").value.replace(/[rR]/g, "|");
+    var mRaw = $("melodyIn").value.replace(/[rR]/g, "|");
+    var rBars = rRaw.split("|");
+    var mBars = mRaw.split("|");
+    var n = Math.max(rBars.length, mBars.length);
+    var allWarns = [], bars = [];
+
+    /* 마디 개수 불일치 */
+    if (rBars.length !== mBars.length)
+      allWarns.push("⚠ 마디 개수가 다릅니다 — 리듬 " + rBars.length + "마디, 멜로디 " + mBars.length + "마디. (|의 개수를 맞춰주세요)");
+
+    var meterParts = ($("meterIn").value || "4/4").split("/");
+    var beats = meterParts[0] && meterParts[1] ? (+meterParts[0] * 8 / +meterParts[1]) : 8;
+    var autoFit = $("autoFitChk") && $("autoFitChk").checked;
+    var fittedCount = 0;
+
+    for (var i = 0; i < n; i++) {
+      var rb = (rBars[i] || "").trim();
+      var mb = (mBars[i] || "").trim();
+      if (!rb && !mb) continue;
+      var c = combineBar(mb, rb, i, autoFit);
+      if (c.fitted) fittedCount++;
+      if (c.sum !== beats && (rb || mb))
+        c.warns.push((i+1) + "마디: 길이 합 " + c.sum + " (정상은 " + beats + ")");
+      bars.push(c.abc);
+      allWarns = allWarns.concat(c.warns);
+    }
+
+    /* 4마디마다 줄바꿈 */
+    var lines = [];
+    for (var b = 0; b < bars.length; b += 4) {
+      lines.push(bars.slice(b, b + 4).join(" | ") + " |");
+    }
+    var body = lines.join("\n");
+    /* 마지막 마디 종지 줄 닫기 */
+    body = body.replace(/\|$/, "|]");
+
+    var header = "X:1\nT:리듬+멜로디 합치기\nM:" + ($("meterIn").value || "4/4") +
+      "\nL:1/8\nQ:1/4=" + ($("tempoIn").value || "100") + "\nK:" + ($("keyIn").value || "C") + "\n";
+    lastABC = header + body;
+    lastBars = bars;
+
+    $("result").textContent = lastABC;
+
+    /* 경고 표시 */
+    var w = $("warn");
+    var fitMsg = fittedCount > 0 ? " 🔧 " + fittedCount + "개 마디는 음/리듬 개수를 자동으로 맞췄어요." : "";
+    if (allWarns.length === 0) {
+      w.className = "warnbox ok";
+      w.innerHTML = "✅ 모든 마디 정상 — 음과 길이 개수가 맞고, 마디 길이 합도 정확해요." + fitMsg;
+    } else {
+      w.className = "warnbox bad";
+      w.innerHTML = "⚠ 확인이 필요한 곳:<ul>" +
+        allWarns.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ul>" + (fitMsg ? "<p>" + fitMsg + "</p>" : "");
+    }
+  }
+
+  /* ── 파일 드래그 ── */
+  function setupDrop(textarea) {
+    textarea.addEventListener("dragover", function (e) { e.preventDefault(); textarea.classList.add("drop-active"); });
+    textarea.addEventListener("dragleave", function () { textarea.classList.remove("drop-active"); });
+    textarea.addEventListener("drop", function (e) {
+      e.preventDefault(); textarea.classList.remove("drop-active");
+      var f = e.dataTransfer.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () { textarea.value = String(reader.result).trim(); };
+      reader.readAsText(f);
+    });
+  }
+  setupDrop($("rhythmIn"));
+  setupDrop($("melodyIn"));
+
+  /* ── 버튼 ── */
+  $("goBtn").addEventListener("click", build);
+  $("sampleBtn").addEventListener("click", function () {
+    $("rhythmIn").value = "2 2 2 2 r 1 1 2 2 2 r 2 1 1 2 2 r 4 4";
+    $("melodyIn").value = "미 도 레 도 r 미 미 파 솔 미 r 솔 라 솔 미 레 r 도 도";
+    build();
+  });
+  $("copyBtn").addEventListener("click", function () {
+    if (!lastABC) build();
+    navigator.clipboard.writeText(lastABC).then(function () {
+      $("copyBtn").textContent = "✅ 복사됨!";
+      setTimeout(function () { $("copyBtn").textContent = "📋 ABC 복사"; }, 1500);
+    }, function () {
+      /* 폴백: 선택 */
+      var r = document.createRange(); r.selectNode($("result"));
+      window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+    });
+  });
+  $("txtBtn").addEventListener("click", function () {
+    if (!lastABC) build();
+    var blob = new Blob([lastABC], { type: "text/plain" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "합친악보.abc";
+    a.click(); URL.revokeObjectURL(a.href);
+  });
+  $("xlsxBtn").addEventListener("click", function () {
+    if (!lastBars.length) build();
+    if (!lastBars.length) return;
+    /* 마디별 표: 마디# | ABC | (음별 분해) */
+    var rows = [["마디", "합쳐진 ABC"]];
+    lastBars.forEach(function (bar, i) { rows.push([i + 1, bar]); });
+    rows.push([]);
+    rows.push(["전체 악보 (아래 칸 복사 → 연구소에 붙여넣기)"]);
+    rows.push([lastABC]);
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 6 }, { wch: 60 }];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "합친악보");
+    XLSX.writeFile(wb, "합친악보.xlsx");
+  });
+
+  /* 시작 시 예시 한번 */
+  $("sampleBtn").click();
+})();
+</script>
+</body>
+</html>
