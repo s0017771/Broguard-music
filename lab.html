@@ -250,6 +250,13 @@
         <select id="melodySel" class="grow">
           <option value="">모티프 엔진 (기본)</option>
         </select>
+        <select id="melodyColor" class="grow" title="멜로디 색채 — 같은 코드라도 음을 고르는 성격이 달라집니다">
+          <option value="free" selected>색채: 자유로움</option>
+          <option value="bright">색채: 밝게 (장조풍)</option>
+          <option value="lyrical">색채: 서정적 (단조풍)</option>
+          <option value="pentatonic">색채: 동양풍 (5음계)</option>
+          <option value="folk">색채: 민요풍</option>
+        </select>
       </div>
 
       <label class="check" style="margin:6px 0 10px;"><input type="checkbox" id="optChords" checked> 코드 기호 표시</label>
@@ -988,8 +995,29 @@
   }
 
   /* 멜로디 레이어 (모티프 엔진): 동기를 만들고 변형하며 A-A'-B 프레이즈를 구성 */
+  /* ════════ 멜로디 색채 (선법/분위기 특화 모티프) ════════
+     같은 코드 진행이라도, 음을 고르는 성격(움직임·선호음·회피음)을 달리해 색을 입힘 */
+  var MELODY_COLORS = {
+    free:       { steps: [-2,-1,-1,0,1,1,2],        avoid: [] },
+    bright:     { steps: [-2,-1,0,1,1,2,2,3],        avoid: [] },
+    lyrical:    { steps: [-3,-2,-1,-1,0,1,1,2],      avoid: [] },
+    pentatonic: { steps: [-2,-1,0,1,2],              avoid: [3,6] },
+    folk:       { steps: [-2,-1,-1,0,1,1,2],         avoid: [6] }
+  };
+  function curColor() {
+    var sel = $("melodyColor");
+    return MELODY_COLORS[(sel && sel.value) || "free"] || MELODY_COLORS.free;
+  }
+  function degInScale(idx) { return ((idx % 7) + 7) % 7; }
+  function snapToColor(idx, color) {
+    if (!color.avoid.length) return idx;
+    if (color.avoid.indexOf(degInScale(idx)) < 0) return idx;
+    if (color.avoid.indexOf(degInScale(idx - 1)) < 0) return idx - 1;
+    if (color.avoid.indexOf(degInScale(idx + 1)) < 0) return idx + 1;
+    return idx - 1;
+  }
   function makeShape(len) {
-    var STEPS2 = [-2, -1, -1, 0, 1, 1, 2];
+    var STEPS2 = curColor().steps;
     var shape = [0];
     for (var i = 1; i < len; i++) shape.push(STEPS2[Math.floor(Math.random() * STEPS2.length)]);
     return shape;
@@ -1047,15 +1075,18 @@
       var notes = [];
       if (tag === "CAD" || m === c.bars - 1) {
         var half = beatsOf(c.meter) / 2;
-        notes.push({ idx: tonic + (Math.random() < 0.5 ? 1 : -1), len: half });
+        var lead = snapToColor(tonic + (Math.random() < 0.5 ? 1 : -1), curColor()); /* 종지 앞음도 색채 적용 */
+        notes.push({ idx: lead, len: half });
         notes.push({ idx: tonic, len: half });
         c.rhythms[m] = [half, half];
       } else {
         var pat = c.rhythms[m];
         var shape = shapeFor(tag, pat.length);
+        var color = curColor();
         /* 앵커: 코드음에서 시작. B 구간은 음역을 올려 대비를 만든다 */
         var bias = tag.charAt(0) === "B" ? 3 : 0;
         idx = nearestTone(tones, idx + bias + (Math.random() < 0.5 ? 1 : -1), lo, hi);
+        idx = snapToColor(idx, color);
         var pos = idx;
         for (var i = 0; i < pat.length; i++) {
           if (i > 0) {
@@ -1063,6 +1094,7 @@
             if (pos < lo) pos = lo + 1;
             if (pos > hi) pos = hi - 1;
             if (pat[i] >= 4) pos = nearestTone(tones, pos, lo, hi); /* 긴 음표는 코드음으로 안정화 */
+            pos = snapToColor(pos, color); /* 색채 회피음 처리 */
           }
           notes.push({ idx: pos, len: pat[i] });
         }
