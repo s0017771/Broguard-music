@@ -204,6 +204,32 @@
     </tr>
   </table>
   <p style="font-size:.76rem; color:var(--ink-soft); margin:8px 0 2px;">숫자패드의 Num Lock이 켜져 있어야 숫자키가 작동합니다. 흰건반(도레미파솔라시)만 누르면, 위에서 고른 조성에 맞춰 샵/플랫이 자동 반영됩니다 (예: G 사장조에서 파 → 파#).</p>
+
+  <p style="font-size:.82rem; font-weight:700; color:var(--brass-deep); margin:14px 0 4px;">🎹 왼손 베이스 (글자키) — 소리만 나며 녹음은 오른손만 됩니다</p>
+  <table style="border-collapse:collapse; font-size:.8rem; width:100%; text-align:center;">
+    <tr style="color:var(--ink-soft);"><td colspan="4" style="padding:3px; text-align:left;">▸ 낮은 옥타브</td></tr>
+    <tr>
+      <td style="padding:4px; border:1px solid var(--line);">낮은솔 <b>Z</b></td>
+      <td style="padding:4px; border:1px solid var(--line);">낮은라 <b>X</b></td>
+      <td style="padding:4px; border:1px solid var(--line);">낮은시 <b>C</b></td>
+      <td style="padding:4px;"></td>
+    </tr>
+    <tr style="color:var(--ink-soft);"><td colspan="4" style="padding:3px; text-align:left;">▸ 가운데 옥타브</td></tr>
+    <tr>
+      <td style="padding:4px; border:1px solid var(--line);">도 <b>A</b></td>
+      <td style="padding:4px; border:1px solid var(--line);">레 <b>S</b></td>
+      <td style="padding:4px; border:1px solid var(--line);">미 <b>D</b></td>
+      <td style="padding:4px; border:1px solid var(--line);">파 <b>F</b></td>
+    </tr>
+    <tr style="color:var(--ink-soft);"><td colspan="4" style="padding:3px; text-align:left;">▸ 높은 옥타브</td></tr>
+    <tr>
+      <td style="padding:4px; border:1px solid var(--line);">솔 <b>W</b></td>
+      <td style="padding:4px; border:1px solid var(--line);">라 <b>E</b></td>
+      <td style="padding:4px; border:1px solid var(--line);">시 <b>R</b></td>
+      <td style="padding:4px; border:1px solid var(--line);">도 <b>Space</b></td>
+    </tr>
+  </table>
+  <p style="font-size:.76rem; color:var(--ink-soft); margin:8px 0 2px;">왼손은 오른손보다 낮은 베이스 음역입니다. 양손으로 화음을 짚으며 분위기를 느낄 수 있고, 악보에는 오른손 멜로디만 깔끔하게 기록됩니다.</p>
 </details>
 
 <div id="keyboard">
@@ -711,6 +737,28 @@
     return doMidi + oct * 12 + MAJOR_SEMI[within];
   }
 
+  /* ════════ 왼손 베이스 키 (소리만, 녹음 안 함) ════════
+     오른손 가운데 도보다 한 옥타브 낮은 음역. 글자키라 오른손(숫자패드)과 안 겹침 */
+  var LEFT_SCALE = {
+    "KeyZ": -3,  /* 낮은 솔 */
+    "KeyX": -2,  /* 낮은 라 */
+    "KeyC": -1,  /* 낮은 시 */
+    "KeyA": 0,   /* 도 */
+    "KeyS": 1,   /* 레 */
+    "KeyD": 2,   /* 미 */
+    "KeyF": 3,   /* 파 */
+    "KeyW": 4,   /* 솔 */
+    "KeyE": 5,   /* 라 */
+    "KeyR": 6,   /* 시 */
+    "Space": 7   /* 높은 도 */
+  };
+  function leftScaleToMidi(scaleIdx) {
+    var leftDoMidi = rows[1].baseA + 3 - 12; /* 오른손 도보다 한 옥타브 아래 */
+    var oct = Math.floor(scaleIdx / 7);
+    var within = ((scaleIdx % 7) + 7) % 7;
+    return leftDoMidi + oct * 12 + MAJOR_SEMI[within];
+  }
+
   function getMode() { return document.getElementById("inputMode").value; }
 
   /* ════════ 조성별 샵/플랫 (연주·녹음 모두 적용) ════════
@@ -740,6 +788,17 @@
     if (getMode() === "mouse") return;
     var tag = (e.target.tagName || "").toLowerCase();
     if (tag === "input" || tag === "select" || tag === "textarea") return;
+    /* ── 왼손 베이스 (소리만, 녹음 안 함) ── */
+    if (e.code in LEFT_SCALE) {
+      if (heldCodes[e.code] !== undefined) return; /* 키 반복 방지 */
+      var lRaw = leftScaleToMidi(LEFT_SCALE[e.code]);
+      var lSound = applyKeySig(lRaw); /* 왼손도 조성 샵/플랫 적용 */
+      heldCodes[e.code] = lSound;
+      e.preventDefault(); /* 스페이스바 스크롤·버튼 누름 등 기본동작 차단 */
+      noteOn(lSound);                 /* 소리만 (press 아님 → 녹음 안 됨) */
+      highlightKey(lSound, true);
+      return;
+    }
     if (!(e.code in KEY_SCALE)) return;
     if (heldCodes[e.code] !== undefined) return; /* 키 반복 방지 */
     var rawMidi = scaleToMidi(KEY_SCALE[e.code]);   /* 흰건반 원음 */
