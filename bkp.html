@@ -122,15 +122,36 @@
     <button id="tapBtn" type="button" style="padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-family:inherit;font-size:.85rem;" title="곡 박자에 맞춰 이 버튼을 여러 번 누르세요">👆 탭 템포 <span id="tapInfo" style="color:var(--ink-soft);"></span></button>
     <label>조성
       <select id="keySel" style="padding:5px;border-radius:6px;border:1px solid var(--line);">
-        <option value="C" selected>C 다장조</option>
-        <option value="G">G 사장조 (파#)</option>
-        <option value="D">D 라장조 (파#도#)</option>
-        <option value="A">A 가장조</option>
-        <option value="F">F 바장조 (시♭)</option>
-        <option value="Bb">B♭ 내림나장조</option>
-        <option value="Am">Am 가단조</option>
-        <option value="Em">Em 마단조</option>
-        <option value="Dm">Dm 라단조</option>
+        <optgroup label="자주 쓰는 조성">
+          <option value="C" selected>C 다장조</option>
+          <option value="G">G 사장조 (파#)</option>
+          <option value="D">D 라장조 (파#도#)</option>
+          <option value="A">A 가장조 (3#)</option>
+          <option value="F">F 바장조 (시♭)</option>
+          <option value="Bb">B♭ 내림나장조 (2♭)</option>
+          <option value="Am">Am 가단조</option>
+          <option value="Em">Em 마단조 (1#)</option>
+          <option value="Dm">Dm 라단조 (1♭)</option>
+        </optgroup>
+        <optgroup label="그 외 장조">
+          <option value="E">E 마장조 (4#)</option>
+          <option value="B">B 나장조 (5#)</option>
+          <option value="F#">F# 올림바장조 (6#)</option>
+          <option value="Eb">E♭ 내림마장조 (3♭)</option>
+          <option value="Ab">A♭ 내림가장조 (4♭)</option>
+          <option value="Db">D♭ 내림라장조 (5♭)</option>
+        </optgroup>
+        <optgroup label="그 외 단조">
+          <option value="Bm">Bm 나단조 (2#)</option>
+          <option value="F#m">F#m 올림바단조 (3#)</option>
+          <option value="C#m">C#m 올림다단조 (4#)</option>
+          <option value="G#m">G#m 올림사단조 (5#)</option>
+          <option value="D#m">D#m 올림라단조 (6#)</option>
+          <option value="Gm">Gm 사단조 (2♭)</option>
+          <option value="Cm">Cm 다단조 (3♭)</option>
+          <option value="Fm">Fm 바단조 (4♭)</option>
+          <option value="Bbm">B♭m 내림나단조 (5♭)</option>
+        </optgroup>
       </select>
     </label>
     <label>악기
@@ -821,14 +842,33 @@
      각 조성에서 어떤 음정(0~11 반음, 도=0 기준)에 +1/-1 하는지.
      흰건반 음을 누르면 그 조성의 조표에 맞게 자동 조정 */
   var KEY_ACCIDENTALS = {
+    /* 자주 쓰는 조성 */
     "C":  {}, "Am": {},
-    "G":  { 5: +1 },                 /* 파# (F→F#) */
+    "G":  { 5: +1 },                 /* 파# */
     "Em": { 5: +1 },
     "D":  { 5: +1, 0: +1 },          /* 파#, 도# */
     "A":  { 5: +1, 0: +1, 7: +1 },   /* 파#, 도#, 솔# */
-    "F":  { 11: -1 },                /* 시♭ (B→Bb) */
+    "F":  { 11: -1 },                /* 시♭ */
+    "Dm": { 11: -1 },
     "Bb": { 11: -1, 4: -1 },         /* 시♭, 미♭ */
-    "Dm": { 11: -1 }                 /* 시♭ */
+    /* 그 외 장조 — 샵 계열 (파도솔레라미 순서) */
+    "E":  { 5: +1, 0: +1, 7: +1, 2: +1 },
+    "B":  { 5: +1, 0: +1, 7: +1, 2: +1, 9: +1 },
+    "F#": { 5: +1, 0: +1, 7: +1, 2: +1, 9: +1, 4: +1 },
+    /* 그 외 장조 — 플랫 계열 (시미라레솔 순서) */
+    "Eb": { 11: -1, 4: -1, 9: -1 },
+    "Ab": { 11: -1, 4: -1, 9: -1, 2: -1 },
+    "Db": { 11: -1, 4: -1, 9: -1, 2: -1, 7: -1 },
+    /* 그 외 단조 — 나란한 장조와 같은 조표 */
+    "Bm":  { 5: +1, 0: +1 },
+    "F#m": { 5: +1, 0: +1, 7: +1 },
+    "C#m": { 5: +1, 0: +1, 7: +1, 2: +1 },
+    "G#m": { 5: +1, 0: +1, 7: +1, 2: +1, 9: +1 },
+    "D#m": { 5: +1, 0: +1, 7: +1, 2: +1, 9: +1, 4: +1 },
+    "Gm":  { 11: -1, 4: -1 },
+    "Cm":  { 11: -1, 4: -1, 9: -1 },
+    "Fm":  { 11: -1, 4: -1, 9: -1, 2: -1 },
+    "Bbm": { 11: -1, 4: -1, 9: -1, 2: -1, 7: -1 }
   };
   function applyKeySig(midi) {
     var keyName = (document.getElementById("keySel") || {}).value || "C";
