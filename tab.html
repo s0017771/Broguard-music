@@ -70,7 +70,7 @@
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
   <a class="home" href="index.html">&larr; 랩 홈</a>
-  <h1><span class="clef">&#127928;</span>기타 타브 변환기 <small style="font-size:.7rem;color:var(--brass);">VER.1.0</small></h1>
+  <h1><span class="clef">&#127928;</span>기타 타브 변환기 <small style="font-size:.7rem;color:var(--brass);">VER.1.2</small></h1>
   <p>ABC 피아노 악보 &rarr; 기타 타브악보(TAB) &middot; 표준 튜닝 EADGBE &middot; 옥타브 자동 보정 &middot; 카포 지원</p>
 </header>
 <main>
@@ -112,8 +112,14 @@
           <option value="64">좁게</option><option value="84" selected>보통</option><option value="112">넓게</option>
         </select>
       </label>
+      <label class="opt" style="color:var(--brass-deep);">&#127928; 베이스 반주
+        <select id="optBass">
+          <option value="off">없음(멜로디만)</option>
+          <option value="boomchick">쿵짝(코드 베이스)</option>
+        </select>
+      </label>
     </div>
-    <p class="hint"><b>지원:</b> 멀티보이스(V:/[V:RH]), 조표·임시표, 화음 [CEG], 쉼표, 셋잇단(3, 브로큰리듬 &gt;&lt;, 붙임줄, 코드 심볼 "C" &middot; 입력을 바꾸면 자동으로 다시 변환됩니다.</p>
+    <p class="hint"><b>지원:</b> 멀티보이스(V:/[V:RH]), 조표·임시표, 화음 [CEG], 쉼표, 셋잇단(3, 브로큰리듬 &gt;&lt;, 붙임줄, 코드 심볼 "C" &middot; 입력을 바꾸면 자동으로 다시 변환됩니다.<br><b>&#127928; 베이스 반주:</b> 멜로디는 높은 줄, 코드의 베이스 음을 낮은 줄(E&middot;A&middot;D)에 강박마다 얹어 <b>쿵짝쿵짝</b>으로 함께 칩니다 &middot; <b>코드 심볼이 없으면 조성에 맞는 코드를 자동으로 골라</b> 베이스를 만듭니다(멜로디만 있어도 OK).</p>
   </div>
 
   <div class="card">
@@ -153,12 +159,13 @@ var TabCore = (function () {
 
   /* ---------- 조표 ---------- */
   function parseKey(str) {
-    var out = { name: (str || '').trim() || 'C', map: {} };
+    var out = { name: (str || '').trim() || 'C', map: {}, tonicPc: 0, minor: false, useFlats: false };
     var s = out.name;
     if (!s || /^none$/i.test(s)) return out;
     var m = s.match(/^([A-Ga-g])\s*([#b♯♭]?)\s*([A-Za-z]*)/);
     if (!m) return out;
-    var tonic = m[1].toUpperCase() + (m[2] === '#' || m[2] === '♯' ? '#' : (m[2] === 'b' || m[2] === '♭' ? 'B' : ''));
+    var accCh = (m[2] === '#' || m[2] === '♯') ? '#' : ((m[2] === 'b' || m[2] === '♭') ? 'B' : '');
+    var tonic = m[1].toUpperCase() + accCh;
     var mode = (m[3] || '').toLowerCase();
     var minor = /^(m|min|minor|aeo|aeolian)/.test(mode) && !/^maj/.test(mode);
     var count = (minor ? MINOR_ACC : MAJOR_ACC)[tonic];
@@ -166,7 +173,76 @@ var TabCore = (function () {
     var i;
     if (count > 0) for (i = 0; i < count; i++) out.map[SHARP_ORDER[i]] = 1;
     else for (i = 0; i < -count; i++) out.map[FLAT_ORDER[i]] = -1;
+    out.tonicPc = ((NOTE_BASE[m[1].toUpperCase()] + (accCh === '#' ? 1 : accCh === 'B' ? -1 : 0)) % 12 + 12) % 12;
+    out.minor = minor;
+    out.useFlats = count < 0;
     return out;
+  }
+
+  /* ---------- 자동 코드(조성 기준 다이어토닉) ---------- */
+  var SHARP_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  var FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+  function pcToName(pc, useFlats) { return (useFlats ? FLAT_NAMES : SHARP_NAMES)[((pc % 12) + 12) % 12]; }
+
+  // 각 조성의 "무난한" 코드 후보 (으뜸음 기준 반음, 품질, 선호도)
+  function diatonicCandidates(tonicPc, minor) {
+    var defs = minor
+      ? [ { off: 0, q: 'min', pref: 0.30 },   // i
+          { off: 5, q: 'min', pref: 0.20 },   // iv
+          { off: 7, q: 'maj', pref: 0.25 },   // V (화성단조 도미넌트)
+          { off: 8, q: 'maj', pref: 0.15 },   // VI
+          { off: 10, q: 'maj', pref: 0.10 },  // VII
+          { off: 3, q: 'maj', pref: 0.12 } ]  // III
+      : [ { off: 0, q: 'maj', pref: 0.30 },   // I
+          { off: 5, q: 'maj', pref: 0.20 },   // IV
+          { off: 7, q: 'maj', pref: 0.25 },   // V
+          { off: 9, q: 'min', pref: 0.14 },   // vi
+          { off: 2, q: 'min', pref: 0.10 } ]; // ii
+    var thirds = { maj: 4, min: 3, dim: 3 }, fifths = { maj: 7, min: 7, dim: 6 };
+    return defs.map(function (d) {
+      var root = (tonicPc + d.off) % 12;
+      return { rootPc: root, quality: d.q, pref: d.pref,
+               tones: [root, (root + thirds[d.q]) % 12, (root + fifths[d.q]) % 12] };
+    });
+  }
+
+  function chordSymbolOf(cand, useFlats) {
+    return pcToName(cand.rootPc, useFlats) + (cand.quality === 'min' ? 'm' : cand.quality === 'dim' ? 'dim' : '');
+  }
+
+  // events(마디 포함)에 코드 심볼이 없을 때, 마디별로 어울리는 코드를 골라 첫 음에 부여
+  function autoChords(events, key) {
+    var cands = diatonicCandidates(key.tonicPc, key.minor);
+    var tonicCand = cands[0];
+    var chosen = [];        // 마디별 선택된 심볼
+    var measure = [], firstNote = null, hist = {};
+    var prevPc = null;
+    function flush(isLast) {
+      if (!measure.length) return;
+      var best = null, bestScore = -Infinity;
+      cands.forEach(function (c) {
+        var score = c.tones.reduce(function (a, pc) { return a + (hist[pc] || 0); }, 0);
+        score += c.pref * 0.6;                                   // 무난한 코드 살짝 우대(동점 처리)
+        if (firstNote === null) score = c.pref;                  // 멜로디 없는 마디: 선호도만
+        if (best === null && (c === tonicCand)) { /* noop */ }
+        if (score > bestScore) { bestScore = score; best = c; }
+      });
+      if (firstNote === null) best = prevPc !== null ? prevPc : tonicCand;
+      else prevPc = best;
+      chosen.push(best);
+      if (firstNote) firstNote.chordSym = chordSymbolOf(best, key.useFlats);
+      measure = []; firstNote = null; hist = {};
+    }
+    events.forEach(function (ev) {
+      if (ev.type === 'bar') { flush(false); return; }
+      measure.push(ev);
+      if (ev.type === 'note' && ev.midis.length > 0) {
+        if (!firstNote) firstNote = ev;
+        ev.midis.forEach(function (mm) { var pc = ((mm % 12) + 12) % 12; hist[pc] = (hist[pc] || 0) + (ev.dur || 1); });
+      }
+    });
+    flush(true);
+    return { symbols: chosen.map(function (c) { return chordSymbolOf(c, key.useFlats); }) };
   }
 
   /* ---------- 길이 (예: "3/2", "/", "//", "2") ---------- */
@@ -452,16 +528,164 @@ var TabCore = (function () {
         });
         ev.frets = [best];
         if (best && best.fret > 0) handPos = handPos * 0.4 + best.fret * 0.6;
-      } else {
+      } else if (midis.length >= 2) {
         ev.frets = assignChord(midis, capo, maxFret, handPos, warnings, idx);
         var fretted = ev.frets.filter(function (f) { return f && f.fret > 0; });
         if (fretted.length) {
           var avg = fretted.reduce(function (a, f) { return a + f.fret; }, 0) / fretted.length;
           handPos = handPos * 0.4 + avg * 0.6;
         }
+      } else {
+        ev.frets = [];                    // 베이스 전용 이벤트 (멜로디 없음)
       }
+
+      if (ev.bass) assignBass(ev, capo, maxFret, handPos, warnings, idx);
     });
     return warnings;
+  }
+
+  /* 코드의 베이스 음(쿵)을 낮은 줄(E·A·D)에 손 닿는 위치로 배치 */
+  function assignBass(ev, capo, maxFret, handPos, warnings, idx) {
+    var pc = ((ev.bass.pitchClass % 12) + 12) % 12;
+    var used = 0;
+    (ev.frets || []).forEach(function (f) { if (f) used |= (1 << f.string); });
+    var best = null, bestCost = Infinity;
+    for (var s = 0; s < 3; s++) {                    // 낮은 세 줄만: E(0) A(1) D(2)
+      if (used & (1 << s)) continue;
+      for (var fret = 0; fret <= maxFret; fret++) {
+        if (((TUNING[s] + capo + fret) % 12) !== pc) continue;
+        // 개방현 최우선, 멜로디 손 위치에서 멀지 않게, 낮은 줄 선호
+        var cost = (fret === 0 ? 0 : 3 + fret * 0.15 + Math.abs(fret - handPos) * 0.4) + s * 0.25;
+        if (cost < bestCost) { bestCost = cost; best = { string: s, fret: fret }; }
+        break;                                       // 그 줄에서 가장 낮은(=베이스에 적합) 프렛만
+      }
+    }
+    if (best) { if (!ev.frets) ev.frets = []; ev.frets.push(best); }
+    else warnings.push({ index: idx, msg: '베이스를 넣을 빈 낮은 줄이 없어 일부 베이스를 생략했습니다.' });
+  }
+
+  /* ---------- 코드 심볼 → 루트/5도/베이스 음정 ---------- */
+  function noteNamePc(letter, acc) {
+    var base = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[letter];
+    if (base === undefined) return null;
+    if (acc === '#' || acc === '♯') base += 1;
+    else if (acc === 'b' || acc === '♭') base -= 1;
+    return ((base % 12) + 12) % 12;
+  }
+
+  function parseChordRoot(sym) {
+    if (!sym) return null;
+    var s = String(sym).trim();
+    var m = s.match(/^([A-Ga-g])([#b♯♭]?)/);
+    if (!m) return null;
+    var rootPc = noteNamePc(m[1].toUpperCase(), m[2]);
+    if (rootPc === null) return null;
+    var dim = /(dim|°|o)/.test(s.slice(1));
+    var fifthPc = (rootPc + (dim ? 6 : 7)) % 12;
+    var bassPc = rootPc;
+    var sl = s.match(/\/\s*([A-Ga-g])([#b♯♭]?)/);   // 슬래시 코드 C/E → 베이스 E
+    if (sl) { var bp = noteNamePc(sl[1].toUpperCase(), sl[2]); if (bp !== null) bassPc = bp; }
+    return { rootPc: rootPc, fifthPc: fifthPc, bassPc: bassPc };
+  }
+
+  /* ---------- 쿵짝 베이스 라인 생성 (멜로디 타임라인에 병합) ---------- */
+  function bassOnsets(measureLen, beatLen) {
+    var beats = Math.max(1, Math.round(measureLen / beatLen));
+    var res = [{ time: 0, degree: 'root' }];         // 첫 박: 루트(쿵)
+    if (beats >= 8) { res.push({ time: 2 * beatLen, degree: 'fifth' });
+                      res.push({ time: 4 * beatLen, degree: 'root' });
+                      res.push({ time: 6 * beatLen, degree: 'fifth' }); }
+    else if (beats >= 4) res.push({ time: 2 * beatLen, degree: 'fifth' }); // 4/4: 1·3박
+    else if (beats === 2) res.push({ time: beatLen, degree: 'fifth' });    // 2/4·6/8: 두 펄스
+    // 3박(왈츠)은 첫 박 루트만
+    return res;
+  }
+
+  function cloneEv(e) {
+    if (e.type === 'note') return { type: 'note', midis: e.midis.slice(), dur: e.dur, chordSym: e.chordSym, tie: e.tie };
+    if (e.type === 'rest') return { type: 'rest', dur: e.dur };
+    return { type: e.type, sym: e.sym };
+  }
+
+  function buildBassLine(events, meter, unit) {
+    var mm = /(\d+)\s*\/\s*(\d+)/.exec(meter || '4/4');
+    var num = mm ? parseInt(mm[1], 10) : 4, den = mm ? parseInt(mm[2], 10) : 4;
+    var beatNote = (den === 8 && num % 3 === 0) ? 3 / 8 : 1 / 4;  // 6/8 등 겹박자 → 점4분음표 펄스
+    var beatLen = beatNote / (unit || 1 / 8);
+    if (!(beatLen > 0)) beatLen = 2;
+    var ctx = { currentChord: null };
+    var out = [], measure = [];
+    function flush() { if (measure.length) { out.push.apply(out, arrangeMeasure(measure, ctx, beatLen)); measure = []; } }
+    events.forEach(function (ev) {
+      if (ev.type === 'bar') { flush(); out.push(ev); }
+      else measure.push(ev);
+    });
+    flush();
+    return out;
+  }
+
+  function arrangeMeasure(mev, ctx, beatLen) {
+    var evs = mev.map(cloneEv);
+    var startChord = ctx.currentChord;
+    var chordChanges = [], run = 0;
+    evs.forEach(function (e) {
+      if (e.type === 'note' && e.chordSym) {
+        var c = parseChordRoot(e.chordSym);
+        if (c) { ctx.currentChord = c; chordChanges.push({ time: run, chord: c }); }
+      }
+      run += e.dur || 0;
+    });
+    var measureLen = run;
+    function activeChordAt(tm) {
+      var c = startChord;
+      for (var k = 0; k < chordChanges.length; k++) {
+        if (chordChanges[k].time <= tm + 1e-9) c = chordChanges[k].chord; else break;
+      }
+      return c;
+    }
+    function coverIndex(time) {
+      var acc = 0;
+      for (var k = 0; k < evs.length; k++) {
+        var d = evs[k].dur || 0;
+        if (time >= acc - 1e-9 && time < acc + d - 1e-9) return { i: k, onset: acc };
+        acc += d;
+      }
+      return null;
+    }
+    bassOnsets(measureLen, beatLen).forEach(function (o) {
+      if (o.time >= measureLen - 1e-9) return;
+      var chord = activeChordAt(o.time);
+      if (!chord) return;
+      var pc = o.degree === 'root' ? chord.bassPc : chord.fifthPc;
+      var loc = coverIndex(o.time);
+      if (!loc) return;
+      var e = evs[loc.i], atStart = Math.abs(loc.onset - o.time) < 1e-9;
+      var bassEv = function (dur) {
+        return { type: 'note', midis: [], dur: dur, bass: { pitchClass: pc, degree: o.degree },
+                 isBassOnly: true, chordSym: null, tie: false };
+      };
+      if (e.type === 'note' && e.midis.length > 0) {
+        if (atStart) e.bass = { pitchClass: pc, degree: o.degree };
+        else { var rem = (loc.onset + e.dur) - o.time; e.dur = o.time - loc.onset; evs.splice(loc.i + 1, 0, bassEv(rem)); }
+      } else if (e.type === 'note') {                 // 이미 베이스 전용
+        if (atStart) { if (!e.bass) e.bass = { pitchClass: pc, degree: o.degree }; }
+        else { var rem2 = (loc.onset + e.dur) - o.time; e.dur = o.time - loc.onset; evs.splice(loc.i + 1, 0, bassEv(rem2)); }
+      } else {                                        // 쉼표 구간 → 베이스만 튕김
+        if (atStart) {
+          var bdur = Math.min(e.dur, beatLen), restRem = e.dur - bdur;
+          e.type = 'note'; e.midis = []; e.bass = { pitchClass: pc, degree: o.degree }; e.isBassOnly = true; e.dur = bdur;
+          if (restRem > 1e-9) evs.splice(loc.i + 1, 0, { type: 'rest', dur: restRem });
+        } else {
+          var before = o.time - loc.onset, bdur2 = Math.min((loc.onset + e.dur) - o.time, beatLen);
+          var after = (loc.onset + e.dur) - o.time - bdur2;
+          e.dur = before;
+          var ins = [bassEv(bdur2)];
+          if (after > 1e-9) ins.push({ type: 'rest', dur: after });
+          evs.splice.apply(evs, [loc.i + 1, 0].concat(ins));
+        }
+      }
+    });
+    return evs;
   }
 
   function assignChord(midis, capo, maxFret, handPos, warnings, idx) {
@@ -608,6 +832,18 @@ var TabCore = (function () {
                dur: e.dur, chordSym: e.chordSym, tie: e.tie };
     });
 
+    var bassMode = (opts.bass && opts.bass !== 'off') ? opts.bass : null;
+    if (bassMode) {
+      var chordCount = events.filter(function (e) { return e.type === 'note' && e.chordSym; }).length;
+      if (!chordCount) {
+        var auto = autoChords(events, song.key);          // 코드 없으면 조성 기준 자동 코드 삽입
+        result.autoChords = auto.symbols;
+        result.autoChordApplied = true;
+      }
+      events = buildBassLine(events, song.meter, song.unit);
+      result.bassApplied = true;
+    }
+
     var fretWarnings = assignFrets(events, { capo: capo, maxFret: maxFret });
     var seen = {};
     fretWarnings.forEach(function (w) { if (!seen[w.msg]) { seen[w.msg] = 1; result.warnings.push(w.msg); } });
@@ -617,7 +853,9 @@ var TabCore = (function () {
     header.push('조성: ' + song.key.name + ' · 박자: ' + song.meter +
                 (song.tempo ? ' · 템포: ' + song.tempo : '') +
                 ' · 보이스: ' + v.id +
-                (shift ? ' · 옥타브 보정: ' + (shift > 0 ? '+' : '') + (shift / 12) : ''));
+                (shift ? ' · 옥타브 보정: ' + (shift > 0 ? '+' : '') + (shift / 12) : '') +
+                (result.bassApplied ? ' · 쿵짝 베이스(낮은 줄 E·A·D)' : ''));
+    if (result.autoChordApplied) header.push('자동 코드(조성 ' + song.key.name + '): ' + result.autoChords.join(' '));
     header.push('');
 
     result.tab = header.join('\n') + renderAscii(events, { width: opts.width || 84 });
@@ -630,6 +868,8 @@ var TabCore = (function () {
     TUNING: TUNING, STRING_LABELS: STRING_LABELS,
     parseKey: parseKey, parseABC: parseABC, pickVoice: pickVoice,
     autoShift: autoShift, candidatesFor: candidatesFor, assignFrets: assignFrets,
+    parseChordRoot: parseChordRoot, buildBassLine: buildBassLine, bassOnsets: bassOnsets,
+    diatonicCandidates: diatonicCandidates, autoChords: autoChords, pcToName: pcToName,
     renderAscii: renderAscii, convert: convert
   };
 })();
@@ -667,7 +907,8 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
       octaveShift: $('optOct').value,
       capo: parseInt($('optCapo').value, 10) || 0,
       maxFret: parseInt($('optMaxFret').value, 10) || 15,
-      width: parseInt($('optWidth').value, 10) || 84
+      width: parseInt($('optWidth').value, 10) || 84,
+      bass: $('optBass').value
     };
   }
 
@@ -704,6 +945,8 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
       tabOut.textContent = res.tab;
       metaLine.textContent = '보이스 ' + res.voiceUsed +
         (res.shift ? ' · 옥타브 자동보정 ' + (res.shift > 0 ? '+' : '') + (res.shift / 12) : '') +
+        (res.bassApplied ? ' · 쿵짝 베이스 ON(낮은 줄)' : '') +
+        (res.autoChordApplied ? ' · 자동 코드: ' + res.autoChords.join(' ') : '') +
         ' · 튜닝 EADGBE';
       $('btnCopy').disabled = $('btnSave').disabled = false;
     } else {
@@ -741,7 +984,7 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
   }
 
   abcIn.addEventListener('input', scheduleConvert);
-  ['optVoice', 'optOct', 'optCapo', 'optMaxFret', 'optWidth'].forEach(function (id) {
+  ['optVoice', 'optOct', 'optCapo', 'optMaxFret', 'optWidth', 'optBass'].forEach(function (id) {
     $(id).addEventListener('change', convertNow);
   });
   $('btnConvert').addEventListener('click', convertNow);
