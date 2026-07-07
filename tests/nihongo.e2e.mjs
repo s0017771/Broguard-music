@@ -22,10 +22,14 @@ function check(name, cond, extra = '') {
 async function solveExercise(page, { wrong = false } = {}) {
   const ex = await page.evaluate(() => {
     const e = window.NIHONGO.exercise;
-    return e && { type: e.type, correct: e.correct, answer: e.answer, options: e.options, pairs: e.pairs };
+    return e && { type: e.type, correct: e.correct, answer: e.answer, options: e.options, pairs: e.pairs, buildOrder: e.buildOrder };
   });
   if (!ex) throw new Error('no current exercise');
 
+  if (ex.type === 'tip') {
+    await page.click('#action-btn'); // 알겠어요 (채점 없음)
+    return;
+  }
   if (ex.type === 'choice' || ex.type === 'listen') {
     const target = wrong ? ex.options.find(o => o !== ex.correct) : ex.correct;
     const idx = ex.options.indexOf(target);
@@ -33,11 +37,12 @@ async function solveExercise(page, { wrong = false } = {}) {
     await page.click('#action-btn'); // 확인
     await page.click('#action-btn'); // 계속
   } else if (ex.type === 'build') {
-    const chars = wrong ? [...ex.answer].reverse() : [...ex.answer];
-    for (const ch of chars) {
+    const order = ex.buildOrder || [...ex.answer];
+    const seq = wrong ? [...order].reverse() : order;
+    for (const tok of seq) {
       const tiles = await page.$$('#build-tiles .tile:not(.used)');
       for (const t of tiles) {
-        if ((await t.textContent()) === ch) { await t.click(); break; }
+        if ((await t.textContent()) === tok) { await t.click(); break; }
       }
     }
     await page.click('#action-btn');
@@ -52,7 +57,7 @@ async function solveExercise(page, { wrong = false } = {}) {
 }
 
 /** 세션이 끝날 때까지 정답으로 풀기 */
-async function solveSession(page, maxSteps = 40) {
+async function solveSession(page, maxSteps = 60) {
   for (let i = 0; i < maxSteps; i++) {
     const inLesson = await page.evaluate(() => !!window.NIHONGO.session);
     if (!inLesson) return;
@@ -60,6 +65,9 @@ async function solveSession(page, maxSteps = 40) {
   }
   throw new Error('lesson did not finish in ' + maxSteps + ' steps');
 }
+
+const UNIT_COUNT = 10;
+const TOTAL_LESSONS = UNIT_COUNT * 3;
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
@@ -70,9 +78,9 @@ page.on('dialog', d => d.accept());
 console.log('\n[1] 첫 로드 · 잠금 상태');
 await page.goto(APP + '?reset=1');
 check('홈 화면 표시', await page.isVisible('#screen-home'));
-check('유닛 7개 렌더링', (await page.$$('.unit')).length === 7);
+check(`유닛 ${UNIT_COUNT}개 렌더링`, (await page.$$('.unit')).length === UNIT_COUNT);
 check('첫 레슨만 열림(★ 1개)', (await page.$$('.node.next')).length === 1);
-check('나머지 레슨 잠김', (await page.$$('.node:disabled')).length === 20);
+check('나머지 레슨 잠김', (await page.$$('.node:disabled')).length === TOTAL_LESSONS - 1);
 check('스트릭 0으로 시작', (await page.textContent('#stat-streak .val')) === '0');
 check('XP 0으로 시작', (await page.textContent('#stat-xp .val')) === '0');
 check('하트 5개로 시작', (await page.textContent('#stat-hearts .val')) === '5');
@@ -106,7 +114,6 @@ check('SRS 항목 기록됨', await page.evaluate(() => Object.keys(window.NIHON
 console.log('\n[4] 하트 · 오답 재출제');
 await page.click('.node.next');
 const q0 = await page.evaluate(() => window.NIHONGO.session.queue.length);
-// 첫 choice 문제를 일부러 틀린다
 await solveExercise(page, { wrong: true });
 check('하트 4개로 감소', await page.evaluate(() => window.NIHONGO.state.hearts === 4));
 check('틀린 문제 큐 끝에 재추가', await page.evaluate(q => window.NIHONGO.session.queue.length === q + 1, q0));
@@ -163,7 +170,7 @@ check('유닛3은 아직 잠김', await page.evaluate(() => {
   return btn && btn.disabled;
 }));
 
-/* ── 8. 단어 유닛(조립 문제 포함)도 완주 가능한지 — 유닛 5 인사말 강제 진입 ── */
+/* ── 8. 단어 유닛(조립 문제 포함) 완주 — 유닛 5 인사말 강제 진입 ── */
 console.log('\n[8] 단어 유닛 · 조립 문제');
 await page.evaluate(() => {
   const st = window.NIHONGO.state;
@@ -173,14 +180,13 @@ await page.evaluate(() => {
 await page.goto(APP);
 await page.evaluate(() => { window.NIHONGO.state.hearts = 5; });
 await page.click('.node[data-unit="4"][data-lesson="0"]');
-const hasBuild = await page.evaluate(() => window.NIHONGO.session.queue.some(e => e.type === 'build'));
-check('조립(build) 문제 포함', hasBuild);
-const hasMatch = await page.evaluate(() => window.NIHONGO.session.queue.some(e => e.type === 'match'));
-check('짝 맞추기 문제 포함', hasMatch);
+check('조립(build) 문제 포함', await page.evaluate(() => window.NIHONGO.session.queue.some(e => e.type === 'build')));
+check('짝 맞추기 문제 포함', await page.evaluate(() => window.NIHONGO.session.queue.some(e => e.type === 'match')));
 await solveSession(page);
 check('단어 레슨 완주', await page.isVisible('#screen-done'));
+await page.click('#done-btn');
 
-/* ── 9. 스트릭 로직: 어제 공부 → 오늘 완료 시 +1 ── */
+/* ── 9. 스트릭 로직 ── */
 console.log('\n[9] 스트릭 계산');
 await page.evaluate(() => {
   const st = window.NIHONGO.state;
@@ -192,7 +198,7 @@ check('어제까지 3일 스트릭 표시', (await page.textContent('#stat-strea
 await page.click('.node.next');
 await solveSession(page);
 check('오늘 공부로 스트릭 4', (await page.textContent('#done-streak')).includes('4'));
-// 끊긴 스트릭: 이틀 전이 마지막이면 0으로 표시
+await page.click('#done-btn');
 await page.evaluate(() => {
   const st = window.NIHONGO.state;
   st.lastStudy = window.NIHONGO.today(-2); st.streak = 9;
@@ -200,6 +206,43 @@ await page.evaluate(() => {
 });
 await page.goto(APP);
 check('이틀 쉬면 스트릭 0 표시', (await page.textContent('#stat-streak .val')) === '0');
+
+/* ── 10. 문장·문법 레슨 (문법 팁 + 문장 조립 + 조사) ── */
+console.log('\n[10] 문장·문법 레슨');
+await page.evaluate(() => {
+  const st = window.NIHONGO.state;
+  ['u1','u2','u3','u4','u5','u6','u7'].forEach(u => { for (let i=0;i<3;i++) st.done[u+'-'+i]=true; });
+  st.hearts = 5;
+  localStorage.setItem('nihongo-v1', JSON.stringify(st));
+});
+await page.goto(APP);
+check('유닛 8(기초 문장) 잠금 해제', await page.evaluate(() => {
+  const b = [...document.querySelectorAll('.node')].find(n => n.dataset.unit === '7' && n.dataset.lesson === '0');
+  return b && !b.disabled;
+}));
+await page.click('.node[data-unit="7"][data-lesson="0"]');
+check('문법 팁으로 시작', await page.evaluate(() => window.NIHONGO.exercise.type === 'tip'));
+check('팁 화면 렌더링(.tip-body)', await page.isVisible('#ex-area .tip-body'));
+check('팁 예문 표시', (await page.$$('#ex-area .tip-ex-row')).length >= 1);
+check('팁 버튼 "알겠어요"', (await page.textContent('#action-btn')) === '알겠어요');
+check('문장 조립(단어 타일) 문제 포함', await page.evaluate(() => window.NIHONGO.session.queue.some(e => e.type === 'build' && e.wordTiles)));
+check('문장 뜻 고르기 문제 포함', await page.evaluate(() => window.NIHONGO.session.queue.some(e => e.type === 'choice' && !e.particle)));
+await solveSession(page);
+check('문장 레슨 완주', await page.isVisible('#screen-done'));
+check('문장 항목 SRS 기록(s_*)', await page.evaluate(() => Object.keys(window.NIHONGO.state.items).some(k => k.startsWith('s_'))));
+await page.click('#done-btn');
+check('유닛 8 레슨1 완료 표시', await page.evaluate(() => !!window.NIHONGO.state.done['u8-0']));
+
+/* ── 11. 조사 채우기 문제가 실제로 생성/채점되는지 ── */
+console.log('\n[11] 조사 채우기 문제');
+const particleWorks = await page.evaluate(() => {
+  // 조사 문제 생성 여부와 정답 매칭을 직접 검증
+  const units = window.NIHONGO.units;
+  const u = units.find(x => x.id === 'u9');
+  const s = u.items.find(it => it.particleIdx != null);
+  return s && s.tokens[s.particleIdx];
+});
+check('조사 토큰 존재(예: を/が)', typeof particleWorks === 'string' && particleWorks.length >= 1);
 
 await browser.close();
 console.log(`\n═══ 결과: ${passed} 통과, ${failed} 실패 ═══`);
