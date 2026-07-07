@@ -85,6 +85,22 @@ await check('.txt 저장 버튼이 타브 내용을 다운로드한다', async (
   assert.ok(content.includes('e|') && content.includes('E|'), '다운로드 파일에 타브 내용 포함');
 });
 
+await check('쿵짝 베이스 켜면 낮은 줄에 베이스가 추가된다', async () => {
+  await page.selectOption('#optBass', 'off');
+  await page.fill('#abcIn', 'X:1\nT:베이스테스트곡\nM:4/4\nL:1/8\nK:C\n"C"G2 G2 A2 A2 | "G"G2 E2 D2 E2 |');
+  await page.waitForFunction(() =>
+    document.getElementById('tabOut').textContent.includes('베이스테스트곡'), undefined, { timeout: 5000 });
+  await page.selectOption('#optBass', 'boomchick');
+  await page.waitForFunction(() =>
+    document.getElementById('tabOut').textContent.includes('쿵짝 베이스'), undefined, { timeout: 5000 });
+  const tab = await page.textContent('#tabOut');
+  const lines = tab.split('\n');
+  const lowRows = lines.filter(l => /^[EA]\|/.test(l));
+  assert.ok(lowRows.some(l => /\d/.test(l.slice(2))), '낮은 줄(E/A)에 베이스 숫자가 있어야 함');
+  const meta = await page.textContent('#metaLine');
+  assert.ok(meta.includes('쿵짝'), 'metaLine에 쿵짝 표시');
+});
+
 await check('빈 입력이면 버튼 비활성 + 안내 문구', async () => {
   await page.fill('#abcIn', '');
   await page.waitForFunction(() => document.getElementById('btnCopy').disabled === true, { timeout: 3000 });

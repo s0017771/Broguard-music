@@ -252,3 +252,102 @@ test('convert: 높은 피아노 멜로디 자동 옥타브 하향', () => {
     if (ev.type === 'note') assert.ok(ev.frets[0].fret <= 15);
   }
 });
+
+// ==================== 쿵짝 베이스 반주 ====================
+test('parseChordRoot: 루트·5도·슬래시 베이스', () => {
+  assert.deepEqual(TabCore.parseChordRoot('C'), { rootPc: 0, fifthPc: 7, bassPc: 0 });
+  assert.deepEqual(TabCore.parseChordRoot('G7'), { rootPc: 7, fifthPc: 2, bassPc: 7 });
+  assert.deepEqual(TabCore.parseChordRoot('Am'), { rootPc: 9, fifthPc: 4, bassPc: 9 });
+  assert.deepEqual(TabCore.parseChordRoot('F#m'), { rootPc: 6, fifthPc: 1, bassPc: 6 });
+  assert.deepEqual(TabCore.parseChordRoot('Bb'), { rootPc: 10, fifthPc: 5, bassPc: 10 });
+  assert.equal(TabCore.parseChordRoot('C/E').bassPc, 4);   // 슬래시 코드: 베이스 E
+  assert.equal(TabCore.parseChordRoot('Ddim').fifthPc, 8); // 감5도
+  assert.equal(TabCore.parseChordRoot(''), null);
+  assert.equal(TabCore.parseChordRoot('N.C.'), null);
+});
+
+test('bassOnsets: 박자별 쿵짝 위치', () => {
+  // 4/4, L=1/8 → measureLen 8, beatLen 2 : 1박 루트, 3박 5도
+  assert.deepEqual(TabCore.bassOnsets(8, 2), [{ time: 0, degree: 'root' }, { time: 4, degree: 'fifth' }]);
+  // 3/4 왈츠 → 첫 박 루트만
+  assert.deepEqual(TabCore.bassOnsets(6, 2), [{ time: 0, degree: 'root' }]);
+  // 2/4 → 두 박 모두
+  assert.deepEqual(TabCore.bassOnsets(4, 2), [{ time: 0, degree: 'root' }, { time: 2, degree: 'fifth' }]);
+});
+
+test('convert+bass: 멜로디는 유지되고 낮은 줄에 베이스가 추가된다', () => {
+  const plain = TabCore.convert(PIANO_ABC, {});
+  const bass = TabCore.convert(PIANO_ABC, { bass: 'boomchick' });
+  assert.ok(bass.ok && bass.bassApplied);
+  // 멜로디 음(높은 줄, string>=3) 개수는 그대로 보존
+  const melodyNotes = ev => ev.events.filter(e => e.type === 'note' && e.midis.length > 0).length;
+  assert.equal(melodyNotes(bass), melodyNotes(plain));
+  // 베이스는 낮은 세 줄(E·A·D = string 0,1,2)에만
+  let bassCount = 0;
+  for (const ev of bass.events) {
+    if (ev.type !== 'note') continue;
+    const melodyStrings = ev.midis.length; // 참고용
+    for (const f of ev.frets) {
+      assert.ok(f.fret >= 0 && f.fret <= 15);
+    }
+    if (ev.bass) {
+      bassCount++;
+      const bassFrets = ev.frets.filter(f => f.string <= 2);
+      assert.ok(bassFrets.length >= 1, '베이스가 낮은 줄에 배치되어야 함');
+    }
+    if (ev.isBassOnly) {
+      assert.equal(ev.midis.length, 0, '베이스 전용 이벤트는 멜로디 음이 없어야 함');
+      assert.ok(ev.frets.every(f => f.string <= 2), '베이스 전용은 낮은 줄에만');
+    }
+  }
+  assert.ok(bassCount > 0, '베이스 음이 실제로 추가되어야 함');
+});
+
+test('convert+bass: C코드 1박=루트C, 3박=5도G (알터네이팅 베이스)', () => {
+  const res = TabCore.convert('X:1\nM:4/4\nL:1/8\nK:C\n"C"G2 G2 G2 G2 |', { bass: 'boomchick' });
+  assert.ok(res.bassApplied);
+  const noteEvents = res.events.filter(e => e.type === 'note');
+  // 1박(첫 이벤트): 루트 C(pitchClass 0)
+  assert.equal(noteEvents[0].bass.pitchClass % 12, 0);
+  // 3박에 5도 G(pitchClass 7)가 존재
+  assert.ok(noteEvents.some(e => e.bass && e.bass.pitchClass % 12 === 7), '3박 5도 G');
+  // 실제 프렛: 어떤 베이스 음이든 낮은 줄에서 해당 음정을 낸다
+  const TUNING = TabCore.TUNING;
+  for (const e of noteEvents) {
+    if (!e.bass) continue;
+    const bf = e.frets.filter(f => f.string <= 2);
+    assert.ok(bf.some(f => (TUNING[f.string] + f.fret) % 12 === e.bass.pitchClass % 12),
+      '베이스 프렛이 지정한 음정을 내야 함');
+  }
+});
+
+test('convert+bass: 긴 음표 아래에서도 3박 베이스가 들어간다(분할)', () => {
+  // 온음표 멜로디 한 개 + C코드 → 1박 루트(겹침) + 3박 5도(분할된 베이스 전용)
+  const res = TabCore.convert('X:1\nM:4/4\nL:1/8\nK:C\n"C"C8 |', { bass: 'boomchick' });
+  assert.ok(res.bassApplied);
+  const bassOnly = res.events.filter(e => e.isBassOnly);
+  assert.equal(bassOnly.length, 1, '3박에 베이스 전용 이벤트 1개');
+  assert.equal(bassOnly[0].bass.pitchClass % 12, 7, '5도 G');
+});
+
+test('convert+bass: 코드 심볼이 없으면 경고하고 베이스 미적용', () => {
+  const res = TabCore.convert('X:1\nM:4/4\nL:1/8\nK:C\nG2 G2 A2 A2 |', { bass: 'boomchick' });
+  assert.ok(res.ok);
+  assert.ok(!res.bassApplied);
+  assert.ok(res.warnings.some(w => /코드 심볼/.test(w)));
+});
+
+test('convert+bass: 슬래시 코드는 지정된 베이스 음을 사용', () => {
+  const res = TabCore.convert('X:1\nM:4/4\nL:1/8\nK:C\n"C/E"G2 G2 G2 G2 |', { bass: 'boomchick' });
+  const first = res.events.find(e => e.type === 'note' && e.bass);
+  assert.equal(first.bass.pitchClass % 12, 4, 'C/E → 베이스 E(pitchClass 4)');
+});
+
+test('renderAscii+bass: 낮은 줄(E·A·D)에 숫자가 나타난다', () => {
+  const res = TabCore.convert(PIANO_ABC, { bass: 'boomchick' });
+  const lines = res.tab.split('\n');
+  const eRows = lines.filter(l => /^E\|/.test(l));
+  const aRows = lines.filter(l => /^A\|/.test(l));
+  const hasBassDigit = [...eRows, ...aRows].some(l => /\d/.test(l.slice(2)));
+  assert.ok(hasBassDigit, '낮은 줄에 베이스 프렛 숫자가 표시되어야 함');
+});
