@@ -48,6 +48,13 @@
   .stepbar { display:flex; gap:6px; flex-wrap:wrap; font-size:.74rem; }
   .stepbar span { padding:3px 9px; border-radius:20px; border:1px solid var(--line); color:var(--ink-soft); }
   .stepbar span.on { background:var(--ink); color:#f3efe4; border-color:var(--ink); font-weight:700; }
+  .twocol { display:flex; gap:14px; flex-wrap:wrap; }
+  .twocol > .card { flex:1; min-width:270px; }
+  button.sm { padding:5px 11px; font-size:.78rem; }
+  label.opt { display:flex; align-items:center; gap:5px; font-size:.8rem; color:var(--ink-soft); font-weight:700; }
+  select { font:inherit; font-size:.8rem; padding:5px 7px; border:1px solid var(--line); border-radius:7px; background:#fffdf7; color:var(--ink); }
+  .miniinfo { font-size:.76rem; color:var(--ink-soft); margin-top:8px; line-height:1.5; }
+  .miniinfo .badge { font-size:.68rem; }
   footer { text-align:center; padding:14px; font-size:.72rem; color:#b6ae9c; }
 </style>
 <!-- html-midi-player (구글 Magenta 팀 · 무료 · GM 사운드폰트로 드럼 포함 재생) -->
@@ -57,47 +64,66 @@
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
   <a class="home" href="index.html">&larr; 랩 홈</a>
-  <h1><span class="clef">&#127928;</span>MIDI 드럼 병합 <span class="beta">BETA · 1단계</span></h1>
-  <p>멜로디 MIDI + 드럼 MIDI를 하나로 병합해 어디서나 재생 &middot; 지금은 <b>1단계: MIDI 불러와 재생·분석</b></p>
+  <h1><span class="clef">&#127928;</span>MIDI 드럼 병합 <span class="beta">BETA · 2단계</span></h1>
+  <p>멜로디 MIDI + 드럼 MIDI를 <b>함께 재생</b>해 박자가 맞는지 확인 &middot; PPQ·템포 자동 정합</p>
 </header>
 <main>
 
   <div class="flow">
     <div class="stepbar">
-      <span class="on">1. 불러와 재생·분석</span>
-      <span>2. 두 MIDI 동시 재생</span>
+      <span>1. 불러와 재생·분석</span>
+      <span class="on">2. 두 MIDI 동시 재생</span>
       <span>3. 병합·저장</span>
       <span>4. 랩 통합</span>
     </div>
     <div style="margin-top:8px">
-      <b>&#127925; 이 도구:</b> 뮤직랩 멜로디 MIDI와 Magenta 등에서 만든 드럼 MIDI를 병합합니다.
-      재생 소리는 <b>html-midi-player</b>(구글 Magenta 팀 · 무료)의 GM 사운드폰트로 나며 <b>드럼까지 자연스럽게</b> 들립니다 &middot; <b>인터넷 연결 필요</b>(사운드폰트 로드).
+      <b>&#127925; 2단계:</b> 멜로디 MIDI와 드럼 MIDI를 각각 올린 뒤 <b>함께 재생</b>합니다.
+      PPQ(틱 해상도)와 템포가 달라도 <b>자동으로 480 기준·단일 템포로 정합</b>해 박자를 맞춥니다.
+      소리는 <b>html-midi-player</b>(무료 GM 사운드폰트)로 드럼까지 재생 &middot; <b>인터넷 필요</b>.
+    </div>
+  </div>
+
+  <div class="twocol">
+    <div class="card">
+      <h2>&#127925; ① 멜로디 MIDI</h2>
+      <div id="dzMel" class="dropzone">여기로 멜로디 <b>.mid</b> 드롭 / 클릭</div>
+      <input type="file" id="fileMel" accept=".mid,.midi" style="display:none">
+      <div class="row">
+        <button id="btnSampleMel" class="alt sm">🎵 샘플 멜로디</button>
+        <button id="playMel" class="alt sm" disabled>▶ 멜로디만</button>
+      </div>
+      <div id="infoMel" class="miniinfo"></div>
+    </div>
+    <div class="card">
+      <h2>&#129345; ② 드럼 MIDI</h2>
+      <div id="dzDrum" class="dropzone">여기로 드럼 <b>.mid</b> 드롭 / 클릭</div>
+      <input type="file" id="fileDrum" accept=".mid,.midi" style="display:none">
+      <div class="row">
+        <button id="btnSampleDrum" class="alt sm">🥁 샘플 드럼(Magenta)</button>
+        <button id="playDrum" class="alt sm" disabled>▶ 드럼만</button>
+      </div>
+      <div id="infoDrum" class="miniinfo"></div>
     </div>
   </div>
 
   <div class="card">
-    <h2>&#9836; MIDI 불러오기</h2>
-    <p class="sub">드럼 또는 멜로디 <b>.mid</b> 파일을 올리면 재생하고 구조를 분석합니다.</p>
-    <div id="dropzone" class="dropzone">여기로 <b>.mid 파일</b>을 끌어다 놓거나 클릭해서 선택</div>
-    <input type="file" id="midiFile" accept=".mid,.midi" style="display:none">
+    <h2>&#9654; ③ 함께 재생 (정합 확인)</h2>
     <div class="row">
-      <button id="btnSample" class="alt">&#129345; 샘플 드럼(Magenta) 불러오기</button>
-      <span id="fileName" class="note" style="margin:0"></span>
+      <label class="opt">길이 정합
+        <select id="loopOpt">
+          <option value="asis">그대로 겹치기</option>
+          <option value="loop" selected>짧은 쪽 반복해 맞추기</option>
+        </select>
+      </label>
+      <span style="flex:1"></span>
+      <button id="btnPlayBoth" disabled>&#9654; 멜로디+드럼 함께 재생</button>
     </div>
-  </div>
-
-  <div class="card" id="playCard" style="display:none">
-    <h2>&#9654; 재생</h2>
-    <div id="playerWrap">
+    <div id="playerWrap" style="margin-top:10px; display:none">
       <midi-player id="player" sound-font visualizer="#viz"></midi-player>
       <midi-visualizer id="viz" type="piano-roll"></midi-visualizer>
     </div>
     <p id="playNote" class="note"></p>
-  </div>
-
-  <div class="card" id="infoCard" style="display:none">
-    <h2>&#128202; MIDI 분석</h2>
-    <div id="infoBox"></div>
+    <div id="mergeInfo" class="note"></div>
   </div>
 
 </main>
@@ -174,7 +200,82 @@ var MidiCore = (function () {
              totalTicks: m.totalTicks, bars: Math.round(bars * 100) / 100, hasDrums: tracks.some(function (t) { return t.isDrum; }), tracks: tracks };
   }
 
-  return { parseMidi: parseMidi, describe: describe, GM_DRUM: GM_DRUM };
+  /* ============ SMF 쓰기 + 병합 ============ */
+  function writeVarLen(v) { var buf = [v & 0x7f]; v >>= 7; while (v > 0) { buf.unshift((v & 0x7f) | 0x80); v >>= 7; } return buf; }
+  function str2bytes(s) { var a = []; for (var i = 0; i < s.length; i++) a.push(s.charCodeAt(i) & 0xff); return a; }
+  function u32(v) { return [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff]; }
+  function u16(v) { return [(v >>> 8) & 0xff, v & 0xff]; }
+  function chunk(id, data) { return str2bytes(id).concat(u32(data.length)).concat(data); }
+
+  function trackFromNotes(notes, name) {
+    var abs = [];
+    notes.forEach(function (n) {
+      abs.push({ t: n.startTick, on: true, midi: n.midi, ch: n.channel });
+      abs.push({ t: n.startTick + Math.max(1, n.durTick), on: false, midi: n.midi, ch: n.channel });
+    });
+    abs.sort(function (a, b) { return a.t - b.t || (a.on === b.on ? 0 : a.on ? 1 : -1); }); // off 먼저
+    var trk = [], last = 0;
+    if (name) trk = trk.concat(writeVarLen(0), [0xff, 0x03, name.length], str2bytes(name));
+    abs.forEach(function (e) {
+      trk = trk.concat(writeVarLen(e.t - last));
+      trk.push((e.on ? 0x90 : 0x80) | (e.ch & 0x0f), e.midi & 0x7f, e.on ? 90 : 0);
+      last = e.t;
+    });
+    return trk.concat(writeVarLen(0), [0xff, 0x2f, 0x00]);
+  }
+
+  // 멜로디 MIDI + 드럼 MIDI → 병합 MIDI(멜로디 ch1 + 드럼 ch10, 공통 PPQ·단일 템포)
+  function mergeMidis(melodyBytes, drumBytes, opts) {
+    opts = opts || {};
+    var mel = parseMidi(melodyBytes), drm = parseMidi(drumBytes);
+    var PPQ = opts.targetPpq || 480;
+    var tempo = opts.tempoBpm || mel.tempoBpm || drm.tempoBpm || 120;
+    var ts = mel.timeSig || [4, 4];
+    function rescale(notes, srcPpq, ch) {
+      return notes.map(function (n) {
+        return { midi: n.midi, channel: ch, startTick: Math.round(n.startTick * PPQ / srcPpq), durTick: Math.max(1, Math.round(n.durTick * PPQ / srcPpq)) };
+      });
+    }
+    var melNotes = [], drmNotes = [];
+    mel.tracks.forEach(function (t) { if (!t.isDrum) melNotes = melNotes.concat(rescale(t.notes, mel.ppq, 0)); });
+    drm.tracks.forEach(function (t) { drmNotes = drmNotes.concat(rescale(t.notes, drm.ppq, 9)); }); // 드럼 = 채널 10
+    // 길이 정합: 옵션에 따라 짧은 쪽 반복(loopToMatch)
+    var beatsPerBar = ts[0] * (4 / ts[1]);
+    var melLen = melNotes.reduce(function (a, n) { return Math.max(a, n.startTick + n.durTick); }, 0);
+    var drmLen = drmNotes.reduce(function (a, n) { return Math.max(a, n.startTick + n.durTick); }, 0);
+    if (opts.loopToMatch && melNotes.length && drmNotes.length) {
+      var barTicks = PPQ * beatsPerBar;
+      function loopTo(notes, srcLen, targetLen) {
+        if (srcLen <= 0 || srcLen >= targetLen) return notes;
+        var loopLen = Math.max(barTicks, Math.round(srcLen / barTicks) * barTicks); // 마디 단위로 반복
+        var out = notes.slice(), shift = loopLen;
+        while (shift < targetLen - 1) {
+          notes.forEach(function (n) { if (n.startTick + shift < targetLen) out.push({ midi: n.midi, channel: n.channel, startTick: n.startTick + shift, durTick: n.durTick }); });
+          shift += loopLen;
+        }
+        return out;
+      }
+      var target = Math.max(melLen, drmLen);
+      melNotes = loopTo(melNotes, melLen, target);
+      drmNotes = loopTo(drmNotes, drmLen, target);
+    }
+    var meta = [], uspq = Math.round(60000000 / tempo);
+    meta = meta.concat(writeVarLen(0), [0xff, 0x51, 0x03, (uspq >> 16) & 0xff, (uspq >> 8) & 0xff, uspq & 0xff]);
+    var dd = Math.round(Math.log(ts[1]) / Math.log(2));
+    meta = meta.concat(writeVarLen(0), [0xff, 0x58, 0x04, ts[0], dd, 24, 8]);
+    meta = meta.concat(writeVarLen(0), [0xff, 0x2f, 0x00]);
+    var tracks = [chunk('MTrk', meta)];
+    if (melNotes.length) tracks.push(chunk('MTrk', trackFromNotes(melNotes, 'Melody')));
+    if (drmNotes.length) tracks.push(chunk('MTrk', trackFromNotes(drmNotes, 'Drums')));
+    var header = chunk('MThd', u16(1).concat(u16(tracks.length)).concat(u16(PPQ)));
+    var all = header; tracks.forEach(function (t) { all = all.concat(t); });
+    return { bytes: Uint8Array.from(all), ppq: PPQ, tempoBpm: tempo, timeSig: ts,
+             melBars: Math.round(melLen / (PPQ * beatsPerBar) * 100) / 100,
+             drmBars: Math.round(drmLen / (PPQ * beatsPerBar) * 100) / 100,
+             melNotes: melNotes.length, drmNotes: drmNotes.length };
+  }
+
+  return { parseMidi: parseMidi, describe: describe, mergeMidis: mergeMidis, GM_DRUM: GM_DRUM };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = MidiCore;
 if (typeof window !== 'undefined') window.MidiCore = MidiCore;
@@ -185,79 +286,90 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  // 샘플: Magenta Drumify 4마디 드럼(base64 MIDI)
-  var SAMPLE_B64 = 'TVRoZAAAAAYAAAABANxNVHJrAAABqgD/UQMHoSAAyQAAmSQ0N4kkWj6ZJgM3iSZaKZkqTwqZMyktiSpaCokzWoEgmSQ3N4kkWnqZKhUnmSpBBJkmQQOZMyMDmTIkBokqWieJKloEiSZaA4kzWgOJMlprmTMGM5kkWQSJM1oziSRac5kmDQKZMgIrmSpgCokmWgKZMh0AiTJaK4kqWgyJMlpvmSQVMJkkSgOZMjECmTMFAokkWjCJJFoDiTJaAokzWoEZmSplDZkkESqJKloNiSRaOZkyDTSZMhMDiTJaAZkkCS6ZJFQFiTJaBIkkWi6JJFpzmTIPLpkqUwiZMkoBiTJaLokqWgiJMlo7mTIRAZkmBDaJMloBiSZaKpkkZgeZMkkwiSRaB4kyWoEemSpSCJkyWgKZJBotiSpaCIkyWgKJJFo6mTIMN4kyWiyZJGMFmTJXApkwCTCJJFoFiTJaAokwWoEdmSpRBpkyWTGJKloGiTJab5kyFTGZJGoGmTJIAIkyWgOZKgIuiSRaBokyWgOJKlo6mTIPN4kyWimZKk8HmTJZA5kmCy2JKloHiTJaA4kmWmyZMhM3iTJaAP8vAA==';
+  // 샘플 (base64 MIDI): Magenta Drumify 4마디 드럼 / 4마디 멜로디
+  var SAMPLE_DRUM = 'TVRoZAAAAAYAAAABANxNVHJrAAABqgD/UQMHoSAAyQAAmSQ0N4kkWj6ZJgM3iSZaKZkqTwqZMyktiSpaCokzWoEgmSQ3N4kkWnqZKhUnmSpBBJkmQQOZMyMDmTIkBokqWieJKloEiSZaA4kzWgOJMlprmTMGM5kkWQSJM1oziSRac5kmDQKZMgIrmSpgCokmWgKZMh0AiTJaK4kqWgyJMlpvmSQVMJkkSgOZMjECmTMFAokkWjCJJFoDiTJaAokzWoEZmSplDZkkESqJKloNiSRaOZkyDTSZMhMDiTJaAZkkCS6ZJFQFiTJaBIkkWi6JJFpzmTIPLpkqUwiZMkoBiTJaLokqWgiJMlo7mTIRAZkmBDaJMloBiSZaKpkkZgeZMkkwiSRaB4kyWoEemSpSCJkyWgKZJBotiSpaCIkyWgKJJFo6mTIMN4kyWiyZJGMFmTJXApkwCTCJJFoFiTJaAokwWoEdmSpRBpkyWTGJKloGiTJab5kyFTGZJGoGmTJIAIkyWgOZKgIuiSRaBokyWgOJKlo6mTIPN4kyWimZKk8HmTJZA5kmCy2JKloHiTJaA4kmWmyZMhM3iTJaAP8vAA==';
+  var SAMPLE_MEL = 'TVRoZAAAAAYAAQACAeBNVHJrAAAAHQD/UQMHoSAA/1gEBAIYCAD/AwbYDCBcXBQA/y8ATVRyawAAAHkAkDxQg2CAPAAAkEBQg2CAQAAAkENQg2CAQwAAkEBQg2CAQAAAkEFQg2CAQQAAkEVQg2CARQAAkEhQg2CASAAAkEVQg2CARQAAkENQg2CAQwAAkEdQg2CARwAAkEpQg2CASgAAkEdQg2CARwAAkEhQiyCASAAA/y8A';
 
-  var currentUrl = null;
+  var melBytes = null, drumBytes = null, curUrl = null;
 
-  function b64ToBytes(b64) {
-    var bin = atob(b64), a = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
-    return a;
-  }
-
+  function b64ToBytes(b64) { var bin = atob(b64), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
   function playerReady() { return !!(window.customElements && customElements.get('midi-player')); }
 
-  function loadBytes(bytes, label) {
-    $('fileName').textContent = label || '';
-    // 분석
-    var info;
-    try { info = MidiCore.describe(bytes); }
-    catch (e) { $('infoCard').style.display = 'block'; $('infoBox').innerHTML = '<span class="err">분석 실패: ' + e.message + '</span>'; return; }
-    renderInfo(info);
-    // 재생기
-    $('playCard').style.display = 'block';
+  function miniInfo(bytes) {
+    try {
+      var d = MidiCore.describe(bytes);
+      var kind = d.hasDrums ? '<span class="badge drum">🥁 드럼</span>' : '<span class="badge mel">🎵 멜로디</span>';
+      var drums = '';
+      d.tracks.forEach(function (t) { if (t.drumNotes) drums = '<br><span style="color:var(--drum)">' + t.drumNotes.map(function (x) { return x.name + '×' + x.count; }).join(', ') + '</span>'; });
+      return kind + ' · <b>PPQ ' + d.ppq + '</b>' + (d.ppq !== 480 ? '<span class="warnppq">(→480 환산)</span>' : '') +
+        ' · ' + d.tempoBpm + 'BPM · ' + d.timeSig.join('/') + ' · 약 ' + d.bars + '마디' + drums;
+    } catch (e) { return '<span class="err">분석 실패: ' + e.message + '</span>'; }
+  }
+
+  function refreshButtons() {
+    $('playMel').disabled = !melBytes;
+    $('playDrum').disabled = !drumBytes;
+    $('btnPlayBoth').disabled = !(melBytes && drumBytes);
+  }
+
+  function play(bytes, label, extraNote) {
+    $('playerWrap').style.display = 'block';
     var blob = new Blob([bytes], { type: 'audio/midi' });
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    currentUrl = URL.createObjectURL(blob);
-    var player = $('player');
-    try { player.src = currentUrl; } catch (e) {}
+    if (curUrl) URL.revokeObjectURL(curUrl);
+    curUrl = URL.createObjectURL(blob);
+    try { $('player').src = curUrl; } catch (e) {}
     if (!playerReady()) {
-      $('playNote').innerHTML = '<span class="err">&#9888;&#65039; 재생기(html-midi-player)를 불러오지 못했습니다 — 인터넷 연결 시 사운드폰트로 재생됩니다.</span> 분석은 정상 동작합니다.';
+      $('playNote').innerHTML = '<span class="err">&#9888;&#65039; 재생기(html-midi-player)를 불러오지 못했습니다 — 인터넷 연결 시 재생됩니다.</span>';
     } else {
-      $('playNote').innerHTML = '&#9654; 위 플레이어의 재생 버튼을 누르세요. GM 사운드폰트로 ' + (info.hasDrums ? '<b>드럼 소리</b>까지 ' : '') + '재생됩니다(처음엔 음원 로딩에 몇 초).';
+      $('playNote').innerHTML = '&#9654; <b>' + label + '</b> — 플레이어의 재생 버튼을 누르세요(처음엔 음원 로딩 몇 초). ' + (extraNote || '');
     }
   }
 
-  function renderInfo(info) {
-    $('infoCard').style.display = 'block';
-    var rows = '';
-    function row(k, v) { rows += '<tr><td class="k">' + k + '</td><td>' + v + '</td></tr>'; }
-    row('종류', info.hasDrums ? '<span class="badge drum">🥁 드럼 포함</span>' : '<span class="badge mel">🎵 멜로디(음정)</span>');
-    row('포맷 / PPQ', 'format ' + info.format + ' · <b>PPQ ' + info.ppq + '</b>' +
-      (info.ppq !== 480 ? ' <span class="warnppq">(병합 시 480 기준으로 환산 필요)</span>' : ''));
-    row('템포 / 박자', info.tempoBpm + ' BPM · ' + info.timeSig.join('/'));
-    row('길이', '약 ' + info.bars + '마디 (' + info.totalTicks + '틱)');
-    info.tracks.forEach(function (t) {
-      var label = t.isDrum ? '<span class="badge drum">드럼</span>' : (t.noteCount ? '<span class="badge mel">멜로디</span>' : '(빈 트랙)');
-      var detail = '채널 ' + (t.channels.map(function (c) { return c + 1; }).join(',') || '-') + ' · 노트 ' + t.noteCount;
-      if (t.drumNotes) detail += '<br><span style="color:var(--drum)">' + t.drumNotes.map(function (d) { return d.name + '×' + d.count; }).join(', ') + '</span>';
-      row('트랙 ' + t.index + ' ' + label, detail);
+  function playBoth() {
+    if (!(melBytes && drumBytes)) return;
+    var res;
+    try { res = MidiCore.mergeMidis(melBytes, drumBytes, { loopToMatch: $('loopOpt').value === 'loop' }); }
+    catch (e) { $('mergeInfo').innerHTML = '<span class="err">병합 실패: ' + e.message + '</span>'; return; }
+    play(res.bytes, '멜로디 + 드럼 함께', '박자가 맞는지 들어보세요.');
+    $('mergeInfo').innerHTML = '정합 결과 · <b>PPQ ' + res.ppq + ' · ' + res.tempoBpm + 'BPM</b> · 멜로디 ' + res.melBars + '마디(' + res.melNotes + '음) + 드럼 ' + res.drmBars + '마디(' + res.drmNotes + '음)' +
+      ($('loopOpt').value === 'loop' ? ' · 짧은 쪽 반복' : ' · 그대로 겹침');
+  }
+
+  function setMel(bytes) { melBytes = bytes; $('infoMel').innerHTML = miniInfo(bytes); refreshButtons(); }
+  function setDrum(bytes) { drumBytes = bytes; $('infoDrum').innerHTML = miniInfo(bytes); refreshButtons(); }
+
+  function wireSlot(dzId, fileId, setter) {
+    var dz = $(dzId);
+    dz.addEventListener('click', function () { $(fileId).click(); });
+    $(fileId).addEventListener('change', function () {
+      var f = this.files && this.files[0]; if (!f) { return; }
+      var r = new FileReader(); r.onload = function () { setter(new Uint8Array(r.result)); }; r.readAsArrayBuffer(f); this.value = '';
     });
-    $('infoBox').innerHTML = '<table class="info">' + rows + '</table>';
+    ['dragenter', 'dragover'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('drag'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('drag'); }); });
+    dz.addEventListener('drop', function (e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) { var r = new FileReader(); r.onload = function () { setter(new Uint8Array(r.result)); }; r.readAsArrayBuffer(f); }
+    });
   }
+  wireSlot('dzMel', 'fileMel', setMel);
+  wireSlot('dzDrum', 'fileDrum', setDrum);
 
-  function handleFile(f) {
-    if (!f) return;
-    var r = new FileReader();
-    r.onload = function () { loadBytes(new Uint8Array(r.result), '📄 ' + f.name); };
-    r.readAsArrayBuffer(f);
-  }
-
-  var dz = $('dropzone');
-  dz.addEventListener('click', function () { $('midiFile').click(); });
-  $('midiFile').addEventListener('change', function () { handleFile(this.files && this.files[0]); this.value = ''; });
-  ['dragenter', 'dragover'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('drag'); }); });
-  ['dragleave', 'drop'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('drag'); }); });
-  dz.addEventListener('drop', function (e) { handleFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]); });
-  $('btnSample').addEventListener('click', function () { loadBytes(b64ToBytes(SAMPLE_B64), '🥁 샘플 드럼 (Magenta Drumify · 4마디)'); });
+  $('btnSampleMel').addEventListener('click', function () { setMel(b64ToBytes(SAMPLE_MEL)); });
+  $('btnSampleDrum').addEventListener('click', function () { setDrum(b64ToBytes(SAMPLE_DRUM)); });
+  $('playMel').addEventListener('click', function () { if (melBytes) play(melBytes, '멜로디만'); });
+  $('playDrum').addEventListener('click', function () { if (drumBytes) play(drumBytes, '드럼만'); });
+  $('btnPlayBoth').addEventListener('click', playBoth);
 
   // 테스트 훅
   if (/[?&]autotest=1/.test(location.search)) {
     try {
-      var d = MidiCore.describe(b64ToBytes(SAMPLE_B64));
-      loadBytes(b64ToBytes(SAMPLE_B64), 'sample');
-      window.__autotest = { ok: true, hasDrums: d.hasDrums, ppq: d.ppq, bars: d.bars, drumTrack: d.tracks.some(function (t) { return t.isDrum; }) };
+      setMel(b64ToBytes(SAMPLE_MEL)); setDrum(b64ToBytes(SAMPLE_DRUM));
+      var res = MidiCore.mergeMidis(b64ToBytes(SAMPLE_MEL), b64ToBytes(SAMPLE_DRUM), { loopToMatch: true });
+      var back = MidiCore.describe(res.bytes);
+      window.__autotest = { ok: true, mergedPpq: res.ppq, hasDrums: back.hasDrums,
+        melCh: back.tracks.some(function (t) { return !t.isDrum && t.noteCount > 0; }),
+        drumCh: back.tracks.some(function (t) { return t.isDrum; }) };
     } catch (e) { window.__autotest = { ok: false, error: e.message }; }
     window.__autotestDone = true;
   }
