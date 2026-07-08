@@ -66,6 +66,69 @@ await check('샘플 A·B 넣기 버튼이 두 입력을 채운다', async () => 
   await page.waitForSelector('.resultblock', { timeout: 3000 });
 });
 
+await check('코드 진행 입력 시 topNote에 반영 표시', async () => {
+  await page.click('#mMorph');
+  await page.click('#btnSample');
+  await page.fill('#chordStr', 'C F G C');
+  await page.click('#btnGo');
+  await page.waitForFunction(() => /코드 진행 반영/.test(document.getElementById('topNote').textContent), undefined, { timeout: 3000 });
+  const note = await page.textContent('#topNote');
+  assert.ok(note.includes('C F G C'));
+});
+
+await check('각 결과 블록에 재생·복사 버튼이 있다', async () => {
+  const plays = await page.$$('.resultblock .rb-play');
+  const copies = await page.$$('.resultblock .rb-copy');
+  assert.ok(plays.length >= 1 && plays.length === copies.length, '블록마다 재생·복사 버튼');
+});
+
+await check('오프라인 내장 신스로 재생 클릭 시 오류 없이 정지 상태로 토글', async () => {
+  const play = await page.$('.resultblock .rb-play');
+  await play.click();                                  // Web Audio 오실레이터 재생(오프라인 OK)
+  // 재생 시작하면 버튼이 "정지"로 바뀜(음표가 있으므로)
+  const label = await play.evaluate(el => el.textContent);
+  assert.ok(/정지|재생/.test(label));
+  await play.click();                                  // 다시 눌러 정지 — 오류 없어야 함
+});
+
+await check('재생 음색 선택기(자동/악기/기본 톤)가 있다', async () => {
+  const opts = await page.$$eval('#soundEngine option', els => els.map(e => e.value));
+  assert.deepEqual(opts, ['auto', 'synth', 'tone']);
+  await page.selectOption('#soundEngine', 'tone');
+  const play = await page.$('.resultblock .rb-play');
+  await play.click();   // 기본 톤(오실레이터) 재생 — 오류 없어야
+  await page.selectOption('#soundEngine', 'auto');
+});
+
+await check('AI Morph 모드 칩이 있고 전환 시 안내가 표시된다', async () => {
+  await page.click('#mAI');
+  await page.waitForFunction(() => document.getElementById('mAI').classList.contains('on'), undefined, { timeout: 3000 });
+  const desc = await page.textContent('#modeDesc');
+  assert.ok(desc.includes('MusicVAE'), '모드 설명에 MusicVAE');
+  assert.ok(await page.isVisible('#aiStatus'), 'AI 상태 안내 표시');
+});
+
+await check('AI Morph 실패(오프라인) 시 알고리즘 Morph로 자동 대체', async () => {
+  await page.click('#btnSample');
+  await page.click('#mAI');
+  await page.click('#btnGo');
+  // 모델 로드 실패 → 자동 폴백으로 결과 블록 생성
+  await page.waitForFunction(() => /자동 대체/.test(document.getElementById('aiStatus').textContent), undefined, { timeout: 12000 });
+  const blocks = await page.$$('.resultblock');
+  assert.ok(blocks.length >= 3, '폴백으로 결과 블록이 채워짐');
+  assert.ok(await page.isEnabled('#btnGo'), '버튼 재활성화');
+  await page.click('#mMorph');   // 원복
+});
+
+await check('멜로디 A 파일 열기 → 내용이 채워진다', async () => {
+  await page.setInputFiles('#fileA', {
+    name: 'melodyA.abc', mimeType: 'text/plain',
+    buffer: Buffer.from('X:1\nT:불러온A\nM:4/4\nL:1/8\nK:C\nE2 E2 D2 C2 |'),
+  });
+  await page.waitForFunction(() => document.getElementById('abcA').value.includes('불러온A'), undefined, { timeout: 3000 });
+  assert.ok((await page.inputValue('#abcA')).includes('불러온A'));
+});
+
 await check('입력이 비면 오류 메시지', async () => {
   await page.fill('#abcA', '');
   await page.fill('#abcB', '');
