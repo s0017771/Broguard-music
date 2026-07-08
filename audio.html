@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오디오 → MIDI 변환기 — 브로가드 뮤직 랩</title>
+<style>
+  :root {
+    --ink: #1c2b3a; --ink-soft: #46586b;
+    --paper: #faf8f2; --card: #ffffff; --line: #ddd6c8;
+    --brass: #b08a2e; --brass-deep: #8f6e1f; --warn: #a33c2e; --ok: #2f7d5b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Segoe UI', sans-serif;
+    background: var(--paper); color: var(--ink); min-height: 100vh; display: flex; flex-direction: column; }
+  header { position: relative; background: var(--ink); color: #f3efe4; padding: 26px 22px 22px; overflow: hidden; }
+  .staff-lines { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 11px; opacity: .2; pointer-events: none; }
+  .staff-lines span { display: block; height: 1px; background: #f3efe4; }
+  header h1 { position: relative; font-size: 1.3rem; font-weight: 800; letter-spacing: .04em; }
+  header h1 .clef { color: var(--brass); font-size: 1.7rem; vertical-align: -3px; margin-right: 9px; font-weight: 400; }
+  header p { position: relative; margin-top: 5px; font-size: .8rem; color: #c9c2b0; }
+  header a.home { position: absolute; right: 16px; top: 16px; color: #c9c2b0; font-size: .78rem; text-decoration: none; z-index: 1; }
+  header a.home:hover { color: var(--brass); }
+  main { flex: 1; max-width: 900px; width: 100%; margin: 0 auto; padding: 18px 14px 50px; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .card h2 { font-size: .95rem; font-weight: 800; color: var(--brass-deep); margin-bottom: 4px; letter-spacing: .03em; }
+  .card .sub { font-size: .76rem; color: var(--ink-soft); margin-bottom: 10px; line-height: 1.5; }
+  textarea { width: 100%; min-height: 130px; resize: vertical; font-family: 'D2Coding', Consolas, Menlo, monospace;
+    font-size: .84rem; line-height: 1.5; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #fffdf7; color: var(--ink); }
+  textarea:focus { outline: 2px solid var(--brass); border-color: transparent; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  label.fld { font-size: .76rem; color: var(--ink-soft); display: flex; flex-direction: column; gap: 3px; }
+  input[type=number] { font: inherit; font-size: .82rem; width: 90px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: #fffdf7; }
+  button { font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; background: var(--ink); color: #f3efe4; border: 0; border-radius: 9px; padding: 8px 14px; }
+  button.alt { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .45; cursor: default; }
+  .chip { font-size: .8rem; font-weight: 700; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line); background: #fffdf7; color: var(--ink-soft); cursor: pointer; }
+  .chip.on { background: var(--brass); border-color: var(--brass); color: #fff; }
+  .dropzone { border: 1.5px dashed var(--line); border-radius: 10px; padding: 22px 14px; text-align: center;
+    color: var(--ink-soft); font-size: .85rem; background: #fffdf7; cursor: pointer; transition: border-color .15s; }
+  .dropzone.drag { border-color: var(--brass); background: #fdf7e8; }
+  .dropzone b { color: var(--brass-deep); }
+  .preview { margin-top: 10px; overflow-x: auto; background: #fff; border-radius: 8px; }
+  .note { font-size: .76rem; color: var(--ink-soft); margin-top: 8px; line-height: 1.6; }
+  .err { color: var(--warn); font-weight: 700; }
+  .ok { color: var(--ok); font-weight: 700; }
+  .flow { padding: 12px 14px; background: var(--card); border: 1px dashed var(--line); border-radius: 12px; font-size: .78rem; color: var(--ink-soft); line-height: 1.7; }
+  .flow b { color: var(--brass-deep); }
+  .status { font-size: .78rem; color: var(--ink-soft); margin-top: 8px; min-height: 1.2em; }
+  footer { text-align: center; padding: 14px; font-size: .72rem; color: #b6ae9c; }
+</style>
+</head>
+<body>
+<header>
+  <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
+  <a class="home" href="index.html">&larr; 랩 홈</a>
+  <h1><span class="clef">&#127908;</span>오디오 &rarr; MIDI 변환기 <small style="font-size:.7rem;color:var(--brass);">VER.1.0</small></h1>
+  <p>노래·연주·허밍(MP3·WAV·녹음)을 분석해 ABC 악보와 MIDI로 &middot; 오프라인 음정추적 + AI(폴리포닉) 선택</p>
+</header>
+<main>
+
+  <div class="flow">
+    <b>&#127925; 어떻게 쓰나요:</b> 오디오 파일을 넣거나 마이크로 녹음 → <b>분석</b> → ABC 악보가 나옵니다.
+    <b>악보 연구소로 보내기</b>로 바로 듣고 편집하거나, <b>.mid 저장</b>으로 다른 프로그램에서 이어 작업하세요.
+    <br><b>오프라인 모드</b>는 <b>단선율</b>(허밍·휘파람·솔로 악기 등 한 번에 한 음)에 정확합니다. 화음이 많은 곡은 <b>AI 모드</b>(인터넷 필요)를 시도하세요.
+  </div>
+
+  <div class="card">
+    <h2>&#9312; 오디오 입력</h2>
+    <p class="sub">MP3·WAV·M4A·OGG 파일을 넣거나 마이크로 직접 녹음하세요.</p>
+    <div id="dropzone" class="dropzone">여기로 <b>오디오 파일</b>을 끌어다 놓거나 클릭해서 선택하세요</div>
+    <input type="file" id="audioFile" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" style="display:none">
+    <div class="row">
+      <button id="btnRec" class="alt">&#128308; 마이크 녹음 시작</button>
+      <span id="recTime" class="note" style="margin:0"></span>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <span style="font-size:.76rem;color:var(--ink-soft)">분석 방식:</span>
+      <button class="chip on" id="chipOffline" data-mode="offline">오프라인 (단선율·확실)</button>
+      <button class="chip" id="chipAI" data-mode="ai">AI (폴리포닉·인터넷)</button>
+    </div>
+    <div class="row">
+      <label class="fld">템포 (BPM)
+        <input type="number" id="tempo" value="100" min="40" max="220">
+      </label>
+      <label class="fld">최소 음 길이 (초)
+        <input type="number" id="minDur" value="0.08" min="0.02" max="0.5" step="0.01">
+      </label>
+      <span style="flex:1"></span>
+      <button id="btnGo" disabled>&#127925; 분석해서 악보 만들기</button>
+    </div>
+    <p id="status" class="status"></p>
+  </div>
+
+  <div class="card">
+    <h2>&#9313; 결과 — ABC 악보</h2>
+    <p class="sub">나온 악보를 듣고, 복사하거나 MIDI로 저장하거나, 다른 랩으로 보내세요.</p>
+    <div class="row" style="margin-top:0">
+      <button id="btnPlay" class="alt" disabled>&#9654; 재생</button>
+      <button id="btnStop" class="alt" disabled>&#9632; 정지</button>
+      <button id="btnCopy" class="alt" disabled>&#128203; ABC 복사</button>
+      <button id="btnSaveAbc" class="alt" disabled>&#128190; .abc 저장</button>
+      <button id="btnSaveMidi" disabled>&#8681; .mid 저장</button>
+      <button id="btnToLab" disabled>&#127925; 악보 연구소로</button>
+      <button id="btnToDrum" disabled>&#129345; 드럼 얹기</button>
+    </div>
+    <textarea id="abcOut" spellcheck="false" readonly placeholder="분석하면 여기에 ABC 악보가 나옵니다." style="margin-top:10px"></textarea>
+    <div id="preview" class="preview"></div>
+    <p id="outNote" class="note"></p>
+  </div>
+
+</main>
+<footer>Broguard Music Lab &middot; Audio → MIDI &middot; 오프라인 YIN 음정추적 + Spotify Basic Pitch(AI)</footer>
+
+<script id="abcmidi-core">
+/* AbcMidi — ABC ↔ MIDI(SMF) 변환 코어 (자체 구현, 오프라인/테스트 가능) */
+var AbcMidi = (function () {
+  'use strict';
+  var PPQ = 480;                                   // 4분음표당 틱
+  var NOTE_BASE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  var SHARP_ORDER = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+  var FLAT_ORDER = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+  var MAJOR_ACC = { 'C':0,'G':1,'D':2,'A':3,'E':4,'B':5,'F#':6,'C#':7,'F':-1,'BB':-2,'EB':-3,'AB':-4,'DB':-5,'GB':-6,'CB':-7 };
+  var MINOR_ACC = { 'A':0,'E':1,'B':2,'F#':3,'C#':4,'G#':5,'D#':6,'A#':7,'D':-1,'G':-2,'C':-3,'F':-4,'BB':-5,'EB':-6,'AB':-7 };
+
+  /* ============ ABC 파싱 ============ */
+  function parseKey(str) {
+    var out = { name: (str || '').trim() || 'C', map: {} };
+    var s = out.name;
+    if (!s || /^none$/i.test(s)) return out;
+    var m = s.match(/^([A-Ga-g])\s*([#b♯♭]?)\s*([A-Za-z]*)/);
+    if (!m) return out;
+    var accCh = (m[2] === '#' || m[2] === '♯') ? '#' : ((m[2] === 'b' || m[2] === '♭') ? 'B' : '');
+    var tonic = m[1].toUpperCase() + accCh;
+    var mode = (m[3] || '').toLowerCase();
+    var minor = /^(m|min|minor|aeo|aeolian)/.test(mode) && !/^maj/.test(mode);
+    var count = (minor ? MINOR_ACC : MAJOR_ACC)[tonic];
+    if (count === undefined) count = 0;
+    var i;
+    if (count > 0) for (i = 0; i < count; i++) out.map[SHARP_ORDER[i]] = 1;
+    else for (i = 0; i < -count; i++) out.map[FLAT_ORDER[i]] = -1;
+    return out;
+  }
+
+  function parseFraction(s) {
+    var m = /^(\d+)\s*\/\s*(\d+)/.exec(s || '');
+    if (!m) return /^\s*(C\|?)\s*$/.test(s || '') ? 1 : null;
+    return parseInt(m[1], 10) / parseInt(m[2], 10);
+  }
+
+  function parseTempo(s) {
+    if (!s) return 120;
+    var m = /=\s*(\d+)/.exec(s);
+    if (m) return parseInt(m[1], 10);
+    m = /(\d+)/.exec(s);
+    return m ? parseInt(m[1], 10) : 120;
+  }
+
+  function readDuration(str, pos) {
+    var num = null, den = 1, slashes = 0;
+    var m = /^(\d+)/.exec(str.slice(pos));
+    if (m) { num = parseInt(m[1], 10); pos += m[1].length; }
+    while (str[pos] === '/') { slashes++; pos++; }
+    if (slashes) {
+      m = /^(\d+)/.exec(str.slice(pos));
+      if (m && slashes === 1) { den = parseInt(m[1], 10); pos += m[1].length; }
+      else den = Math.pow(2, slashes);
+    }
+    return { dur: (num === null ? 1 : num) / den, pos: pos };
+  }
+
+  function readNote(line, pos, key, measureAcc) {
+    var m = /^(\^{1,2}|_{1,2}|=)?([A-Ga-g])([,']*)/.exec(line.slice(pos));
+    if (!m) return null;
+    pos += m[0].length;
+    var accStr = m[1] || null, letter = m[2], marks = m[3] || '';
+    var upper = letter.toUpperCase();
+    var octave = 4 + (letter === letter.toLowerCase() ? 1 : 0);
+    for (var i = 0; i < marks.length; i++) octave += marks[i] === "'" ? 1 : -1;
+    var accKey = upper + octave, alter;
+    if (accStr === '=') { alter = 0; measureAcc[accKey] = 0; }
+    else if (accStr) { alter = (accStr[0] === '^' ? 1 : -1) * accStr.length; measureAcc[accKey] = alter; }
+    else if (accKey in measureAcc) alter = measureAcc[accKey];
+    else alter = key.map[upper] || 0;
+    var midi = 12 * (octave + 1) + NOTE_BASE[upper] + alter;
+    var d = readDuration(line, pos);
+    return { midi: midi, dur: d.dur, pos: d.pos };
+  }
+
+  function applyBroken(line, pos, dur, pending) {
+    if (pending !== null && pending !== undefined) { dur *= pending; pending = null; }
+    if (line[pos] === '>') { dur *= 1.5; pending = 0.5; pos++; while (line[pos] === '>') pos++; }
+    else if (line[pos] === '<') { dur *= 0.5; pending = 1.5; pos++; while (line[pos] === '<') pos++; }
+    return { pos: pos, dur: dur, next: pending };
+  }
+
+  function sameMidis(a, b) {
+    if (a.length !== b.length) return false;
+    var x = a.slice().sort(), y = b.slice().sort();
+    for (var i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+    return true;
+  }
+
+  function pushNote(events, midis, dur, tie) {
+    var j = events.length - 1;
+    while (j >= 0 && events[j].type === 'bar') j--;      // 붙임줄은 마디선을 건너뛰어 병합(MIDI엔 마디 없음)
+    var prev = j >= 0 ? events[j] : null;
+    if (prev && prev.type === 'note' && prev.tie && sameMidis(prev.midis, midis)) {
+      prev.dur += dur; prev.tie = tie; return;
+    }
+    events.push({ type: 'note', midis: midis.slice().sort(function (a, b) { return a - b; }), dur: dur, tie: !!tie });
+  }
+
+  function parseABC(text) {
+    var song = { title: '', meter: '4/4', unit: null, tempoBpm: 120, key: parseKey('C'), voices: {}, voiceOrder: [] };
+    var lines = String(text || '').replace(/\r/g, '').split('\n');
+    var bodyStarted = false, curVoice = null;
+    function voice(id) { if (!song.voices[id]) { song.voices[id] = { id: id, events: [] }; song.voiceOrder.push(id); } return song.voices[id]; }
+
+    for (var li = 0; li < lines.length; li++) {
+      var line = lines[li];
+      if (/^\s*%/.test(line)) continue;
+      var hm = line.match(/^([A-Za-z]):\s?(.*)$/);
+      if (hm && !/^\[/.test(line)) {
+        var f = hm[1], v = hm[2];
+        if (f === 'w' || f === 'W') continue;
+        if (f === 'T') { if (!song.title) song.title = v.trim(); continue; }
+        if (f === 'M') { song.meter = v.trim() || '4/4'; continue; }
+        if (f === 'L') { song.unit = parseFraction(v.trim()); continue; }
+        if (f === 'Q') { song.tempoBpm = parseTempo(v.trim()); continue; }
+        if (f === 'K') { song.key = parseKey(v); bodyStarted = true; continue; }
+        if (f === 'V') { curVoice = voice((v.trim().split(/\s+/)[0] || '1')).id; continue; }
+        continue;
+      }
+      if (!bodyStarted) continue;
+      parseBodyLine(line, song, function (id) { curVoice = voice(id).id; }, function () { return curVoice === null ? voice('1').id : curVoice; });
+    }
+    if (song.unit === null) { var mf = parseFraction(song.meter); song.unit = (mf !== null && mf < 0.75) ? 1 / 16 : 1 / 8; }
+    return song;
+  }
+
+  function parseBodyLine(line, song, setVoice, getVoice) {
+    var pos = 0, len = line.length, brokenNext = null, tuplet = null, measureAcc = {};
+    function curEvents() { return song.voices[getVoice()].events; }
+    function pushBar() { measureAcc = {}; var evs = curEvents(); if (evs.length && evs[evs.length - 1].type !== 'bar') evs.push({ type: 'bar' }); }
+
+    while (pos < len) {
+      var ch = line[pos], rest = line.slice(pos), m;
+      if (ch === ' ' || ch === '\t' || ch === '\\') { pos++; continue; }
+      if ((m = rest.match(/^\[V:\s*([^\]\s]+)\s*\]/))) { setVoice(m[1]); pos += m[0].length; continue; }
+      if ((m = rest.match(/^\[([KMLQ]):([^\]]*)\]/))) {
+        if (m[1] === 'K') song.key = parseKey(m[2]);
+        else if (m[1] === 'L') song.unit = parseFraction(m[2]) || song.unit;
+        else if (m[1] === 'M') song.meter = m[2].trim() || song.meter;
+        else if (m[1] === 'Q') song.tempoBpm = parseTempo(m[2]);
+        pos += m[0].length; continue;
+      }
+      if ((m = rest.match(/^"([^"]*)"/))) { pos += m[0].length; continue; }        // 코드 심볼 무시
+      if ((m = rest.match(/^![^!]*!/)) || (m = rest.match(/^\+[^+]*\+/))) { pos += m[0].length; continue; }
+      if ((m = rest.match(/^\{[^}]*\}/))) { pos += m[0].length; continue; }
+      if ((m = rest.match(/^\((\d)(?::(\d))?(?::(\d))?/))) {
+        var p = parseInt(m[1], 10);
+        var q = m[2] ? parseInt(m[2], 10) : (p === 2 ? 3 : p === 3 ? 2 : p === 4 ? 3 : p === 6 ? 2 : 2);
+        var r = m[3] ? parseInt(m[3], 10) : p;
+        tuplet = { factor: q / p, remain: r }; pos += m[0].length; continue;
+      }
+      if ((m = rest.match(/^(\|\]|\[\||\|\||:\|+|\|:|::|\|)/))) { pushBar(); pos += m[0].length; continue; }
+      if ((m = rest.match(/^\[(\d)/))) { pos += m[0].length; continue; }
+      if (ch === '(' || ch === ')') { pos++; continue; }
+
+      if (ch === '[') {                                                            // 화음
+        var chordNotes = [], innerMax = 0; pos++;
+        while (pos < len && line[pos] !== ']') {
+          if (line[pos] === ' ') { pos++; continue; }
+          var n = readNote(line, pos, song.key, measureAcc);
+          if (!n) { pos++; continue; }
+          chordNotes.push(n); if (n.dur > innerMax) innerMax = n.dur; pos = n.pos;
+        }
+        if (line[pos] === ']') pos++;
+        var d = readDuration(line, pos); pos = d.pos;
+        var cd = (innerMax || 1) * d.dur;
+        var br = applyBroken(line, pos, cd, brokenNext); pos = br.pos; cd = br.dur; brokenNext = br.next;
+        if (tuplet) { cd *= tuplet.factor; if (--tuplet.remain <= 0) tuplet = null; }
+        var t1 = line[pos] === '-'; if (t1) pos++;
+        if (chordNotes.length) pushNote(curEvents(), chordNotes.map(function (x) { return x.midi; }), cd, t1);
+        continue;
+      }
+      if (/^[zxZX]/.test(ch)) {                                                     // 쉼표
+        pos++; var rd = readDuration(line, pos); pos = rd.pos; var rdur = rd.dur;
+        if (ch === 'Z' || ch === 'X') rdur *= (parseFraction(song.meter) / song.unit) || 8;
+        if (tuplet) { rdur *= tuplet.factor; if (--tuplet.remain <= 0) tuplet = null; }
+        curEvents().push({ type: 'rest', dur: rdur });
+        continue;
+      }
+      var note = readNote(line, pos, song.key, measureAcc);
+      if (note) {
+        pos = note.pos; var nd = note.dur;
+        var br2 = applyBroken(line, pos, nd, brokenNext); pos = br2.pos; nd = br2.dur; brokenNext = br2.next;
+        if (tuplet) { nd *= tuplet.factor; if (--tuplet.remain <= 0) tuplet = null; }
+        var t2 = line[pos] === '-'; if (t2) pos++;
+        pushNote(curEvents(), [note.midi], nd, t2);
+        continue;
+      }
+      pos++;
+    }
+  }
+
+  /* ============ ABC → MIDI(SMF) ============ */
+  function writeVarLen(v) {
+    var buf = [v & 0x7f]; v >>= 7;
+    while (v > 0) { buf.unshift((v & 0x7f) | 0x80); v >>= 7; }
+    return buf;
+  }
+  function str2bytes(s) { var a = []; for (var i = 0; i < s.length; i++) a.push(s.charCodeAt(i) & 0xff); return a; }
+  function u32(v) { return [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff]; }
+  function u16(v) { return [(v >>> 8) & 0xff, v & 0xff]; }
+
+  function chunk(id, data) { return str2bytes(id).concat(u32(data.length)).concat(data); }
+
+  function abcToMidi(text, opts) {
+    opts = opts || {};
+    var song = parseABC(text);
+    var Lq = (song.unit || 1 / 8) * 4;                 // L-단위 하나의 4분음표 길이
+    var bpm = opts.tempoBpm || song.tempoBpm || 120;
+    var voices = song.voiceOrder.length ? song.voiceOrder : ['1'];
+
+    // 트랙0: 템포/박자
+    var meta = [];
+    var mtr = (/(\d+)\s*\/\s*(\d+)/.exec(song.meter) || [0, 4, 4]);
+    var uspq = Math.round(60000000 / bpm);
+    meta = meta.concat(writeVarLen(0), [0xff, 0x51, 0x03, (uspq >> 16) & 0xff, (uspq >> 8) & 0xff, uspq & 0xff]);
+    var dd = Math.round(Math.log(parseInt(mtr[2], 10)) / Math.log(2));
+    meta = meta.concat(writeVarLen(0), [0xff, 0x58, 0x04, parseInt(mtr[1], 10), dd, 24, 8]);
+    if (song.title) meta = meta.concat(writeVarLen(0), [0xff, 0x03, song.title.length], str2bytes(song.title));
+    meta = meta.concat(writeVarLen(0), [0xff, 0x2f, 0x00]);
+
+    var tracks = [chunk('MTrk', meta)];
+    voices.forEach(function (vid) {
+      var evs = (song.voices[vid] || { events: [] }).events;
+      var abs = [], t = 0;
+      evs.forEach(function (e) {
+        if (e.type === 'bar') return;
+        var durTicks = Math.round(e.dur * Lq * PPQ);
+        if (e.type === 'note') {
+          e.midis.forEach(function (mm) {
+            if (mm >= 0 && mm <= 127) { abs.push({ t: t, on: true, midi: mm }); abs.push({ t: t + durTicks, on: false, midi: mm }); }
+          });
+        }
+        t += durTicks;
+      });
+      abs.sort(function (a, b) { return a.t - b.t || (a.on === b.on ? 0 : a.on ? 1 : -1); }); // off 먼저
+      var trk = [], last = 0;
+      abs.forEach(function (ev) {
+        trk = trk.concat(writeVarLen(ev.t - last));
+        trk.push(ev.on ? 0x90 : 0x80, ev.midi, ev.on ? 80 : 0);
+        last = ev.t;
+      });
+      trk = trk.concat(writeVarLen(0), [0xff, 0x2f, 0x00]);
+      tracks.push(chunk('MTrk', trk));
+    });
+
+    var header = chunk('MThd', u16(1).concat(u16(tracks.length)).concat(u16(PPQ)));
+    var all = header;
+    tracks.forEach(function (tk) { all = all.concat(tk); });
+    return Uint8Array.from(all);
+  }
+
+  /* ============ MIDI(SMF) 파싱 ============ */
+  function parseMidi(bytes) {
+    bytes = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes);
+    var p = 0;
+    function u32r() { var v = (bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3]; p += 4; return v >>> 0; }
+    function u16r() { var v = (bytes[p] << 8) | bytes[p + 1]; p += 2; return v; }
+    if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'MThd') throw new Error('MThd 헤더가 아닙니다 (올바른 MIDI 파일이 아닙니다).');
+    p = 4; u32r(); var format = u16r(); var ntrk = u16r(); var division = u16r();
+    if (division & 0x8000) throw new Error('SMPTE 타임코드 MIDI는 지원하지 않습니다.');
+    var ppq = division || 480;
+    var out = { ppq: ppq, format: format, tempoBpm: 120, timeSig: [4, 4], tracks: [] };
+    for (var ti = 0; ti < ntrk && p < bytes.length; ti++) {
+      if (String.fromCharCode(bytes[p], bytes[p + 1], bytes[p + 2], bytes[p + 3]) !== 'MTrk') break;
+      p += 4; var len = u32r(); var end = p + len, tick = 0, status = 0;
+      var open = {}, notes = [];
+      function varr() { var v = 0, c; do { c = bytes[p++]; v = (v << 7) | (c & 0x7f); } while (c & 0x80); return v; }
+      while (p < end) {
+        tick += varr();
+        var b = bytes[p];
+        if (b === 0xff) { p++; var type = bytes[p++]; var l = varr(); var data = bytes.slice(p, p + l); p += l;
+          if (type === 0x51 && l === 3) out.tempoBpm = Math.round(60000000 / ((data[0] << 16) | (data[1] << 8) | data[2]));
+          else if (type === 0x58 && l >= 2) out.timeSig = [data[0], Math.pow(2, data[1])];
+          continue;
+        }
+        if (b === 0xf0 || b === 0xf7) { p++; var sl = varr(); p += sl; continue; }
+        if (b & 0x80) { status = b; p++; } // 아니면 러닝 스테이터스
+        var hi = status & 0xf0, ch = status & 0x0f;
+        if (hi === 0x90 || hi === 0x80) {
+          var key = bytes[p++], vel = bytes[p++];
+          var id = ch + ':' + key;
+          if (hi === 0x90 && vel > 0) { (open[id] = open[id] || []).push(tick); }
+          else { var st = open[id] && open[id].shift(); if (st !== undefined) notes.push({ midi: key, startTick: st, durTick: tick - st }); }
+        } else if (hi === 0xc0 || hi === 0xd0) { p += 1; }
+        else { p += 2; }
+      }
+      p = end;
+      out.tracks.push({ notes: notes });
+    }
+    return out;
+  }
+
+  /* ============ MIDI → ABC ============ */
+  var SHARP_ABC = ['C', '^C', 'D', '^D', 'E', 'F', '^F', 'G', '^G', 'A', '^A', 'B'];
+  function midiToAbcNote(m) {
+    var pc = ((m % 12) + 12) % 12, name = SHARP_ABC[pc];
+    var letter = name.slice(-1), acc = name.length > 1 ? name[0] : '';
+    // 옥타브: 60~71 대문자, 72~ 소문자+', 48~59 대문자+',' ...
+    var out;
+    if (m >= 60 && m < 72) out = letter;
+    else if (m >= 72) { out = letter.toLowerCase(); var up = Math.floor((m - 72) / 12); for (var i = 0; i < up; i++) out += "'"; }
+    else { out = letter; var dn = Math.floor((59 - m) / 12) + 1; for (var j = 0; j < dn; j++) out += ','; }
+    return acc + out;
+  }
+  function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { var t = b; b = a % b; a = t; } return a || 1; }
+  function durToAbc(units) {
+    // units = L 단위 개수 (예: 2, 0.5, 1.5)
+    var num = Math.round(units * 4), den = 4, g = gcd(num, den); num /= g; den /= g;
+    if (num === 1 && den === 1) return '';
+    if (den === 1) return String(num);
+    if (num === 1) return '/' + (den === 2 ? '' : den);
+    return num + '/' + den;
+  }
+
+  function midiToAbc(bytes, opts) {
+    opts = opts || {};
+    var mid = parseMidi(bytes);
+    var ppq = mid.ppq;
+    var notes = [];
+    mid.tracks.forEach(function (tk) { tk.notes.forEach(function (n) { notes.push(n); }); });
+    if (!notes.length) return { abc: '', error: 'MIDI에 음표가 없습니다.' };
+    notes.sort(function (a, b) { return a.startTick - b.startTick || a.midi - b.midi; });
+
+    var grid = ppq / 4;                                       // 16분음표 그리드
+    var q = function (t) { return Math.max(0, Math.round(t / grid)) * grid; };
+    notes.forEach(function (n) { n.s = q(n.startTick); n.d = Math.max(grid, q(n.durTick)); });
+
+    // L 결정: 모든 s·d가 8분(=ppq/2)의 배수면 L=1/8, 아니면 1/16
+    var eighth = ppq / 2;
+    var needSix = notes.some(function (n) { return (n.s % eighth) !== 0 || (n.d % eighth) !== 0; });
+    var L = needSix ? 1 / 16 : 1 / 8;
+    var Lticks = ppq * (L * 4);                               // L-단위 하나의 틱
+
+    var ts = mid.timeSig, measureTicks = ts[0] * (4 / ts[1]) * ppq;
+
+    // 시작 틱별로 그룹(동시 시작 = 화음)
+    var groups = [], byStart = {};
+    notes.forEach(function (n) { (byStart[n.s] = byStart[n.s] || []).push(n); });
+    Object.keys(byStart).map(Number).sort(function (a, b) { return a - b; }).forEach(function (s) {
+      var g = byStart[s];
+      var dur = Math.max.apply(null, g.map(function (n) { return n.d; }));
+      groups.push({ start: s, dur: dur, midis: g.map(function (n) { return n.midi; }).sort(function (a, b) { return a - b; }) });
+    });
+
+    // 마디 경계에서 분할(붙임줄) + 쉼표 채우기
+    var body = '', cursor = 0, barCount = 0;
+    function emitToken(midis, ticks, tie) {
+      var lenStr = durToAbc(ticks / Lticks);
+      var tok = midis.length === 1 ? midiToAbcNote(midis[0]) + lenStr
+                                   : '[' + midis.map(midiToAbcNote).join('') + ']' + lenStr;
+      return tok + (tie ? '-' : '');
+    }
+    function barAt(t) { return Math.abs(t % measureTicks) < 1e-6; }
+    // 구간(midis=null 이면 쉼표)을 마디 경계마다 쪼개 붙임줄로 이어 출력
+    function emitSpan(midis, start, dur) {
+      var remain = dur, st = start;
+      while (remain > 1e-6) {
+        var nextBar = (Math.floor(st / measureTicks + 1e-9) + 1) * measureTicks;
+        var seg = Math.min(remain, nextBar - st);
+        var crosses = seg < remain - 1e-6;
+        if (midis) body += emitToken(midis, seg, crosses) + ' ';
+        else body += 'z' + durToAbc(seg / Lticks) + ' ';
+        st += seg; remain -= seg; cursor = st;
+        if (barAt(cursor)) { barCount++; body += (barCount % 4 === 0 ? '|\n' : '| '); } // 4마디마다 줄바꿈
+      }
+    }
+
+    groups.forEach(function (g) {
+      if (g.start > cursor + 1e-6) emitSpan(null, cursor, g.start - cursor);   // 쉼표
+      emitSpan(g.midis, g.start, g.dur);                                       // 음/화음
+    });
+
+    var header = 'X:1\nT:' + (opts.title || 'MIDI에서 변환') + '\nM:' + ts[0] + '/' + ts[1] +
+                 '\nL:' + (L === 1 / 16 ? '1/16' : '1/8') + '\nQ:1/4=' + mid.tempoBpm + '\nK:C\n';
+    var bodyClean = body.replace(/\|\s*$/, '').trim();       // 끝의 바 중복 제거
+    return { abc: header + bodyClean + ' |]', tempoBpm: mid.tempoBpm, timeSig: ts, ppq: ppq, L: L, noteCount: notes.length };
+  }
+
+  return { PPQ: PPQ, parseABC: parseABC, abcToMidi: abcToMidi, parseMidi: parseMidi, midiToAbc: midiToAbc };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = AbcMidi;
+if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
+</script>
+
+<script id="audiomidi-core">
+/* AudioMidi — 오디오(PCM) → 멜로디 → ABC (오프라인 단선율 YIN + 폴리포닉 노트 조립) */
+var AudioMidi = (function () {
+  'use strict';
+  function detectPitch(buf, sampleRate, minHz, maxHz) {
+    var n = buf.length, half = (n / 2) | 0;
+    var diff = new Float32Array(half);
+    for (var tau = 0; tau < half; tau++) {
+      var sum = 0;
+      for (var i = 0; i < half; i++) { var d = buf[i] - buf[i + tau]; sum += d * d; }
+      diff[tau] = sum;
+    }
+    var cmnd = new Float32Array(half); cmnd[0] = 1;
+    var running = 0;
+    for (var t = 1; t < half; t++) { running += diff[t]; cmnd[t] = running ? diff[t] * t / running : 1; }
+    var thr = 0.15, tauEst = -1;
+    var tauMin = Math.max(2, Math.floor(sampleRate / maxHz));
+    var tauMax = Math.min(half - 1, Math.ceil(sampleRate / minHz));
+    for (var tt = tauMin; tt <= tauMax; tt++) {
+      if (cmnd[tt] < thr) { while (tt + 1 <= tauMax && cmnd[tt + 1] < cmnd[tt]) tt++; tauEst = tt; break; }
+    }
+    if (tauEst === -1) return -1;
+    var bt = tauEst;
+    if (tauEst > 0 && tauEst < half - 1) {
+      var s0 = cmnd[tauEst - 1], s1 = cmnd[tauEst], s2 = cmnd[tauEst + 1];
+      var denom = 2 * (2 * s1 - s2 - s0);
+      if (denom) { var adj = (s2 - s0) / denom; if (isFinite(adj) && Math.abs(adj) < 1) bt = tauEst + adj; }
+    }
+    return sampleRate / bt;
+  }
+  function hzToMidi(f) { return Math.round(69 + 12 * Math.log2(f / 440)); }
+
+  function analyzeFrames(pcm, sampleRate, opts) {
+    opts = opts || {};
+    var frameSize = opts.frameSize || 2048, hop = opts.hop || 512;
+    var rmsGate = opts.rmsGate != null ? opts.rmsGate : 0.01;
+    var minHz = opts.minHz || 80, maxHz = opts.maxHz || 1000;
+    var frames = [];
+    for (var start = 0; start + frameSize <= pcm.length; start += hop) {
+      var frame = pcm.subarray(start, start + frameSize);
+      var rms = 0; for (var i = 0; i < frameSize; i++) rms += frame[i] * frame[i]; rms = Math.sqrt(rms / frameSize);
+      var midi = -1;
+      if (rms >= rmsGate) { var hz = detectPitch(frame, sampleRate, minHz, maxHz); if (hz > 0) midi = hzToMidi(hz); }
+      frames.push({ t: start / sampleRate, midi: midi, rms: rms });
+    }
+    return { frames: frames, hopSec: hop / sampleRate };
+  }
+  function medianSmooth(frames, win) {
+    win = win || 5; var half = win >> 1;
+    return frames.map(function (f, i) {
+      var arr = [];
+      for (var k = -half; k <= half; k++) { var j = i + k; if (j >= 0 && j < frames.length) arr.push(frames[j].midi); }
+      arr.sort(function (a, b) { return a - b; });
+      return { t: f.t, midi: arr[arr.length >> 1], rms: f.rms };
+    });
+  }
+  function segment(frames, hopSec, opts) {
+    opts = opts || {};
+    var minDur = opts.minDur != null ? opts.minDur : 0.08;
+    var notes = [], cur = null;
+    frames.forEach(function (f) {
+      if (f.midi > 0) {
+        if (cur && cur.midi === f.midi) cur.end = f.t + hopSec;
+        else { if (cur) notes.push(cur); cur = { midi: f.midi, start: f.t, end: f.t + hopSec }; }
+      } else { if (cur) { notes.push(cur); cur = null; } }
+    });
+    if (cur) notes.push(cur);
+    return notes.map(function (n) { return { midi: n.midi, start: n.start, dur: n.end - n.start }; })
+      .filter(function (n) { return n.dur >= minDur; });
+  }
+
+  function midiToAbcPitch(m) {
+    var names = ['C', '^C', 'D', '^D', 'E', 'F', '^F', 'G', '^G', 'A', '^A', 'B'];
+    var pc = ((m % 12) + 12) % 12, oct = Math.floor(m / 12) - 1;
+    var nm = names[pc], acc = '', ln = nm;
+    if (nm.length > 1) { acc = '^'; ln = nm[1]; }
+    var out;
+    if (oct >= 5) { out = acc + ln.toLowerCase(); for (var o = 6; o <= oct; o++) out += "'"; }
+    else { out = acc + ln.toUpperCase(); for (var o2 = oct; o2 < 4; o2++) out += ","; }
+    return out;
+  }
+  function tokenOf(midis) {
+    if (!midis || !midis.length) return 'z';
+    if (midis.length === 1) return midiToAbcPitch(midis[0]);
+    return '[' + midis.map(midiToAbcPitch).join('') + ']';
+  }
+  function seqToBody(seq) {
+    var barLen = 8, pos = 0, barCount = 0, body = '';
+    seq.forEach(function (ev) {
+      var remain = ev.steps;
+      var midis = ev.midis && ev.midis.length ? ev.midis : null;
+      while (remain > 0) {
+        var take = Math.min(barLen - pos, remain);
+        var willTie = midis && take < remain;
+        body += tokenOf(midis) + (take > 1 ? take : '') + (willTie ? '-' : '') + ' ';
+        pos += take; remain -= take;
+        if (pos >= barLen) { pos = 0; barCount++; body += (barCount % 4 === 0 ? '|\n' : '| '); }
+      }
+    });
+    body = body.trimEnd();
+    if (pos !== 0 && !/\|$/.test(body)) body += ' |';
+    body = body.replace(/\s*\|\s*$/, ' |').trimEnd();
+    if (!/\|$/.test(body)) body += ' |';
+    return body.replace(/\|$/, '|]');
+  }
+  function header(tempo, title) {
+    return 'X:1\nT:' + (title || 'audio') + '\nM:4/4\nL:1/8\nQ:1/4=' + tempo + '\nK:C\n';
+  }
+  function notesToAbc(notes, opts) {
+    opts = opts || {}; var tempo = opts.tempo || 100;
+    var eighthSec = (60 / tempo) / 2, seq = [], lastEnd = 0;
+    notes.forEach(function (n) {
+      var gap = Math.round((n.start - lastEnd) / eighthSec);
+      if (gap > 0) seq.push({ midis: null, steps: gap });
+      seq.push({ midis: [n.midi], steps: Math.max(1, Math.round(n.dur / eighthSec)) });
+      lastEnd = n.start + n.dur;
+    });
+    return header(tempo, opts.title || 'audio→melody') + seqToBody(seq);
+  }
+  function notesPolyToAbc(notes, opts) {
+    opts = opts || {}; var tempo = opts.tempo || 100;
+    if (!notes.length) return header(tempo, opts.title || 'audio→MIDI') + '|]';
+    var eighthSec = (60 / tempo) / 2;
+    var q = notes.map(function (n) {
+      var s = Math.round(n.start / eighthSec);
+      var e = Math.max(s + 1, Math.round((n.start + n.dur) / eighthSec));
+      return { s: s, e: e, midi: n.midi };
+    });
+    var maxStep = q.reduce(function (a, n) { return Math.max(a, n.e); }, 0);
+    var grid = []; for (var i = 0; i < maxStep; i++) grid.push([]);
+    q.forEach(function (n) { for (var k = n.s; k < n.e && k < maxStep; k++) grid[k].push(n.midi); });
+    grid.forEach(function (g) { g.sort(function (a, b) { return a - b; }); });
+    var seq = [], j = 0;
+    function keyOf(g) { return g.join(','); }
+    while (j < maxStep) {
+      var kk = keyOf(grid[j]), c = 1;
+      while (j + c < maxStep && keyOf(grid[j + c]) === kk) c++;
+      seq.push({ midis: grid[j].slice(), steps: c }); j += c;
+    }
+    return header(tempo, opts.title || 'audio→MIDI(AI)') + seqToBody(seq);
+  }
+
+  function transcribe(pcm, sampleRate, opts) {
+    opts = opts || {};
+    var a = analyzeFrames(pcm, sampleRate, opts);
+    var sm = medianSmooth(a.frames, opts.smoothWin || 5);
+    var notes = segment(sm, a.hopSec, opts);
+    if (!notes.length) return { error: '음정을 찾지 못했어요. 단선율(한 번에 한 음)·잡음이 적은 오디오인지 확인하세요.', notes: [] };
+    return { abc: notesToAbc(notes, opts), notes: notes, count: notes.length };
+  }
+
+  return { detectPitch: detectPitch, hzToMidi: hzToMidi, analyzeFrames: analyzeFrames,
+           medianSmooth: medianSmooth, segment: segment, midiToAbcPitch: midiToAbcPitch,
+           notesToAbc: notesToAbc, notesPolyToAbc: notesPolyToAbc, transcribe: transcribe };
+})();
+if (typeof module !== 'undefined') module.exports = AudioMidi;
+</script>
+
+<script>
+/* ===================== UI ===================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var lastAbc = '', lastNotes = null, mode = 'offline';
+  var decoded = null; // { pcm: Float32Array(16k mono), sampleRate: 16000, audioBuffer: AudioBuffer }
+  var synth = null, mediaRec = null, recChunks = [], recTimer = null, recStart = 0;
+  var TARGET_SR = 16000;
+
+  function setStatus(msg, cls) { var s = $('status'); s.className = 'status' + (cls ? ' ' + cls : ''); s.innerHTML = msg; }
+
+  /* ---------- 오디오 디코드 + 16k 모노 다운샘플 ---------- */
+  function decodeAudio(arrayBuffer) {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ac = new AC();
+    return ac.decodeAudioData(arrayBuffer).then(function (buf) {
+      // 모노 다운믹스
+      var ch = buf.numberOfChannels, len = buf.length;
+      var mono = new Float32Array(len);
+      for (var c = 0; c < ch; c++) { var d = buf.getChannelData(c); for (var i = 0; i < len; i++) mono[i] += d[i] / ch; }
+      // 선형 리샘플 → TARGET_SR
+      var ratio = TARGET_SR / buf.sampleRate;
+      var outLen = Math.floor(len * ratio);
+      var out = new Float32Array(outLen);
+      for (var j = 0; j < outLen; j++) {
+        var src = j / ratio, i0 = Math.floor(src), frac = src - i0;
+        out[j] = (mono[i0] || 0) * (1 - frac) + (mono[i0 + 1] || 0) * frac;
+      }
+      try { ac.close(); } catch (e) {}
+      return { pcm: out, sampleRate: TARGET_SR, audioBuffer: buf, durationSec: buf.duration };
+    });
+  }
+
+  function handleFile(f) {
+    if (!f) return;
+    setStatus('오디오 읽는 중…');
+    var r = new FileReader();
+    r.onload = function () {
+      decodeAudio(r.result).then(function (d) {
+        decoded = d;
+        $('btnGo').disabled = false;
+        setStatus('✓ ' + (f.name || '오디오') + ' 불러옴 · 길이 ' + d.durationSec.toFixed(1) + '초 · "분석" 버튼을 누르세요.', 'ok');
+      }).catch(function (e) {
+        decoded = null; $('btnGo').disabled = true;
+        setStatus('오디오 디코드 실패: ' + e.message + ' (지원 형식인지 확인하세요.)', 'err');
+      });
+    };
+    r.onerror = function () { setStatus('파일을 읽지 못했습니다.', 'err'); };
+    r.readAsArrayBuffer(f);
+  }
+
+  /* ---------- 드롭존/파일 ---------- */
+  var dz = $('dropzone');
+  dz.addEventListener('click', function () { $('audioFile').click(); });
+  $('audioFile').addEventListener('change', function () { handleFile(this.files && this.files[0]); this.value = ''; });
+  ['dragenter', 'dragover'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('drag'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('drag'); }); });
+  dz.addEventListener('drop', function (e) { handleFile(e.dataTransfer.files && e.dataTransfer.files[0]); });
+
+  /* ---------- 마이크 녹음 ---------- */
+  $('btnRec').addEventListener('click', function () {
+    if (mediaRec && mediaRec.state === 'recording') { mediaRec.stop(); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setStatus('이 브라우저는 마이크 녹음을 지원하지 않습니다.', 'err'); return; }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      recChunks = []; mediaRec = new MediaRecorder(stream);
+      mediaRec.ondataavailable = function (ev) { if (ev.data.size) recChunks.push(ev.data); };
+      mediaRec.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        clearInterval(recTimer); $('recTime').textContent = '';
+        $('btnRec').innerHTML = '&#128308; 마이크 녹음 시작';
+        var blob = new Blob(recChunks, { type: recChunks[0] ? recChunks[0].type : 'audio/webm' });
+        blob.arrayBuffer().then(function (ab) {
+          setStatus('녹음 디코드 중…');
+          return decodeAudio(ab);
+        }).then(function (d) {
+          decoded = d; $('btnGo').disabled = false;
+          setStatus('✓ 녹음 완료 · ' + d.durationSec.toFixed(1) + '초 · "분석" 버튼을 누르세요.', 'ok');
+        }).catch(function (e) { setStatus('녹음 처리 실패: ' + e.message, 'err'); });
+      };
+      mediaRec.start(); recStart = Date.now();
+      $('btnRec').innerHTML = '&#9209;&#65039; 녹음 정지';
+      recTimer = setInterval(function () { $('recTime').textContent = ((Date.now() - recStart) / 1000).toFixed(1) + '초 녹음 중…'; }, 100);
+    }).catch(function (e) { setStatus('마이크 권한이 필요합니다: ' + e.message, 'err'); });
+  });
+
+  /* ---------- 모드 선택 ---------- */
+  $('chipOffline').addEventListener('click', function () { mode = 'offline'; $('chipOffline').classList.add('on'); $('chipAI').classList.remove('on'); });
+  $('chipAI').addEventListener('click', function () { mode = 'ai'; $('chipAI').classList.add('on'); $('chipOffline').classList.remove('on'); });
+
+  /* ---------- 결과 표시 ---------- */
+  function showResult(abc, notesInfo) {
+    lastAbc = abc; $('abcOut').value = abc;
+    ['btnPlay', 'btnCopy', 'btnSaveAbc', 'btnSaveMidi', 'btnToLab', 'btnToDrum'].forEach(function (id) { $(id).disabled = false; });
+    $('outNote').textContent = notesInfo || '';
+    renderPreview(abc);
+  }
+  function renderPreview(abc) {
+    var el = $('preview');
+    if (window.ABCJS) { try { ABCJS.renderAbc('preview', abc, { responsive: 'resize', add_classes: true }); return; } catch (e) {} }
+    el.innerHTML = '<p class="note" style="padding:8px">악보 미리보기(abcjs)를 불러오지 못했습니다 — ABC 텍스트/재생은 정상입니다.</p>';
+  }
+
+  /* ---------- 분석 실행 ---------- */
+  function opts() {
+    return {
+      tempo: Math.max(40, Math.min(220, parseInt($('tempo').value, 10) || 100)),
+      minDur: Math.max(0.02, Math.min(0.5, parseFloat($('minDur').value) || 0.08))
+    };
+  }
+  function runOffline() {
+    var o = opts();
+    var res = AudioMidi.transcribe(decoded.pcm, decoded.sampleRate, o);
+    if (res.error) { setStatus(res.error, 'err'); return null; }
+    return { abc: res.abc, info: '오프라인 음정추적 · ' + res.count + '개 음 · 템포 ' + o.tempo + ' BPM (단선율 기준)' };
+  }
+
+  $('btnGo').addEventListener('click', function () {
+    if (!decoded) { setStatus('먼저 오디오를 넣어주세요.', 'err'); return; }
+    $('btnGo').disabled = true;
+    setTimeout(function () {
+      try {
+        if (mode === 'offline') {
+          setStatus('오프라인 음정추적 중…');
+          var r = runOffline();
+          if (r) { showResult(r.abc, r.info); setStatus('✓ 완료 — ' + r.info, 'ok'); }
+        } else {
+          runAI();
+        }
+      } catch (e) { setStatus('분석 실패: ' + e.message, 'err'); }
+      if (mode === 'offline') $('btnGo').disabled = false;
+    }, 30);
+  });
+
+  /* ---------- AI 모드: Spotify Basic Pitch (온라인·브라우저·무료). 실패 시 오프라인 대체 ---------- */
+  var BP_SOURCES = [
+    'https://esm.sh/@spotify/basic-pitch@1.0.1',
+    'https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1/+esm'
+  ];
+  var BP_MODEL = 'https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1/model/model.json';
+  function importFrom(list, i) {
+    i = i || 0;
+    if (i >= list.length) return Promise.reject(new Error('모든 CDN에서 Basic Pitch 로드 실패'));
+    return import(/* @vite-ignore */ list[i]).catch(function () { return importFrom(list, i + 1); });
+  }
+  function resampleForBP(audioBuffer) {
+    // Basic Pitch는 22050Hz 모노 AudioBuffer를 기대
+    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    var targetSr = 22050;
+    var frames = Math.ceil(audioBuffer.duration * targetSr);
+    var oac = new OAC(1, frames, targetSr);
+    var src = oac.createBufferSource(); src.buffer = audioBuffer; src.connect(oac.destination); src.start();
+    return oac.startRendering();
+  }
+  function runAI() {
+    setStatus('&#10024; AI(Basic Pitch) 모델 로딩 중… (처음엔 수 MB 다운로드)');
+    var o = opts();
+    var mod;
+    importFrom(BP_SOURCES).then(function (m) {
+      mod = m;
+      return resampleForBP(decoded.audioBuffer);
+    }).then(function (rebuf) {
+      setStatus('&#10024; 신경망으로 채보 중…');
+      var bp = new mod.BasicPitch(BP_MODEL);
+      var frames = [], onsets = [], contours = [];
+      return bp.evaluateModel(rebuf, function (f) { frames.push.apply(frames, f); },
+        function (on) { onsets.push.apply(onsets, on); },
+        function (c) { contours.push.apply(contours, c); }, function () {})
+        .then(function () {
+          var raw = mod.outputToNotesPoly(frames, onsets, 0.5, 0.3, 5);
+          var timed = mod.noteFramesToTime(mod.addPitchBendsToNoteEvents ? mod.addPitchBendsToNoteEvents(contours, raw) : raw);
+          var notes = timed.map(function (n) {
+            return { midi: n.pitchMidi, start: n.startTimeSeconds, dur: n.durationSeconds };
+          }).filter(function (n) { return n.dur >= o.minDur; });
+          if (!notes.length) throw new Error('AI가 음을 찾지 못함');
+          var abc = AudioMidi.notesPolyToAbc(notes, o);
+          showResult(abc, 'AI(Spotify Basic Pitch) · ' + notes.length + '개 음(화음 포함) · 템포 ' + o.tempo + ' BPM');
+          setStatus('&#10024; 완료 — AI 채보(폴리포닉) 성공', 'ok');
+          $('btnGo').disabled = false;
+        });
+    }).catch(function (e) {
+      // 실패 → 오프라인 단선율로 자동 대체
+      var r = runOffline();
+      if (r) { showResult(r.abc, r.info + ' (AI 실패로 오프라인 대체)'); setStatus('AI 실패(' + e.message + ') → <b>오프라인 단선율로 자동 대체</b>했습니다.', 'err'); }
+      else { setStatus('AI 실패(' + e.message + ') · 오프라인 대체도 음을 찾지 못함. 단선율·잡음 적은 오디오로 시도하세요.', 'err'); }
+      $('btnGo').disabled = false;
+    });
+  }
+
+  /* ---------- 결과 버튼 ---------- */
+  $('btnCopy').addEventListener('click', function () {
+    if (!lastAbc) return; var self = this;
+    function done() { self.textContent = '✓ 복사됨'; setTimeout(function () { self.innerHTML = '&#128203; ABC 복사'; }, 1200); }
+    if (navigator.clipboard) navigator.clipboard.writeText(lastAbc).then(done, fb); else fb();
+    function fb() { $('abcOut').removeAttribute('readonly'); $('abcOut').select(); try { document.execCommand('copy'); done(); } catch (e) {} $('abcOut').setAttribute('readonly', ''); }
+  });
+  function download(name, data, type) {
+    var blob = new Blob([data], { type: type }); var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
+  }
+  $('btnSaveAbc').addEventListener('click', function () { if (lastAbc) download('audio-melody.abc', lastAbc, 'text/plain;charset=utf-8'); });
+  $('btnSaveMidi').addEventListener('click', function () {
+    if (!lastAbc) return;
+    try { var bytes = AbcMidi.abcToMidi(lastAbc); download('audio-melody.mid', bytes, 'audio/midi'); }
+    catch (e) { setStatus('MIDI 변환 실패: ' + e.message, 'err'); }
+  });
+  $('btnToLab').addEventListener('click', function () {
+    if (!lastAbc) return; try { localStorage.setItem('broguard_lab_abc', lastAbc); } catch (e) {}
+    window.open('lab.html', '_blank');
+  });
+  $('btnToDrum').addEventListener('click', function () {
+    if (!lastAbc) return; try { localStorage.setItem('broguard_drum_abc', lastAbc); } catch (e) {}
+    window.open('merge.html', '_blank');
+  });
+
+  /* ---------- 재생(abcjs 신스) ---------- */
+  $('btnPlay').addEventListener('click', function () {
+    if (!window.ABCJS || !ABCJS.synth || !lastAbc) { setStatus('이 환경에서는 재생을 지원하지 않습니다. .mid로 저장해 들어보세요.', 'err'); return; }
+    stopPlay();
+    try {
+      var visual = ABCJS.renderAbc('preview', lastAbc, { responsive: 'resize' })[0];
+      var ac = new (window.AudioContext || window.webkitAudioContext)();
+      synth = new ABCJS.synth.CreateSynth();
+      synth.init({ audioContext: ac, visualObj: visual, millisecondsPerMeasure: visual.millisecondsPerMeasure() })
+        .then(function () { return synth.prime(); })
+        .then(function () { synth.start(); $('btnStop').disabled = false; });
+    } catch (e) { setStatus('재생 실패: ' + e.message, 'err'); }
+  });
+  function stopPlay() { if (synth) { try { synth.stop(); } catch (e) {} synth = null; } $('btnStop').disabled = true; }
+  $('btnStop').addEventListener('click', stopPlay);
+
+  /* abcjs 동적 로드(실패해도 변환/저장은 동작) */
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js';
+  s.onload = function () { if (lastAbc) renderPreview(lastAbc); };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
