@@ -39,50 +39,68 @@ page.on('pageerror', e => errors.push(e.message));
 await page.goto(`${base}/merge.html?autotest=1`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__autotestDone === true, { timeout: 6000 });
 
-await check('autotest: 샘플 멜로디+드럼 병합 성공(PPQ 480·멜로디/드럼 트랙)', async () => {
+await check('autotest: ABC→멜로디→기본드럼→병합 전 과정 성공', async () => {
   const r = await page.evaluate(() => window.__autotest);
   assert.ok(r.ok, r.error || '');
+  assert.ok(r.melFromAbc, 'ABC→MIDI 변환');
+  assert.ok(r.drumMade, '드럼 생성');
   assert.equal(r.mergedPpq, 480);
   assert.equal(r.hasDrums, true);
-  assert.ok(r.melCh, '멜로디 트랙 존재');
-  assert.ok(r.drumCh, '드럼 트랙 존재');
+  assert.ok(r.canSave, '저장 버튼 활성화');
 });
 
 await page.goto(`${base}/merge.html`, { waitUntil: 'domcontentloaded' });
 
-await check('샘플 멜로디·드럼 버튼 → 각 슬롯 분석 표시', async () => {
+await check('샘플 멜로디(ABC) → 자동 MIDI 변환·분석', async () => {
   await page.click('#btnSampleMel');
-  await page.click('#btnSampleDrum');
-  await page.waitForFunction(() => /PPQ/.test(document.getElementById('infoMel').textContent) && /PPQ/.test(document.getElementById('infoDrum').textContent), undefined, { timeout: 3000 });
-  assert.ok((await page.textContent('#infoMel')).includes('멜로디'));
-  const drumInfo = await page.textContent('#infoDrum');
-  assert.ok(drumInfo.includes('드럼'), '드럼 표시');
-  assert.ok(drumInfo.includes('220'), '드럼 PPQ 220');
+  await page.waitForFunction(() => /멜로디/.test(document.getElementById('infoMel').textContent), undefined, { timeout: 3000 });
+  assert.ok((await page.inputValue('#abcIn')).includes('X:1'), 'ABC 채워짐');
+  assert.equal(await page.isEnabled('#btnBasic'), true, '드럼 버튼 활성화');
 });
 
-await check('둘 다 있으면 "함께 재생" 버튼이 활성화된다', async () => {
-  assert.equal(await page.isEnabled('#btnPlayBoth'), true);
-  assert.equal(await page.isEnabled('#playMel'), true);
-  assert.equal(await page.isEnabled('#playDrum'), true);
+await check('기본 비트 생성 → 드럼 분석 표시(채널10·GM)', async () => {
+  await page.click('#btnBasic');
+  await page.waitForFunction(() => /드럼/.test(document.getElementById('infoDrum').textContent), undefined, { timeout: 3000 });
+  const info = await page.textContent('#infoDrum');
+  assert.ok(info.includes('킥') && info.includes('스네어'), 'GM 드럼');
+  assert.ok((await page.textContent('#drumStatus')).includes('기본 비트'));
 });
 
-await check('함께 재생 → 병합 정합 정보(PPQ 480·멜로디+드럼) 표시', async () => {
+await check('🎲 다시 생성 → 패턴 변경', async () => {
+  const before = await page.textContent('#infoDrum');
+  await page.click('#btnRegen');
+  await page.waitForFunction(prev => document.getElementById('infoDrum').textContent !== prev || /패턴 2/.test(document.getElementById('drumStatus').textContent), before, { timeout: 3000 });
+  assert.ok((await page.textContent('#drumStatus')).match(/패턴 [23]/), '패턴 번호 변경');
+});
+
+await check('함께 재생 → 병합 정보 + 저장 버튼 활성화', async () => {
   await page.click('#btnPlayBoth');
   await page.waitForFunction(() => /PPQ 480/.test(document.getElementById('mergeInfo').textContent), undefined, { timeout: 3000 });
-  const info = await page.textContent('#mergeInfo');
-  assert.ok(info.includes('멜로디') && info.includes('드럼'));
-  assert.ok(await page.isVisible('#playerWrap'), '플레이어 표시');
+  assert.ok((await page.textContent('#mergeInfo')).includes('멜로디'));
+  assert.ok(await page.isVisible('#playerWrap'));
+  assert.equal(await page.isEnabled('#btnSave'), true, '저장 버튼');
 });
 
-await check('파일 업로드(멜로디 슬롯) → 멜로디로 분석', async () => {
+await check('병합 .mid 저장 → 다운로드 발생(MThd)', async () => {
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 5000 }),
+    page.click('#btnSave'),
+  ]);
+  const bytes = readFileSync(await download.path());
+  assert.equal(bytes.slice(0, 4).toString(), 'MThd', 'MIDI 헤더');
+  assert.ok(download.suggestedFilename().endsWith('.mid'));
+});
+
+await check('멜로디 MIDI 파일 업로드도 동작', async () => {
   await page.setInputFiles('#fileMel', { name: 'my-melody.mid', mimeType: 'audio/midi', buffer: melodyBytes });
   await page.waitForFunction(() => /PPQ 480/.test(document.getElementById('infoMel').textContent), undefined, { timeout: 3000 });
   assert.ok((await page.textContent('#infoMel')).includes('멜로디'));
 });
 
-await check('길이 정합 옵션(그대로/반복) 선택 가능', async () => {
-  const opts = await page.$$eval('#loopOpt option', els => els.map(e => e.value));
-  assert.deepEqual(opts, ['asis', 'loop']);
+await check('AI 드럼 버튼 존재(오프라인은 기본 비트로 폴백)', async () => {
+  assert.ok(await page.$('#btnAI'), 'AI 드럼 버튼');
+  await page.click('#btnBasic');   // 멜로디 파일 업로드 후 드럼 재생성
+  await page.waitForFunction(() => /드럼/.test(document.getElementById('infoDrum').textContent), undefined, { timeout: 3000 });
 });
 
 await check('랩 홈 링크가 index.html을 가리킨다', async () => {

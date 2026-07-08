@@ -122,3 +122,52 @@ test('mergeMidis: 표준 GM 드럼 노트가 병합 후에도 유지', () => {
   const notes = dt.drumNotes.map(x => x.note);
   assert.ok(notes.includes(36) && notes.includes(38) && notes.includes(42), '킥·스네어·하이햇 유지');
 });
+
+// ---------- 기본 비트 자동 생성 ----------
+test('makeBasicBeat: 멜로디 박자·템포에 맞는 드럼(채널10·GM) 생성', () => {
+  const beat = MidiCore.makeBasicBeat(melody, { pattern: 0 });
+  const d = MidiCore.describe(beat);
+  assert.ok(d.hasDrums, '드럼으로 인식');
+  assert.equal(d.ppq, 480);
+  assert.equal(d.tempoBpm, 120, '멜로디 템포 따름');
+  const dt = d.tracks.find(t => t.isDrum);
+  assert.deepEqual(dt.channels, [9], '채널 10');
+  const notes = dt.drumNotes.map(x => x.note);
+  assert.ok(notes.includes(36), '킥');
+  assert.ok(notes.includes(38), '스네어');
+  assert.ok(notes.includes(42) || notes.includes(46), '하이햇');
+});
+
+test('makeBasicBeat: 패턴 3종은 서로 다른 결과', () => {
+  const a = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 0 })).tracks.find(t => t.isDrum).noteCount;
+  const b = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 1 })).tracks.find(t => t.isDrum).noteCount;
+  const c = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 2 })).tracks.find(t => t.isDrum).noteCount;
+  assert.ok(!(a === b && b === c), '패턴별로 노트 구성이 다름');
+});
+
+test('makeBasicBeat + mergeMidis: 멜로디에 기본 드럼을 얹어 병합', () => {
+  const beat = MidiCore.makeBasicBeat(melody, { pattern: 0 });
+  const merged = MidiCore.mergeMidis(melody, beat, { loopToMatch: true });
+  const d = MidiCore.describe(merged.bytes);
+  assert.ok(d.hasDrums);
+  assert.ok(d.tracks.some(t => !t.isDrum && t.noteCount > 0), '멜로디 트랙');
+  assert.ok(d.tracks.some(t => t.isDrum), '드럼 트랙');
+});
+
+test('melodyToTapSequence: 멜로디 온셋을 2마디·16분 탭 시퀀스로', () => {
+  const tap = MidiCore.melodyToTapSequence(melody, 2);
+  assert.equal(tap.quantizationInfo.stepsPerQuarter, 4);
+  assert.equal(tap.totalQuantizedSteps, 32);
+  assert.ok(tap.notes.length > 0 && tap.notes.every(n => n.isDrum));
+});
+
+test('drumSequenceToMidi: GrooVAE식 출력 → 드럼 MIDI(채널10)', () => {
+  const fakeGroove = { notes: [
+    { pitch: 36, quantizedStartStep: 0 }, { pitch: 42, quantizedStartStep: 2 },
+    { pitch: 38, quantizedStartStep: 4 }, { pitch: 42, quantizedStartStep: 6 }],
+    tempos: [{ qpm: 120 }] };
+  const midi = MidiCore.drumSequenceToMidi(fakeGroove, { tempoBpm: 120 });
+  const d = MidiCore.describe(midi);
+  assert.ok(d.hasDrums);
+  assert.deepEqual(d.tracks.find(t => t.isDrum).channels, [9]);
+});
