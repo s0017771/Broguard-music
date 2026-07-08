@@ -88,6 +88,20 @@ await check('16분음표 해상도 전환이 동작한다', async () => {
   assert.ok((await page.textContent('#meta')).includes('16분음표'));
 });
 
+await check('「기승전결 한번에」 버튼 → 64마디 완성곡 하나가 생성된다', async () => {
+  await page.fill('#chords', 'C G Am Em');
+  await page.fill('#seed', '42');
+  await page.click('#goSong');
+  await page.waitForFunction(() => /완성곡/.test(document.getElementById('meta').textContent), undefined, { timeout: 8000 });
+  const cards = await page.$$('.card');
+  assert.equal(cards.length, 1, '완성곡 카드 하나');
+  const abc = await page.inputValue('#abc-song');
+  assert.ok(abc.includes('── 기 ──') && abc.includes('── 결 ──'), '섹션 주석 포함');
+  const bars = (abc.replace(/\|\]/, '|').match(/\|/g) || []).length;
+  assert.ok(bars >= 60 && bars <= 66, '약 64마디: ' + bars);
+  assert.ok(abc.trim().endsWith('|]'));
+});
+
 await check('랩 홈 링크가 index.html을 가리킨다', async () => {
   const href = await page.getAttribute('header a', 'href');
   assert.equal(href, 'index.html');

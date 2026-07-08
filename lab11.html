@@ -1937,13 +1937,28 @@
     var tonic = K.tonic, lo = tonic - 5, hi = tonic + 9;
     var targetBars = 32;
     var srcBars = src.bars;
-    /* 원곡 마디를 2배 호흡으로 매핑: 확장본 마디 i → 원곡 마디 floor(i/2 * srcBars/16)... 
-       단순화: 원곡을 4구간(도입/확장/절정/마무리)으로 나눠 각 구간을 2배로 */
-    var quarter = Math.max(1, Math.floor(srcBars / 4));
-    /* 원곡 구간별 대표 마디 인덱스 */
-    function srcBarFor(i) {
-      /* 확장본 32마디를 원곡 srcBars에 비례 매핑 */
-      return Math.min(srcBars - 1, Math.floor(i * srcBars / targetBars));
+    /* 악구(프레이즈) 단위 확장:
+       원곡을 4개 악구(기·승·전·결)로 나누고, 각 악구를 [원악구][원악구 변형] 순서로
+       이어붙여 2배로 늘린다. 예) 기 4마디(C G Am Em) → 8마디(C G Am Em · C G Am Em').
+       예전처럼 한 마디를 그대로 2배(C C G G)로 늘리는 게 아니라, 악구를 통째로 반복+변형한다. */
+    var srcSecLen = Math.max(1, Math.round(srcBars / 4));    /* 원곡 한 악구의 마디 수 (16→4) */
+    var expSecLen = Math.max(2, Math.floor(targetBars / 4)); /* 확장본 한 악구의 마디 수 (=8) */
+    function mapBar(i) {
+      var sec = Math.min(3, Math.floor(i / expSecLen));       /* 0..3 (기·승·전·결) */
+      var posInExp = i - sec * expSecLen;                     /* 악구 안 위치 0..expSecLen-1 */
+      var posInSrc = posInExp % srcSecLen;                    /* 원악구 안 위치 */
+      var isVar = posInExp >= srcSecLen;                      /* 두 번째(반복) 절반 = 변형 대상 */
+      var srcBar = Math.min(srcBars - 1, sec * srcSecLen + posInSrc);
+      return { srcBar: srcBar, isVar: isVar, section: sec };
+    }
+    /* 반복 악구에 얹는 '약간의 변형': 강박(코드음·긴 음)은 그대로 두고
+       짧은 약박 음만 이웃음으로 살짝 흔들어, 같은 악구가 똑같이 반복되지 않게 한다. */
+    function varyNotes(notes) {
+      return notes.map(function (n, k) {
+        if (n.rest) return { rest: true, len: n.len };
+        var delta = (k > 0 && n.len < 4) ? ((k % 2 === 1) ? 1 : -1) : 0;
+        return { idx: n.idx + delta, len: n.len, rest: false };
+      });
     }
 
     /* 동기: 원곡 첫 2마디 */
@@ -1952,11 +1967,11 @@
 
     var newMelody = [], newChords = [], newRhythms = [];
     for (var i = 0; i < targetBars; i++) {
-      var sb = srcBarFor(i);
+      var mp = mapBar(i);
+      var sb = mp.srcBar, isVar = mp.isVar, section = mp.section; /* 0:기 1:승 2:전 3:결 */
       var chord = src.chordDegs[sb] !== undefined ? src.chordDegs[sb] : 0;
       newChords.push(chord);
       var tones = chordToneIdxs(tonic, chord);
-      var section = Math.floor(i / 8); /* 0:도입 1:확장 2:절정 3:마무리 */
       var notes;
 
       if (i === targetBars - 1) {
@@ -1964,35 +1979,29 @@
         var half = src.units / 2;
         notes = [{ idx: tonic + (Math.random() < 0.5 ? 1 : -1), len: half }, { idx: tonic, len: half }];
       } else if (mode === 0) {
-        /* 가 강하게: 원곡 마디를 거의 그대로 가져오되 코드만 맞춤 */
-        notes = (src.melodyBars[sb] || motif1).map(function (n) {
+        /* 강하게: 원곡 악구를 그대로. 반복(뒤) 절반만 약간 변형 */
+        var m0 = src.melodyBars[sb] || motif1;
+        if (isVar) m0 = varyNotes(m0);
+        notes = m0.map(function (n) {
           return n.rest ? { rest: true, len: n.len } : { idx: n.idx, len: n.len, rest: false };
         });
         notes = fitToChord(clampToRange(notes, lo, hi), tones, lo, hi);
       } else {
-        /* 나 중간 / 다 리듬변화: 동기를 변형·발전 */
-        var baseNotes;
-        if (section === 0) {
-          /* 도입: 원곡 동기 거의 그대로 (1,2마디 번갈아) */
-          baseNotes = (i % 2 === 0) ? motif1 : motif2;
-        } else if (section === 1) {
-          /* 확장: 동기를 2도 올리거나 원곡 해당 마디 */
-          baseNotes = src.melodyBars[sb] || motif1;
-          if (i % 2 === 1) baseNotes = transposeNotes(baseNotes, 1);
-        } else if (section === 2) {
-          /* 절정: 음역 올림 (+3도) */
-          baseNotes = transposeNotes(src.melodyBars[sb] || motif1, 3);
-        } else {
-          /* 마무리: 원곡 마무리 구간 동기로 돌아옴 */
-          baseNotes = src.melodyBars[sb] || motif2;
+        /* 중간 / 리듬변화: 원곡 악구를 순서대로 가져오되, 반복 절반과 절정에서 발전 */
+        var baseNotes = src.melodyBars[sb] || motif1;
+        if (section === 2) {
+          /* 전(절정): 음역 올림 (+3도) */
+          baseNotes = transposeNotes(baseNotes, 3);
         }
+        /* 반복 절반이면 약간의 변형(이웃음) 추가 → 같은 악구가 그대로 반복되지 않음 */
+        if (isVar) baseNotes = varyNotes(baseNotes);
         notes = clampToRange(baseNotes.map(function (n) {
           return n.rest ? { rest: true, len: n.len } : { idx: n.idx, len: n.len, rest: false };
         }), lo, hi);
         notes = fitToChord(notes, tones, lo, hi);
 
-        if (mode === 2) {
-          /* 다 리듬변화: 같은 음높이에 새 리듬 입힘 (원곡과 다른 패턴 풀에서) */
+        if (mode === 2 && isVar) {
+          /* 리듬변화: 반복 절반에서만 새 리듬을 입혀 원악구와 대비를 만든다 */
           var pat = pickPattern(src.meter, src.mood);
           notes = reRhythm(notes, pat);
           notes = fitToChord(clampToRange(notes, lo, hi), tones, lo, hi);

@@ -137,7 +137,11 @@
       <div><label for="tempo">템포 (BPM)</label><input type="number" id="tempo" value="90" min="40" max="200"></div>
       <div><label for="seed">시드 (비우면 무작위 · 같은 시드=같은 결과)</label><input type="text" id="seed" placeholder="예: 42"></div>
     </div>
-    <button class="primary" id="go">멜로디 후보 생성</button>
+    <div class="row" style="align-items:stretch">
+      <button class="primary" id="go" style="flex:2">멜로디 후보 생성</button>
+      <button class="primary" id="goSong" style="flex:1;background:var(--z-jeon)">🎼 기승전결 한번에</button>
+    </div>
+    <p class="mode-desc">「기승전결 한번에」는 위 코드 진행을 반복해 <b>기·승·전·결 각 16마디(총 64마디)</b>를 한 흐름으로 이어붙인 완성곡을 만듭니다. 기(낮고 성김) → 승(상승) → 전(클라이맥스·촘촘) → 결(하강·으뜸음 종지)의 곡선을 자동으로 따릅니다.</p>
     <p class="meta" id="meta"></p>
   </div>
 
@@ -541,7 +545,88 @@ function generate(chordStr, opts = {}) {
   };
 }
 
-if (typeof module !== 'undefined') module.exports = { generate };
+// ---------------- 기승전결 한번에 (완성곡) ----------------
+// 한 섹션(기/승/전/결)의 최고 후보 하나를 뽑는다
+function bestSection(chords, mode, rnd, sixteenth) {
+  const candidates = [];
+  const seen = new Set();
+  let attempts = 0;
+  while (candidates.length < 40 && attempts < 5000) {
+    attempts++;
+    const skel = sampleSkeleton(chords, rnd, mode);
+    if (!skel) continue;
+    const rhythm = sampleRhythm(chords.length, rnd, mode, sixteenth);
+    const bars = chords.map((c, i) => {
+      const target = i < chords.length - 1 ? skel[i + 1] : skel[i];
+      const notes = fillBar(skel[i], target, rhythm[i], c, rnd, i === chords.length - 1);
+      return { chord: c.sym, notes, rhythm: rhythm[i] };
+    });
+    const key = bars.map(b => b.notes.join('.')).join('/');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ bars, score: scoreMelody(bars, mode) });
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0] || null;
+}
+
+// 여러 섹션의 마디를 하나의 긴 ABC로 이어붙인다 (섹션마다 % 주석 + 줄바꿈)
+function songToAbc(sections, tempo) {
+  const totalBars = sections.reduce((s, x) => s + x.bars.length, 0);
+  let body = '';
+  sections.forEach((sec, si) => {
+    body += (si > 0 ? '\n' : '') + '% ── ' + sec.label + ' ──\n';
+    sec.bars.forEach((b, i) => {
+      const isLastOfSong = (si === sections.length - 1) && (i === sec.bars.length - 1);
+      body += `"${b.chord}"`;
+      let onset = 0;
+      b.notes.forEach((n, k) => {
+        const d = b.rhythm[k];
+        if (k > 0 && onset === 4) body += ' ';
+        body += midiToAbc(n) + (d === 0.5 ? '/' : d > 1 ? d : '');
+        onset += d;
+      });
+      body += isLastOfSong ? ' |]' : ' | ';
+      if ((i + 1) % 4 === 0 && i !== sec.bars.length - 1) body += '\n';
+    });
+  });
+  return `X:1\nT:기승전결 완성곡 (${totalBars}마디)\nM:4/4\nL:1/8\nQ:1/4=${tempo}\nK:C\n${body}`;
+}
+
+// 기 → 승 → 전 → 결 을 각 barsPerSection(기본 16)마디로 만들어 하나의 곡으로
+function generateSong(chordStr, opts = {}) {
+  const tempo = opts.tempo || 90;
+  const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
+  const rnd = rngFactory(seed);
+  const secLen = Math.max(2, Math.min(16, opts.barsPerSection || 16));
+
+  const base = chordStr.split(/[\s,|]+/).filter(Boolean).map(parseChord);
+  if (base.some(c => !c)) return { error: '코드 기호를 해석할 수 없습니다. 예: C G Am Em F C F G' };
+  if (base.length < 2) return { error: '코드는 2개 이상 입력해 주세요.' };
+
+  const SECTIONS = [['ki', '기'], ['seung', '승'], ['jeon', '전'], ['gyeol', '결']];
+  const sections = [];
+  for (const [mode, label] of SECTIONS) {
+    // 섹션 코드 = base를 반복해 secLen마디로 채움
+    const chords = [];
+    for (let i = 0; i < secLen; i++) chords.push(base[i % base.length]);
+    // 결 섹션 종지: 마지막 코드를 으뜸화음(C)으로 착지
+    if (mode === 'gyeol' && chords[chords.length - 1].pcs[0] !== 0) {
+      chords[chords.length - 1] = parseChord('C');
+    }
+    const cand = bestSection(chords, mode, rnd, !!opts.sixteenth);
+    if (!cand) return { error: label + ' 섹션을 만들지 못했습니다. 코드 진행을 바꾸거나 다시 시도해 주세요.' };
+    sections.push({ mode, label, bars: cand.bars, score: cand.score });
+  }
+  return {
+    seed, tempo, sections,
+    barsPerSection: secLen,
+    totalBars: sections.reduce((s, x) => s + x.bars.length, 0),
+    abc: songToAbc(sections, tempo)
+  };
+}
+
+if (typeof module !== 'undefined') module.exports = { generate, generateSong };
 
 </script>
 
@@ -576,6 +661,7 @@ document.querySelectorAll('#modes .mode-chip').forEach(c =>
   }));
 
 $('go').addEventListener('click', run);
+$('goSong').addEventListener('click', runSong);
 
 function zoneClass(i, n, m) {
   const z = (m === 'full') ? zoneOf(i, n) : m;
@@ -602,6 +688,86 @@ function run() {
     }
     btn.disabled = false; btn.textContent = '멜로디 후보 생성';
   }, 30);
+}
+
+function runSong() {
+  stopPlay();
+  const btn = $('goSong');
+  btn.disabled = true; btn.textContent = '작곡 중…';
+  setTimeout(() => {
+    try {
+      const seedRaw = $('seed').value.trim();
+      const out = generateSong($('chords').value, {
+        tempo: Math.max(40, Math.min(200, parseInt($('tempo').value) || 90)),
+        seed: seedRaw ? (parseInt(seedRaw) || 1) : undefined,
+        barsPerSection: 16,
+        sixteenth
+      });
+      renderSong(out);
+    } catch (e) {
+      $('results').innerHTML = '<p class="err">오류: ' + e.message + '</p>';
+    }
+    btn.disabled = false; btn.textContent = '🎼 기승전결 한번에';
+  }, 30);
+}
+
+function renderSong(out) {
+  const box = $('results');
+  if (out.error) { box.innerHTML = '<p class="err">' + out.error + '</p>'; $('meta').textContent = ''; return; }
+  const scoreStr = out.sections.map(s => s.label + ' ' + s.score).join(' · ');
+  $('meta').textContent = `[기승전결 완성곡] 총 ${out.totalBars}마디 (섹션당 ${out.barsPerSection}) · 섹션 적합도 ${scoreStr} · 시드 ${out.seed}`;
+  box.innerHTML = '';
+
+  // 섹션별 존 색상 막대 (16마디 × 4섹션)
+  let zb = '';
+  out.sections.forEach(sec => {
+    const cls = { ki: 'z-ki', seung: 'z-seung', jeon: 'z-jeon', gyeol: 'z-gyeol' }[sec.mode];
+    sec.bars.forEach(() => { zb += `<span class="${cls}"></span>`; });
+  });
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="zonebar">${zb}</div>
+    <div class="card-head">
+      <div><span class="card-title">🎼 기승전결 완성곡</span> <span class="score">${out.totalBars}마디</span></div>
+      <div class="btns">
+        <button data-act="play">▶ 재생</button>
+        <button data-act="stop">■ 정지</button>
+        <button data-act="copy">ABC 복사</button>
+        <button data-act="drum">🥁 드럼 얹기</button>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i class="z-ki"></i>기</span><span><i class="z-seung"></i>승</span>
+      <span><i class="z-jeon"></i>전 (최고음)</span><span><i class="z-gyeol"></i>결</span>
+    </div>
+    <div class="sheet" id="sheet-song"></div>
+    <div class="abc-box"><textarea id="abc-song" readonly>${out.abc}</textarea></div>`;
+  box.appendChild(card);
+
+  let visual = null;
+  if (window.ABCJS) {
+    try { visual = ABCJS.renderAbc('sheet-song', out.abc, { responsive: 'resize', add_classes: true })[0]; }
+    catch (e) { $('sheet-song').innerHTML = '<p class="meta">악보 렌더링 실패 — ABC 텍스트를 이용해 주세요.</p>'; }
+  } else {
+    $('sheet-song').innerHTML = '<p class="meta">악보 라이브러리(abcjs)를 불러오지 못했습니다. ABC 텍스트 복사는 정상 동작합니다.</p>';
+  }
+
+  card.querySelector('[data-act=copy]').addEventListener('click', ev => {
+    const ta = $('abc-song');
+    ta.select();
+    navigator.clipboard.writeText(ta.value).then(() => {
+      ev.target.textContent = '복사됨 ✓';
+      setTimeout(() => ev.target.textContent = 'ABC 복사', 1500);
+    }).catch(() => { document.execCommand('copy'); ev.target.textContent = '복사됨 ✓'; });
+  });
+  card.querySelector('[data-act=play]').addEventListener('click', () => playVisual(visual));
+  card.querySelector('[data-act=stop]').addEventListener('click', stopPlay);
+  card.querySelector('[data-act=drum]').addEventListener('click', () => {
+    try { localStorage.setItem('broguard_drum_abc', $('abc-song').value); } catch (e) {}
+    window.open('merge.html', '_blank');
+  });
 }
 
 function render(out) {

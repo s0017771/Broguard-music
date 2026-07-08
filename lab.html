@@ -1992,8 +1992,17 @@
 
   /* 초기화 */
   loadStore();
-  preset.value = "nocturne";
-  input.value = PRESETS.nocturne;
+  /* 다른 랩(ABC↔MIDI 변환기 등)에서 넘어온 악보가 있으면 불러오기 */
+  var handoff = null;
+  try { handoff = window.localStorage.getItem("broguard_lab_abc"); } catch (e) {}
+  if (handoff && handoff.trim()) {
+    input.value = handoff;
+    preset.value = "";
+    try { window.localStorage.removeItem("broguard_lab_abc"); } catch (e) {}
+  } else {
+    preset.value = "nocturne";
+    input.value = PRESETS.nocturne;
+  }
   caret.st = caret.en = input.value.length;
   render();
 })();
