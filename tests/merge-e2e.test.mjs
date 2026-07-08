@@ -110,17 +110,17 @@ await check('.abc 파일 열기 → 텍스트를 ABC로 인식·변환', async (
   assert.ok((await page.inputValue('#abcIn')).includes('불러온ABC'), 'ABC 텍스트가 입력창에 채워짐');
 });
 
-await check('🎲 다시 생성으로 6가지 스타일 순환(스타일명 표시)', async () => {
+await check('🎲 다시 생성으로 6가지 스타일 전부 순환(중복 3개 버그 회귀 방지)', async () => {
   await page.click('#btnBasic');
   const names = new Set();
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     const s = await page.textContent('#drumStatus');
-    const m = s.match(/기본 비트 — ([^ (]+)/);
-    if (m) names.add(m[1]);
+    const m = s.match(/기본 비트 — ([^(]+?)\s*\(/);
+    if (m) names.add(m[1].trim());
     await page.click('#btnRegen');
     await page.waitForTimeout(120);
   }
-  assert.ok(names.size >= 3, '여러 스타일명이 나타남: ' + [...names].join(','));
+  assert.ok(names.size >= 6, '6가지 스타일이 모두 나타나야 함(현재 ' + names.size + '): ' + [...names].join(', '));
 });
 
 await check('localStorage 핸드오프 → 로드 시 멜로디 자동 수신', async () => {

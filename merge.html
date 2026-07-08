@@ -849,7 +849,7 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
     catch (e) { $('drumStatus').innerHTML = '<span class="err">생성 실패: ' + e.message + '</span>'; }
   }
 
-  // html-midi-player가 magenta 코어(window.mm)를 이미 로드하므로, MusicVAE만 얹는다(버전 1.23.0로 통일)
+  // magenta.js는 전역 이름이 버전/빌드마다 다름(mm / music_vae / core …). 폭넓게 탐색해 MusicVAE를 찾는다.
   var MAG_CORE = 'https://cdn.jsdelivr.net/npm/@magenta/music@1.23.0/es6/core.js';
   var MAG_MVAE = 'https://cdn.jsdelivr.net/npm/@magenta/music@1.23.0/es6/music_vae.js';
   var GROOVE_CKPT = 'https://storage.googleapis.com/magentadata/js/checkpoints/music_vae/groovae_2bar_tap_fixed_velocity';
@@ -860,14 +860,22 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
       document.head.appendChild(s);
     });
   }
+  function findMagenta() {                                  // MusicVAE 클래스를 가진 전역 네임스페이스 찾기
+    var cands = [window.mm, window.music_vae, window.musicvae, window.magenta, window.core, window.mvae];
+    for (var i = 0; i < cands.length; i++) if (cands[i] && typeof cands[i].MusicVAE === 'function') return cands[i];
+    for (var k in window) { try { var o = window[k]; if (o && typeof o.MusicVAE === 'function') return o; } catch (e) {} }
+    return null;
+  }
   function loadMagenta() {
     if (magentaPromise) return magentaPromise;
-    var haveCore = (typeof window.mm !== 'undefined') && window.mm.SoundFontPlayer;
-    magentaPromise = (haveCore ? Promise.resolve() : loadScript(MAG_CORE))
-      .then(function () { return (typeof window.mm !== 'undefined' && window.mm.MusicVAE) ? null : loadScript(MAG_MVAE); })
+    var found = findMagenta();
+    if (found) { magentaPromise = Promise.resolve(found); return magentaPromise; }
+    magentaPromise = loadScript(MAG_CORE).catch(function () {})   // core는 이미 있을 수 있음(재생기)
+      .then(function () { return loadScript(MAG_MVAE); })
       .then(function () {
-        if (typeof window.mm === 'undefined' || !window.mm.MusicVAE) throw new Error('MusicVAE 로드 실패');
-        return window.mm;
+        var f = findMagenta();
+        if (!f) throw new Error('MusicVAE 전역을 찾지 못함');
+        return f;
       });
     return magentaPromise;
   }
@@ -898,7 +906,7 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
   }
   function regen() {
     if (drumSource === 'ai') genAI();
-    else { drumPattern = (drumPattern + 1) % 3; genBasic(); }
+    else { drumPattern = (drumPattern + 1) % MidiCore.BEAT_STYLES.length; genBasic(); }
   }
   $('btnBasic').addEventListener('click', genBasic);
   $('btnAI').addEventListener('click', genAI);
