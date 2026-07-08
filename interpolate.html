@@ -441,7 +441,7 @@ var PPQ = 480;                                   // 4분음표당 틱
     var measureSteps = Math.max(1, Math.round((num * (4 / den)) / 0.5));   // 마디당 8분음표 수
     var runs = [], i = 0;
     while (i < steps.length) { var p = steps[i], c = 1; while (i + c < steps.length && steps[i + c] === p) c++; runs.push({ p: p, c: c }); i += c; }
-    var body = '', pos = 0;
+    var body = '', pos = 0, barCount = 0;
     runs.forEach(function (r) {
       var remain = r.c, st = pos;
       while (remain > 0) {
@@ -450,7 +450,7 @@ var PPQ = 480;                                   // 4분음표당 틱
         if (r.p === null) body += 'z' + durToAbc(seg) + ' ';
         else body += midiToAbcNote(r.p) + durToAbc(seg) + (crosses ? '-' : '') + ' ';
         st += seg; remain -= seg; pos = st;
-        if (pos % measureSteps === 0) body += '| ';
+        if (pos % measureSteps === 0) { barCount++; body += (barCount % 4 === 0 ? '|\n' : '| '); } // 4마디마다 줄바꿈
       }
     });
     return 'X:1\nT:' + (title || 'interp') + '\nM:' + num + '/' + den + '\nL:1/8\nK:' + (keyName || 'C') + '\n' +
