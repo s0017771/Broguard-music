@@ -849,18 +849,10 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
     catch (e) { $('drumStatus').innerHTML = '<span class="err">생성 실패: ' + e.message + '</span>'; }
   }
 
-  // magenta.js는 전역 이름이 버전/빌드마다 다름(mm / music_vae / core …). 폭넓게 탐색해 MusicVAE를 찾는다.
-  var MAG_CORE = 'https://cdn.jsdelivr.net/npm/@magenta/music@1.23.0/es6/core.js';
-  var MAG_MVAE = 'https://cdn.jsdelivr.net/npm/@magenta/music@1.23.0/es6/music_vae.js';
+  // magenta.js 1.x es6는 ES 모듈이라 <script>로는 전역에 안 올라감 → jsdelivr /+esm 번들을 동적 import
+  var MAG_ESM = 'https://cdn.jsdelivr.net/npm/@magenta/music@1.23.0/+esm';
   var GROOVE_CKPT = 'https://storage.googleapis.com/magentadata/js/checkpoints/music_vae/groovae_2bar_tap_fixed_velocity';
-  function loadScript(url) {
-    return new Promise(function (resolve, reject) {
-      var s = document.createElement('script'); s.src = url; s.crossOrigin = 'anonymous';
-      s.onload = resolve; s.onerror = function () { reject(new Error('로드 실패: ' + url)); };
-      document.head.appendChild(s);
-    });
-  }
-  function findMagenta() {                                  // MusicVAE 클래스를 가진 전역 네임스페이스 찾기
+  function findMagentaGlobal() {                            // 혹시 전역에 올라와 있으면 사용
     var cands = [window.mm, window.music_vae, window.musicvae, window.magenta, window.core, window.mvae];
     for (var i = 0; i < cands.length; i++) if (cands[i] && typeof cands[i].MusicVAE === 'function') return cands[i];
     for (var k in window) { try { var o = window[k]; if (o && typeof o.MusicVAE === 'function') return o; } catch (e) {} }
@@ -868,15 +860,15 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
   }
   function loadMagenta() {
     if (magentaPromise) return magentaPromise;
-    var found = findMagenta();
-    if (found) { magentaPromise = Promise.resolve(found); return magentaPromise; }
-    magentaPromise = loadScript(MAG_CORE).catch(function () {})   // core는 이미 있을 수 있음(재생기)
-      .then(function () { return loadScript(MAG_MVAE); })
-      .then(function () {
-        var f = findMagenta();
-        if (!f) throw new Error('MusicVAE 전역을 찾지 못함');
-        return f;
-      });
+    var pre = findMagentaGlobal();
+    if (pre) { magentaPromise = Promise.resolve(pre); return magentaPromise; }
+    magentaPromise = import(MAG_ESM).then(function (mod) {    // ES 모듈 동적 import(의존성 포함 번들)
+      var ns = (mod && typeof mod.MusicVAE === 'function') ? mod
+             : (mod && mod.default && typeof mod.default.MusicVAE === 'function') ? mod.default
+             : findMagentaGlobal();
+      if (!ns || typeof ns.MusicVAE !== 'function') throw new Error('MusicVAE를 찾지 못함(+esm)');
+      return ns;
+    });
     return magentaPromise;
   }
   function genAI() {
