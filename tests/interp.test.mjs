@@ -210,3 +210,35 @@ test('noteSequenceToAbc: MusicVAE식 출력(다른 음길이)도 변환', () => 
   const notes = Interp.parseABC(Interp.noteSequenceToAbc(fake, {})).voices['1'].events.filter(e => e.type === 'note');
   assert.deepEqual(notes.map(n => n.midis[0]), [60, 64, 67]);
 });
+
+// ---------- AI 청크 확장(길게) 헬퍼 ----------
+test('measureCount: 4/4 4마디 멜로디는 4마디로 센다', () => {
+  const four = 'X:1\nM:4/4\nL:1/8\nK:C\nC2 D2 E2 F2 | G2 A2 G2 E2 | c2 c2 c2 c2 | d2 d2 d2 d2 |';
+  assert.equal(Interp.measureCount(four), 4);
+  assert.equal(Interp.measureCount(A), 2);
+});
+
+test('abcToNoteSequence barOffset: 청크마다 다른 2마디를 잘라온다', () => {
+  const four = 'X:1\nM:4/4\nL:1/8\nK:C\nC2 D2 E2 F2 | G2 A2 G2 E2 | c2 c2 c2 c2 | d2 d2 d2 d2 |';
+  const ch0 = Interp.abcToNoteSequence(four, { bars: 2, barOffset: 0 });
+  const ch1 = Interp.abcToNoteSequence(four, { bars: 2, barOffset: 2 });
+  const p0 = ch0.notes.map(n => n.pitch);
+  const p1 = ch1.notes.map(n => n.pitch);
+  assert.ok(p0.includes(60) && p0.includes(65), '0청크는 1~2마디(C..F)');
+  assert.ok(p1.includes(72) && p1.includes(74), '1청크는 3~4마디(c,d)');
+  assert.notDeepEqual(p0, p1);
+});
+
+test('abcToNoteSequence barOffset: 곡 끝을 넘는 청크는 무음(패딩)으로', () => {
+  const ns = Interp.abcToNoteSequence(A, { bars: 2, barOffset: 4 }); // A는 2마디뿐
+  assert.equal(ns.notes.length, 0, '범위 밖 청크는 음표 없음');
+  assert.equal(ns.totalQuantizedSteps, 32, '2마디(16분 32스텝) 길이는 유지');
+});
+
+test('concatNoteSequences: 2마디 시퀀스 2개 → 4마디로 이어붙임(시간축 오프셋)', () => {
+  const c0 = { notes: [{ pitch: 60, quantizedStartStep: 0, quantizedEndStep: 16 }], totalQuantizedSteps: 32, tempos: [{ time: 0, qpm: 100 }] };
+  const c1 = { notes: [{ pitch: 67, quantizedStartStep: 0, quantizedEndStep: 16 }], totalQuantizedSteps: 32, tempos: [{ time: 0, qpm: 100 }] };
+  const full = Interp.concatNoteSequences([c0, c1]);
+  assert.equal(full.totalQuantizedSteps, 64, '32+32=64스텝');
+  assert.deepEqual(full.notes.map(n => [n.pitch, n.quantizedStartStep]), [[60, 0], [67, 32]]);
+});

@@ -16,7 +16,7 @@ assert.ok(engine, 'melody.html에 module.exports를 가진 엔진 <script> 블�
 
 const tmp = mkdtempSync(join(tmpdir(), 'melody-'));
 writeFileSync(join(tmp, 'engine.cjs'), engine);
-const { generate } = createRequire(import.meta.url)(join(tmp, 'engine.cjs'));
+const { generate, generateSong } = createRequire(import.meta.url)(join(tmp, 'engine.cjs'));
 
 // 코드 심볼 → 구성음 pitchClass (강박 검증용)
 const ROOT_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -156,4 +156,34 @@ test('프리셋 진행들이 모두 정상 생성된다', () => {
     const out = generate(prog, { count: 3, seed: 11 });
     assert.ok(!out.error && out.results.length >= 1, `${prog} 생성 실패`);
   }
+});
+
+// ---------- 기승전결 한번에(완성곡) ----------
+test('generateSong: 기·승·전·결 4섹션 × 16마디 = 총 64마디를 하나의 ABC로', () => {
+  const out = generateSong(CANON, { seed: 42, barsPerSection: 16 });
+  assert.ok(!out.error, '오류 없이 생성: ' + (out.error || ''));
+  assert.equal(out.sections.length, 4);
+  assert.deepEqual(out.sections.map(s => s.mode), ['ki', 'seung', 'jeon', 'gyeol']);
+  for (const s of out.sections) assert.equal(s.bars.length, 16, `${s.label} 16마디`);
+  assert.equal(out.totalBars, 64);
+  assert.ok(out.abc.startsWith('X:1') && out.abc.includes('K:C'));
+  // 섹션 주석과 종지선
+  ['── 기 ──', '── 승 ──', '── 전 ──', '── 결 ──'].forEach(mk =>
+    assert.ok(out.abc.includes(mk), '섹션 주석 ' + mk));
+  assert.ok(out.abc.trim().endsWith('|]'), '완성곡은 |]로 종료');
+});
+
+test('generateSong: 결 섹션 마지막 마디는 으뜸음 C로 착지', () => {
+  const out = generateSong('C G Am F', { seed: 9, barsPerSection: 16 });
+  const gyeol = out.sections[3];
+  const last = gyeol.bars[gyeol.bars.length - 1];
+  assert.equal(last.notes[0] % 12, 0, '결 종지는 도(C)');
+});
+
+test('generateSong: 같은 시드 → 동일한 곡, 잘못된 코드는 오류', () => {
+  const a = generateSong(CANON, { seed: 7 });
+  const b = generateSong(CANON, { seed: 7 });
+  assert.equal(a.abc, b.abc);
+  assert.ok(/해석할 수 없/.test(generateSong('C Xyz', {}).error));
+  assert.ok(/2개 이상/.test(generateSong('C', {}).error));
 });

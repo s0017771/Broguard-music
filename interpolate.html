@@ -513,14 +513,25 @@ var PPQ = 480;                                   // 4분음표당 틱
 
   /* ============ ABC ↔ Magenta NoteSequence (AI 모드용) ============ */
   // MusicVAE 멜로디 모델(mel_2bar)에 맞춰 2마디·16분 양자화 시퀀스로 변환
+  // 8분음표 스텝 기준으로 한 마디가 몇 스텝인지
+  function measureStepsOf(meter) {
+    var mm = /(\d+)\s*\/\s*(\d+)/.exec(meter || '4/4'), num = mm ? +mm[1] : 4, den = mm ? +mm[2] : 4;
+    return Math.max(1, Math.round((num * (4 / den)) / 0.5));
+  }
+  // ABC 멜로디가 몇 마디인지(8분 스텝 기준, 올림)
+  function measureCount(abc) {
+    var A = flattenToSteps(abc, 0.5);
+    var ms = measureStepsOf(A.meter);
+    return Math.max(1, Math.ceil(A.steps.length / ms));
+  }
   function abcToNoteSequence(abc, opts) {
     opts = opts || {};
     var A = flattenToSteps(abc, 0.5);                 // 8분음표 스텝
-    var mm = /(\d+)\s*\/\s*(\d+)/.exec(A.meter || '4/4'), num = mm ? +mm[1] : 4, den = mm ? +mm[2] : 4;
-    var measureSteps = Math.max(1, Math.round((num * (4 / den)) / 0.5));
+    var measureSteps = measureStepsOf(A.meter);
     var bars = opts.bars || 2;
+    var offset = (opts.barOffset || 0) * measureSteps; // 몇 마디째부터 잘라올지(청크 확장용)
     var want = measureSteps * bars;
-    var steps = A.steps.slice(0, want);
+    var steps = A.steps.slice(offset, offset + want);
     while (steps.length < want) steps.push(null);
     var notes = [], i = 0, pos = 0;
     while (i < steps.length) {
@@ -545,10 +556,29 @@ var PPQ = 480;                                   // 4분음표당 틱
     return stepsToAbc(steps, opts.meter || '4/4', 'C', opts.title || 'AI interp');
   }
 
+  // 여러 2마디 NoteSequence를 시간축으로 이어붙여 긴 시퀀스 하나로 (AI 청크 확장용)
+  function concatNoteSequences(list) {
+    var notes = [], offset = 0, qpm = 120;
+    (list || []).forEach(function (ns) {
+      var span = ns.totalQuantizedSteps || 0;
+      (ns.notes || []).forEach(function (n) { span = Math.max(span, n.quantizedEndStep || 0); });
+      (ns.notes || []).forEach(function (n) {
+        notes.push({ pitch: n.pitch,
+          quantizedStartStep: (n.quantizedStartStep || 0) + offset,
+          quantizedEndStep: (n.quantizedEndStep || 0) + offset });
+      });
+      if (ns.tempos && ns.tempos[0]) qpm = ns.tempos[0].qpm;
+      offset += span;
+    });
+    return { notes: notes, quantizationInfo: { stepsPerQuarter: 4 },
+             totalQuantizedSteps: offset, tempos: [{ time: 0, qpm: qpm }] };
+  }
+
   return { parseABC: parseABC, flattenToSteps: flattenToSteps, resample: resample,
            nearestDiaIdx: nearestDiaIdx, DIA: DIA, stepsToAbc: stepsToAbc, morph: morph, bridge: bridge,
            parseChordList: parseChordList, parseChordTones: parseChordTones, snapStepsToChords: snapStepsToChords,
-           abcToNoteSequence: abcToNoteSequence, noteSequenceToAbc: noteSequenceToAbc };
+           abcToNoteSequence: abcToNoteSequence, noteSequenceToAbc: noteSequenceToAbc,
+           measureCount: measureCount, concatNoteSequences: concatNoteSequences };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Interp;
 if (typeof window !== 'undefined') window.Interp = Interp;
@@ -568,7 +598,7 @@ if (typeof window !== 'undefined') window.Interp = Interp;
   var DESC = {
     morph: '<b>Morph</b>: A와 B "사이"의 중간 멜로디들을 단계별로 만듭니다 (A → 섞임 → B). 알고리즘 방식 · 오프라인.',
     bridge: '<b>Bridge</b>: A의 끝 음에서 B의 첫 음으로 자연스럽게 잇는 <b>연결 마디</b>를 만들고, A+연결+B를 이어붙입니다. 곡을 전환할 때.',
-    ai: '<b>AI Morph</b> &#10024;: 구글 <b>Magenta MusicVAE</b> 신경망으로 A↔B를 보간합니다. 각 멜로디의 <b>앞 2마디</b>를 사용 · <b>인터넷 필요</b>(처음 실행 시 모델 다운로드, 이후 브라우저에서 로컬 실행 · 무료).'
+    ai: '<b>AI Morph</b> &#10024;: 구글 <b>Magenta MusicVAE</b> 신경망으로 A↔B를 보간합니다. 모델(mel_2bar)은 한 번에 <b>2마디</b>만 다루므로, 두 곡을 2마디씩 <b>여러 구간으로 나눠 보간한 뒤 이어붙여</b> 원곡 길이만큼(최대 16마디) 길게 만듭니다 · <b>인터넷 필요</b>(처음 실행 시 모델 다운로드, 이후 브라우저에서 로컬 실행 · 무료).'
   };
 
   function setMode(m) {
@@ -734,25 +764,39 @@ if (typeof window !== 'undefined') window.Interp = Interp;
   function runAI(a, b) {
     var steps = parseInt($('optSteps').value, 10) || 3;
     var numInterps = Math.max(3, Math.min(10, steps + 2));   // 양끝 포함
+    // MusicVAE mel_2bar 모델은 한 번에 딱 2마디만 다룬다.
+    // → A·B를 2마디씩 청크로 쪼개 각 청크를 보간하고, 같은 보간 위치끼리 이어붙여
+    //   원곡 길이만큼 긴 결과를 만든다(모프처럼).
+    var barsA = Interp.measureCount(a), barsB = Interp.measureCount(b);
+    var totalBars = Math.max(2, Math.min(16, Math.max(barsA, barsB)));
+    var numChunks = Math.max(1, Math.ceil(totalBars / 2));    // 최대 8청크(16마디)
     aiStatus('&#10024; MusicVAE 모델 로딩 중… (처음엔 수 MB 다운로드, 이후 캐시)');
     $('btnGo').disabled = true;
     loadMagenta().then(function (mmLib) {
       if (!mvae) { mvae = new mmLib.MusicVAE(MVAE_CKPT); }
       return mvae.initialized ? mvae : mvae.initialize().then(function () { return mvae; });
     }).then(function () {
-      aiStatus('&#10024; 신경망으로 보간 중…');
-      var nsA = Interp.abcToNoteSequence(a, { bars: 2 });
-      var nsB = Interp.abcToNoteSequence(b, { bars: 2 });
-      return mvae.interpolate([nsA, nsB], numInterps);
-    }).then(function (seqs) {
+      aiStatus('&#10024; 신경망으로 보간 중… (' + numChunks + '개 구간 × 2마디)');
+      // 청크별로 [A청크, B청크]를 numInterps 단계로 보간
+      var chunkJobs = [];
+      for (var c = 0; c < numChunks; c++) {
+        var nsA = Interp.abcToNoteSequence(a, { bars: 2, barOffset: c * 2 });
+        var nsB = Interp.abcToNoteSequence(b, { bars: 2, barOffset: c * 2 });
+        chunkJobs.push(mvae.interpolate([nsA, nsB], numInterps));
+      }
+      return Promise.all(chunkJobs);   // [chunk0[i], chunk1[i], ...]
+    }).then(function (chunkResults) {
       results.innerHTML = '';
-      seqs.forEach(function (ns, i) {
-        var t = i / (seqs.length - 1);
-        var title = i === 0 ? 'A (0%)' : i === seqs.length - 1 ? 'B (100%)' : Math.round(t * 100) + '%';
-        var abc = Interp.noteSequenceToAbc(ns, { title: 'AI morph ' + Math.round(t * 100) + '%' });
-        results.appendChild(block('&#10024; ' + title, i === 0 || i === seqs.length - 1 ? '원곡(재구성)' : 'MusicVAE 보간', abc));
-      });
-      aiStatus('&#10024; AI Morph 완료 · MusicVAE(mel_2bar) · 각 멜로디 앞 2마디 사용 · 총 ' + seqs.length + '개');
+      // 같은 보간 단계 i의 청크들을 이어붙여 하나의 긴 멜로디로
+      for (var i = 0; i < numInterps; i++) {
+        var perStep = chunkResults.map(function (cr) { return cr[i]; });
+        var full = Interp.concatNoteSequences(perStep);
+        var t = i / (numInterps - 1);
+        var title = i === 0 ? 'A (0%)' : i === numInterps - 1 ? 'B (100%)' : Math.round(t * 100) + '%';
+        var abc = Interp.noteSequenceToAbc(full, { title: 'AI morph ' + Math.round(t * 100) + '%', meter: '4/4' });
+        results.appendChild(block('&#10024; ' + title, i === 0 || i === numInterps - 1 ? '원곡(재구성)' : 'MusicVAE 보간 · ' + (numChunks * 2) + '마디', abc));
+      }
+      aiStatus('&#10024; AI Morph 완료 · MusicVAE(mel_2bar)를 ' + numChunks + '구간으로 이어붙여 ' + (numChunks * 2) + '마디 · 보간 ' + numInterps + '단계');
       $('topNote').textContent = '';
       $('btnGo').disabled = false;
     }).catch(function (e) {
