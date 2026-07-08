@@ -18,7 +18,7 @@ writeFileSync(join(tmp, 'core.cjs'), m[1]);
 const MidiCore = require(join(tmp, 'core.cjs'));
 
 // merge.html에 박아둔 샘플 드럼(base64)을 추출해 실제 데이터로 검증
-const b64 = html.match(/SAMPLE_B64 = '([^']+)'/)[1];
+const b64 = html.match(/SAMPLE_DRUM = '([^']+)'/)[1];
 const drum = Uint8Array.from(Buffer.from(b64, 'base64'));
 
 // 멜로디 MIDI는 ABC↔MIDI 변환기로 생성
@@ -73,4 +73,101 @@ test('GM_DRUM 매핑에 핵심 타악기가 있다', () => {
   assert.ok(/킥/.test(MidiCore.GM_DRUM[36]));
   assert.ok(/스네어/.test(MidiCore.GM_DRUM[38]));
   assert.ok(/하이햇/.test(MidiCore.GM_DRUM[42]));
+});
+
+// ---------- 병합 (2단계) ----------
+test('mergeMidis: 멜로디+드럼 → 멜로디 ch1·드럼 ch10, 공통 PPQ 480', () => {
+  const res = MidiCore.mergeMidis(melody, drum, {});
+  assert.equal(res.ppq, 480);
+  const d = MidiCore.describe(res.bytes);
+  assert.equal(d.ppq, 480);
+  assert.ok(d.hasDrums, '병합본에 드럼 포함');
+  const melTrack = d.tracks.find(t => !t.isDrum && t.noteCount > 0);
+  const drumTrack = d.tracks.find(t => t.isDrum);
+  assert.ok(melTrack, '멜로디 트랙 존재');
+  assert.ok(drumTrack, '드럼 트랙 존재');
+  assert.deepEqual(melTrack.channels, [0], '멜로디는 채널 1(0-index 0)');
+  assert.deepEqual(drumTrack.channels, [9], '드럼은 채널 10(0-index 9)');
+});
+
+test('mergeMidis: 드럼 틱을 PPQ 480으로 정확히 환산(220→480)', () => {
+  const drumParsed = MidiCore.parseMidi(drum);
+  const expected = Math.round(drumParsed.totalTicks * 480 / 220);
+  const merged = MidiCore.parseMidi(MidiCore.mergeMidis(melody, drum, {}).bytes);
+  // 병합 총틱은 드럼(더 긴 쪽)의 환산값과 일치
+  assert.ok(Math.abs(merged.totalTicks - expected) <= 2, `총틱 ${merged.totalTicks} ≈ ${expected}`);
+});
+
+test('mergeMidis: 두 음원의 노트가 모두 보존된다', () => {
+  const melN = MidiCore.parseMidi(melody).tracks.reduce((a, t) => a + t.noteCount, 0);
+  const drmN = MidiCore.parseMidi(drum).tracks.reduce((a, t) => a + t.noteCount, 0);
+  const res = MidiCore.mergeMidis(melody, drum, {});
+  assert.equal(res.melNotes, melN);
+  assert.equal(res.drmNotes, drmN);
+  const total = MidiCore.parseMidi(res.bytes).tracks.reduce((a, t) => a + t.noteCount, 0);
+  assert.equal(total, melN + drmN);
+});
+
+test('mergeMidis: loopToMatch로 짧은 쪽을 반복해 길이를 맞춘다', () => {
+  // 1마디 멜로디 vs 4마디 드럼 → 멜로디가 반복되어 노트가 늘어남
+  const shortMel = AbcMidi.abcToMidi('X:1\nM:4/4\nL:1/8\nQ:1/4=120\nK:C\nC2 E2 G2 c2 |');
+  const asis = MidiCore.mergeMidis(shortMel, drum, { loopToMatch: false });
+  const looped = MidiCore.mergeMidis(shortMel, drum, { loopToMatch: true });
+  assert.ok(looped.melNotes > asis.melNotes, `반복으로 멜로디 노트 증가 (${asis.melNotes} → ${looped.melNotes})`);
+});
+
+test('mergeMidis: 표준 GM 드럼 노트가 병합 후에도 유지', () => {
+  const res = MidiCore.mergeMidis(melody, drum, {});
+  const dt = MidiCore.describe(res.bytes).tracks.find(t => t.isDrum);
+  const notes = dt.drumNotes.map(x => x.note);
+  assert.ok(notes.includes(36) && notes.includes(38) && notes.includes(42), '킥·스네어·하이햇 유지');
+});
+
+// ---------- 기본 비트 자동 생성 ----------
+test('makeBasicBeat: 멜로디 박자·템포에 맞는 드럼(채널10·GM) 생성', () => {
+  const beat = MidiCore.makeBasicBeat(melody, { pattern: 0 });
+  const d = MidiCore.describe(beat);
+  assert.ok(d.hasDrums, '드럼으로 인식');
+  assert.equal(d.ppq, 480);
+  assert.equal(d.tempoBpm, 120, '멜로디 템포 따름');
+  const dt = d.tracks.find(t => t.isDrum);
+  assert.deepEqual(dt.channels, [9], '채널 10');
+  const notes = dt.drumNotes.map(x => x.note);
+  assert.ok(notes.includes(36), '킥');
+  assert.ok(notes.includes(38), '스네어');
+  assert.ok(notes.includes(42) || notes.includes(46), '하이햇');
+});
+
+test('makeBasicBeat: 패턴 3종은 서로 다른 결과', () => {
+  const a = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 0 })).tracks.find(t => t.isDrum).noteCount;
+  const b = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 1 })).tracks.find(t => t.isDrum).noteCount;
+  const c = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 2 })).tracks.find(t => t.isDrum).noteCount;
+  assert.ok(!(a === b && b === c), '패턴별로 노트 구성이 다름');
+});
+
+test('makeBasicBeat + mergeMidis: 멜로디에 기본 드럼을 얹어 병합', () => {
+  const beat = MidiCore.makeBasicBeat(melody, { pattern: 0 });
+  const merged = MidiCore.mergeMidis(melody, beat, { loopToMatch: true });
+  const d = MidiCore.describe(merged.bytes);
+  assert.ok(d.hasDrums);
+  assert.ok(d.tracks.some(t => !t.isDrum && t.noteCount > 0), '멜로디 트랙');
+  assert.ok(d.tracks.some(t => t.isDrum), '드럼 트랙');
+});
+
+test('melodyToTapSequence: 멜로디 온셋을 2마디·16분 탭 시퀀스로', () => {
+  const tap = MidiCore.melodyToTapSequence(melody, 2);
+  assert.equal(tap.quantizationInfo.stepsPerQuarter, 4);
+  assert.equal(tap.totalQuantizedSteps, 32);
+  assert.ok(tap.notes.length > 0 && tap.notes.every(n => n.isDrum));
+});
+
+test('drumSequenceToMidi: GrooVAE식 출력 → 드럼 MIDI(채널10)', () => {
+  const fakeGroove = { notes: [
+    { pitch: 36, quantizedStartStep: 0 }, { pitch: 42, quantizedStartStep: 2 },
+    { pitch: 38, quantizedStartStep: 4 }, { pitch: 42, quantizedStartStep: 6 }],
+    tempos: [{ qpm: 120 }] };
+  const midi = MidiCore.drumSequenceToMidi(fakeGroove, { tempoBpm: 120 });
+  const d = MidiCore.describe(midi);
+  assert.ok(d.hasDrums);
+  assert.deepEqual(d.tracks.find(t => t.isDrum).channels, [9]);
 });
