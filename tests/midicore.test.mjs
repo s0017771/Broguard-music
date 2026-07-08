@@ -138,11 +138,20 @@ test('makeBasicBeat: 멜로디 박자·템포에 맞는 드럼(채널10·GM) 생
   assert.ok(notes.includes(42) || notes.includes(46), '하이햇');
 });
 
-test('makeBasicBeat: 패턴 3종은 서로 다른 결과', () => {
+test('makeBasicBeat: 6가지 스타일이 모두 드럼을 만들고 서로 다르다', () => {
+  assert.equal(MidiCore.BEAT_STYLES.length, 6);
+  const counts = MidiCore.BEAT_STYLES.map((_, i) => {
+    const dt = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: i })).tracks.find(t => t.isDrum);
+    assert.ok(dt && dt.noteCount > 0, `스타일 ${i} 드럼 있음`);
+    return dt.noteCount;
+  });
+  assert.ok(new Set(counts).size >= 4, '스타일별 구성이 대체로 다름');
+});
+
+test('makeBasicBeat: pattern 인덱스는 스타일 수로 순환(음수·초과 안전)', () => {
   const a = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 0 })).tracks.find(t => t.isDrum).noteCount;
-  const b = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 1 })).tracks.find(t => t.isDrum).noteCount;
-  const c = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 2 })).tracks.find(t => t.isDrum).noteCount;
-  assert.ok(!(a === b && b === c), '패턴별로 노트 구성이 다름');
+  const b = MidiCore.describe(MidiCore.makeBasicBeat(melody, { pattern: 6 })).tracks.find(t => t.isDrum).noteCount;
+  assert.equal(a, b, 'pattern 6 == pattern 0');
 });
 
 test('makeBasicBeat + mergeMidis: 멜로디에 기본 드럼을 얹어 병합', () => {

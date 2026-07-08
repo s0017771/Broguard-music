@@ -81,10 +81,10 @@
     <h2>&#127925; ① 멜로디</h2>
     <p class="sub">ABC를 붙여넣으면 <b>자동으로 MIDI 변환</b>됩니다. 또는 멜로디 <b>.mid</b> 파일을 여세요.</p>
     <textarea id="abcIn" spellcheck="false" placeholder="여기에 ABC 멜로디를 붙여넣으세요 (뮤직랩 Melody Maker 등에서 복사)"></textarea>
-    <input type="file" id="fileMel" accept=".mid,.midi" style="display:none">
+    <input type="file" id="fileMel" accept=".abc,.txt,.mid,.midi" style="display:none">
     <div class="row">
       <button id="btnSampleMel" class="alt sm">🎵 샘플 멜로디</button>
-      <button id="btnMelFile" class="alt sm">.mid 파일 열기</button>
+      <button id="btnMelFile" class="alt sm">.abc / .mid 파일 열기</button>
       <button id="playMel" class="alt sm" disabled>▶ 멜로디만</button>
       <span style="flex:1"></span>
     </div>
@@ -663,6 +663,7 @@ var MidiCore = (function () {
              melNotes: melNotes.length, drmNotes: drmNotes.length };
   }
 
+  var BEAT_STYLES = ['기본 록', '8비트 드라이브', '하프타임', '발라드', '팝 그루브', 'four-on-the-floor'];
   // 멜로디에 맞춘 기본 드럼 비트 생성(오프라인·규칙 기반) — 멜로디의 마디·박자·템포·길이를 따름
   function makeBasicBeat(melodyBytes, opts) {
     opts = opts || {};
@@ -672,22 +673,29 @@ var MidiCore = (function () {
     var q = PPQ, e = PPQ / 2, barTicks = beatsPerBar * q;
     var melLen = Math.round(mel.totalTicks * PPQ / mel.ppq);
     var bars = Math.max(1, Math.ceil((melLen - 1) / barTicks));
-    var pattern = ((opts.pattern || 0) % 3 + 3) % 3;
+    var pattern = ((opts.pattern || 0) % BEAT_STYLES.length + BEAT_STYLES.length) % BEAT_STYLES.length;
     var notes = [];
     function add(pitch, tick, dur) { notes.push({ midi: pitch, channel: 9, startTick: tick, durTick: dur || Math.round(e * 0.6) }); }
+    var isBackbeat = function (beat) { return beatsPerBar >= 4 ? (beat % 2 === 1) : (beat === Math.floor(beatsPerBar / 2)); };
     for (var bar = 0; bar < bars; bar++) {
       var b = bar * barTicks;
-      for (var h = 0; h < beatsPerBar * 2; h++) {          // 하이햇: 매 8분(패턴2는 4분)
-        if (pattern === 2 && h % 2 === 1) continue;
-        add(pattern === 2 && h % 4 === 0 ? 46 : 42, b + h * e); // 패턴2는 강박에 오픈하이햇
+      // 하이햇
+      if (pattern === 2 || pattern === 3) {                 // 하프타임·발라드: 4분 하이햇(발라드는 라이드)
+        for (var beat0 = 0; beat0 < beatsPerBar; beat0++) add(pattern === 3 ? 51 : 42, b + beat0 * q, q * 0.4);
+      } else {                                              // 나머지: 8분 하이햇
+        for (var h = 0; h < beatsPerBar * 2; h++) add(pattern === 5 && h % 2 === 0 ? 46 : 42, b + h * e);
       }
+      // 킥·스네어
       for (var beat = 0; beat < beatsPerBar; beat++) {
         var t = b + beat * q;
-        if (beat === 0) add(36, t, q * 0.5);               // 킥: 1박
-        if (beatsPerBar >= 4 && beat === 2 && pattern !== 2) add(36, t, q * 0.5); // 킥: 3박(하프타임 제외)
-        if (beat % 2 === 1) add(38, t, q * 0.5);           // 스네어: 백비트(2·4박)
+        if (beat === 0) add(36, t, q * 0.5);                          // 킥: 1박
+        if (isBackbeat(beat)) add(38, t, q * 0.5);                    // 스네어: 백비트
+        if (pattern === 5) add(36, t, q * 0.5);                       // four-on-the-floor: 매 박 킥
+        else if (beatsPerBar >= 4 && beat === 2 && pattern !== 2 && pattern !== 3) add(36, t, q * 0.5); // 킥: 3박
       }
-      if (pattern === 1) add(36, b + 2 * q + e, e * 0.5);  // 변형: '3박 뒤' 싱코페이션 킥
+      if (pattern === 1) { add(36, b + q + e, e * 0.5); add(36, b + 2 * q + e, e * 0.5); } // 8비트: 싱코 킥 2개
+      if (pattern === 4) add(36, b + 2 * q + e, e * 0.5);            // 팝: '3박 뒤' 킥
+      if (pattern === 2 && beatsPerBar >= 4) add(38, b + 3 * q + e, e * 0.5); // 하프타임: 고스트 스네어
     }
     var meta = [], uspq = Math.round(60000000 / tempo);
     meta = meta.concat(writeVarLen(0), [0xff, 0x51, 0x03, (uspq >> 16) & 0xff, (uspq >> 8) & 0xff, uspq & 0xff]);
@@ -742,7 +750,7 @@ var MidiCore = (function () {
   }
 
   return { parseMidi: parseMidi, describe: describe, mergeMidis: mergeMidis, GM_DRUM: GM_DRUM,
-           makeBasicBeat: makeBasicBeat, melodyToTapSequence: melodyToTapSequence, drumSequenceToMidi: drumSequenceToMidi };
+           makeBasicBeat: makeBasicBeat, BEAT_STYLES: BEAT_STYLES, melodyToTapSequence: melodyToTapSequence, drumSequenceToMidi: drumSequenceToMidi };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = MidiCore;
 if (typeof window !== 'undefined') window.MidiCore = MidiCore;
@@ -810,7 +818,19 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
   $('btnMelFile').addEventListener('click', function () { $('fileMel').click(); });
   $('fileMel').addEventListener('change', function () {
     var f = this.files && this.files[0]; if (!f) return;
-    var r = new FileReader(); r.onload = function () { $('abcIn').value = ''; setMel(new Uint8Array(r.result)); }; r.readAsArrayBuffer(f); this.value = '';
+    var r = new FileReader();
+    r.onload = function () {
+      var buf = new Uint8Array(r.result);
+      // MThd로 시작하면 MIDI, 아니면 ABC 텍스트로 취급
+      var isMidi = buf[0] === 0x4d && buf[1] === 0x54 && buf[2] === 0x68 && buf[3] === 0x64;
+      if (isMidi) { $('abcIn').value = ''; setMel(buf); }
+      else {
+        var txt = ''; for (var i = 0; i < buf.length; i++) txt += String.fromCharCode(buf[i]);
+        try { txt = new TextDecoder('utf-8').decode(buf); } catch (e) {}
+        $('abcIn').value = txt; melFromAbc();
+      }
+    };
+    r.readAsArrayBuffer(f); this.value = '';
   });
   $('playMel').addEventListener('click', function () { if (melBytes) play(melBytes, '멜로디만'); });
 
@@ -823,21 +843,32 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
   }
   function genBasic() {
     if (!melBytes) return;
+    var styles = MidiCore.BEAT_STYLES, name = styles[drumPattern % styles.length];
     try { setDrum(MidiCore.makeBasicBeat(melBytes, { pattern: drumPattern }), 'basic',
-      '🥁 <b>기본 비트</b> 생성 (패턴 ' + (drumPattern + 1) + '/3) · 멜로디 박자·템포에 맞춤. 🎲 다시 생성으로 패턴 바꾸기.'); }
+      '🥁 <b>기본 비트 — ' + name + '</b> (' + (drumPattern % styles.length + 1) + '/' + styles.length + ') · 멜로디 박자·템포에 맞춤. 🎲 다시 생성으로 스타일 바꾸기.'); }
     catch (e) { $('drumStatus').innerHTML = '<span class="err">생성 실패: ' + e.message + '</span>'; }
   }
 
-  var MAGENTA_SRC = 'https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1';
+  // html-midi-player가 magenta 코어(window.mm)를 이미 로드하므로, MusicVAE만 얹는다(버전 1.23.0로 통일)
+  var MAG_CORE = 'https://cdn.jsdelivr.net/npm/@magenta/music@1.23.0/es6/core.js';
+  var MAG_MVAE = 'https://cdn.jsdelivr.net/npm/@magenta/music@1.23.0/es6/music_vae.js';
   var GROOVE_CKPT = 'https://storage.googleapis.com/magentadata/js/checkpoints/music_vae/groovae_2bar_tap_fixed_velocity';
-  function loadMagenta() {
-    if (magentaPromise) return magentaPromise;
-    magentaPromise = new Promise(function (resolve, reject) {
-      var s = document.createElement('script'); s.src = MAGENTA_SRC; s.crossOrigin = 'anonymous';
-      s.onload = function () { (typeof mm !== 'undefined' && mm.MusicVAE) ? resolve(mm) : reject(new Error('Magenta(mm) 전역 없음')); };
-      s.onerror = function () { reject(new Error('스크립트 로드 실패')); };
+  function loadScript(url) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script'); s.src = url; s.crossOrigin = 'anonymous';
+      s.onload = resolve; s.onerror = function () { reject(new Error('로드 실패: ' + url)); };
       document.head.appendChild(s);
     });
+  }
+  function loadMagenta() {
+    if (magentaPromise) return magentaPromise;
+    var haveCore = (typeof window.mm !== 'undefined') && window.mm.SoundFontPlayer;
+    magentaPromise = (haveCore ? Promise.resolve() : loadScript(MAG_CORE))
+      .then(function () { return (typeof window.mm !== 'undefined' && window.mm.MusicVAE) ? null : loadScript(MAG_MVAE); })
+      .then(function () {
+        if (typeof window.mm === 'undefined' || !window.mm.MusicVAE) throw new Error('MusicVAE 로드 실패');
+        return window.mm;
+      });
     return magentaPromise;
   }
   function genAI() {
@@ -897,6 +928,16 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'broguard-melody-drums.mid';
     document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
   });
+
+  // 다른 랩 도구에서 "드럼 얹기"로 넘어온 멜로디 ABC 받기
+  try {
+    var incoming = localStorage.getItem('broguard_drum_abc');
+    if (incoming) {
+      localStorage.removeItem('broguard_drum_abc');
+      $('abcIn').value = incoming; melFromAbc();
+      $('drumStatus').innerHTML = '↩︎ 다른 도구에서 멜로디를 받았습니다. <b>드럼을 생성</b>하세요.';
+    }
+  } catch (e) {}
 
   // 테스트 훅
   if (/[?&]autotest=1/.test(location.search)) {

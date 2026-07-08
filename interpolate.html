@@ -653,12 +653,16 @@ if (typeof window !== 'undefined') window.Interp = Interp;
     wrap.className = 'resultblock' + (stitched ? ' stitched' : '');
     wrap.innerHTML =
       '<div class="rb-head"><div class="rb-title">' + title + (small ? ' <small>' + small + '</small>' : '') + '</div>' +
-      '<div class="btns"><button class="alt sm rb-play">&#9654; 재생</button><button class="alt sm rb-copy">복사</button></div></div>' +
+      '<div class="btns"><button class="alt sm rb-play">&#9654; 재생</button><button class="alt sm rb-copy">복사</button><button class="alt sm rb-drum">🥁 드럼</button></div></div>' +
       '<div class="preview"></div>' +
       '<textarea readonly spellcheck="false"></textarea>';
     var ta = wrap.querySelector('textarea'); ta.value = abc;
     var visual = renderPreview(wrap.querySelector('.preview'), abc);
     wrap.querySelector('.rb-play').addEventListener('click', function () { playAbc(abc, this); });
+    wrap.querySelector('.rb-drum').addEventListener('click', function () {
+      try { localStorage.setItem('broguard_drum_abc', abc); } catch (e) {}
+      window.open('merge.html', '_blank');
+    });
     wrap.querySelector('.rb-copy').addEventListener('click', function () {
       var self = this;
       function done() { self.textContent = '복사됨 ✓'; setTimeout(function () { self.textContent = '복사'; }, 1200); }

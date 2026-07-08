@@ -623,6 +623,7 @@ function render(out) {
           <button data-act="play">▶ 재생</button>
           <button data-act="stop">■ 정지</button>
           <button data-act="copy">ABC 복사</button>
+          <button data-act="drum">🥁 드럼 얹기</button>
         </div>
       </div>
       <div class="legend">
@@ -651,6 +652,10 @@ function render(out) {
     });
     card.querySelector('[data-act=play]').addEventListener('click', () => playVisual(visual));
     card.querySelector('[data-act=stop]').addEventListener('click', stopPlay);
+    card.querySelector('[data-act=drum]').addEventListener('click', () => {
+      try { localStorage.setItem('broguard_drum_abc', $(`abc-${i}`).value); } catch (e) {}
+      window.open('merge.html', '_blank');
+    });
   });
 }
 

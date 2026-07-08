@@ -66,11 +66,11 @@ await check('기본 비트 생성 → 드럼 분석 표시(채널10·GM)', async
   assert.ok((await page.textContent('#drumStatus')).includes('기본 비트'));
 });
 
-await check('🎲 다시 생성 → 패턴 변경', async () => {
-  const before = await page.textContent('#infoDrum');
+await check('🎲 다시 생성 → 스타일 변경', async () => {
+  const before = await page.textContent('#drumStatus');
   await page.click('#btnRegen');
-  await page.waitForFunction(prev => document.getElementById('infoDrum').textContent !== prev || /패턴 2/.test(document.getElementById('drumStatus').textContent), before, { timeout: 3000 });
-  assert.ok((await page.textContent('#drumStatus')).match(/패턴 [23]/), '패턴 번호 변경');
+  await page.waitForFunction(prev => document.getElementById('drumStatus').textContent !== prev, before, { timeout: 3000 });
+  assert.ok((await page.textContent('#drumStatus')).match(/\(2\/6\)/), '2/6 스타일로 변경');
 });
 
 await check('함께 재생 → 병합 정보 + 저장 버튼 활성화', async () => {
@@ -101,6 +101,35 @@ await check('AI 드럼 버튼 존재(오프라인은 기본 비트로 폴백)', 
   assert.ok(await page.$('#btnAI'), 'AI 드럼 버튼');
   await page.click('#btnBasic');   // 멜로디 파일 업로드 후 드럼 재생성
   await page.waitForFunction(() => /드럼/.test(document.getElementById('infoDrum').textContent), undefined, { timeout: 3000 });
+});
+
+await check('.abc 파일 열기 → 텍스트를 ABC로 인식·변환', async () => {
+  await page.setInputFiles('#fileMel', { name: 'song.abc', mimeType: 'text/plain',
+    buffer: Buffer.from('X:1\nT:불러온ABC\nM:4/4\nL:1/8\nK:C\nE2 E2 D2 C2 |') });
+  await page.waitForFunction(() => /멜로디/.test(document.getElementById('infoMel').textContent), undefined, { timeout: 3000 });
+  assert.ok((await page.inputValue('#abcIn')).includes('불러온ABC'), 'ABC 텍스트가 입력창에 채워짐');
+});
+
+await check('🎲 다시 생성으로 6가지 스타일 순환(스타일명 표시)', async () => {
+  await page.click('#btnBasic');
+  const names = new Set();
+  for (let i = 0; i < 6; i++) {
+    const s = await page.textContent('#drumStatus');
+    const m = s.match(/기본 비트 — ([^ (]+)/);
+    if (m) names.add(m[1]);
+    await page.click('#btnRegen');
+    await page.waitForTimeout(120);
+  }
+  assert.ok(names.size >= 3, '여러 스타일명이 나타남: ' + [...names].join(','));
+});
+
+await check('localStorage 핸드오프 → 로드 시 멜로디 자동 수신', async () => {
+  await page.evaluate(() => localStorage.setItem('broguard_drum_abc', 'X:1\nT:넘어온곡\nM:4/4\nL:1/8\nK:C\nG2 A2 B2 c2 |'));
+  await page.goto(`${base}/merge.html`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => /넘어온곡/.test(document.getElementById('abcIn').value), undefined, { timeout: 3000 });
+  assert.ok((await page.textContent('#drumStatus')).includes('다른 도구에서'), '수신 안내');
+  const consumed = await page.evaluate(() => localStorage.getItem('broguard_drum_abc'));
+  assert.equal(consumed, null, '수신 후 비움');
 });
 
 await check('랩 홈 링크가 index.html을 가리킨다', async () => {
