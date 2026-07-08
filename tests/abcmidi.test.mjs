@@ -138,3 +138,14 @@ test('왕복: 템포·박자 메타 보존(6/8, 144bpm)', () => {
   assert.equal(p.tempoBpm, 144);
   assert.deepEqual(p.timeSig, [6, 8]);
 });
+
+test('midiToAbc: 4마디마다 줄바꿈(악보가 4마디씩 접힘)', () => {
+  const abc8 = 'X:1\nM:4/4\nL:1/8\nK:C\n' + Array.from({ length: 8 }, () => 'C2 D2 E2 F2').join(' | ') + ' |';
+  const out = AbcMidi.midiToAbc(AbcMidi.abcToMidi(abc8)).abc;
+  const bodyLines = out.split(/K:C\n/)[1].split('\n').filter(Boolean);
+  assert.ok(bodyLines.length >= 2, '8마디는 최소 2줄(4마디씩)');
+  bodyLines.forEach(l => {
+    const bars = (l.replace(/\|\]/, '|').match(/\|/g) || []).length;
+    assert.ok(bars <= 4, '한 줄에 최대 4마디: ' + l);
+  });
+});

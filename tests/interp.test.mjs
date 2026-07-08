@@ -166,6 +166,13 @@ test('snapStepsToChords: 코드 없으면 원본 그대로', () => {
   assert.deepEqual(Interp.snapStepsToChords(steps, '4/4', []), steps);
 });
 
+test('stepsToAbc: 4마디마다 줄바꿈(결과 악보가 4마디씩 접힘)', () => {
+  const long = 'X:1\nM:4/4\nL:1/8\nK:C\n' + Array.from({ length: 8 }, () => 'C2 D2 E2 F2').join(' | ') + ' |';
+  const out = Interp.morph(long, long, { steps: 1 });
+  const bodyLines = out.results[0].abc.split(/K:C\n/)[1].split('\n').filter(Boolean);
+  assert.ok(bodyLines.length >= 2, '8마디는 최소 2줄');
+});
+
 // ---------- AI 모드용 NoteSequence 변환 ----------
 test('abcToNoteSequence: 2마디·16분 양자화 시퀀스', () => {
   const ns = Interp.abcToNoteSequence(A, { bars: 2 });

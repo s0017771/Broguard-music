@@ -439,7 +439,7 @@ var AbcMidi = (function () {
     });
 
     // 마디 경계에서 분할(붙임줄) + 쉼표 채우기
-    var body = '', cursor = 0;
+    var body = '', cursor = 0, barCount = 0;
     function emitToken(midis, ticks, tie) {
       var lenStr = durToAbc(ticks / Lticks);
       var tok = midis.length === 1 ? midiToAbcNote(midis[0]) + lenStr
@@ -457,7 +457,7 @@ var AbcMidi = (function () {
         if (midis) body += emitToken(midis, seg, crosses) + ' ';
         else body += 'z' + durToAbc(seg / Lticks) + ' ';
         st += seg; remain -= seg; cursor = st;
-        if (barAt(cursor)) body += '| ';
+        if (barAt(cursor)) { barCount++; body += (barCount % 4 === 0 ? '|\n' : '| '); } // 4마디마다 줄바꿈
       }
     }
 
