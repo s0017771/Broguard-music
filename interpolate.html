@@ -34,7 +34,8 @@
   button.sm { padding:5px 10px; font-size:.76rem; }
   button:active { transform:scale(.97); }
   label.opt { display:flex; align-items:center; gap:5px; font-size:.78rem; color:var(--ink-soft); font-weight:700; }
-  select, input[type=number] { font:inherit; font-size:.8rem; padding:5px 6px; border:1px solid var(--line); border-radius:7px; background:#fffdf7; color:var(--ink); }
+  select, input[type=number], input[type=text] { font:inherit; font-size:.8rem; padding:5px 8px; border:1px solid var(--line); border-radius:7px; background:#fffdf7; color:var(--ink); }
+  input[type=text]:focus { outline:2px solid var(--brass); border-color:transparent; }
   .modes { display:flex; gap:6px; }
   .modechip { border:1px solid var(--line); background:#f7f4ec; color:var(--ink); border-radius:9px; padding:7px 15px; font-size:.86rem; font-weight:700; cursor:pointer; }
   .modechip.on { background:var(--ink); color:#f3efe4; border-color:var(--ink); }
@@ -73,12 +74,14 @@
     <h2>&#9834; 두 멜로디 입력 (ABC)</h2>
     <div class="twocol">
       <div>
-        <label class="fld">멜로디 A</label>
+        <label class="fld">멜로디 A <button id="btnFileA" class="alt sm" style="float:right;margin-top:-3px">.abc 열기</button></label>
         <textarea id="abcA" spellcheck="false" placeholder="시작 멜로디의 ABC"></textarea>
+        <input type="file" id="fileA" accept=".abc,.txt" style="display:none">
       </div>
       <div>
-        <label class="fld">멜로디 B</label>
+        <label class="fld">멜로디 B <button id="btnFileB" class="alt sm" style="float:right;margin-top:-3px">.abc 열기</button></label>
         <textarea id="abcB" spellcheck="false" placeholder="도착 멜로디의 ABC"></textarea>
+        <input type="file" id="fileB" accept=".abc,.txt" style="display:none">
       </div>
     </div>
     <div class="row">
@@ -90,6 +93,12 @@
       </div>
     </div>
     <p class="modedesc" id="modeDesc"></p>
+    <div class="row">
+      <label class="opt" style="flex:1">코드 진행 반영 <span style="font-weight:400;color:var(--ink-soft)">(선택 · 비우면 미적용)</span>
+        <input type="text" id="chordStr" placeholder="예: C G Am F  (마디 순서대로 순환)"
+          style="flex:1;min-width:150px;font-family:'D2Coding',Consolas,monospace">
+      </label>
+    </div>
     <div class="row" id="morphOpts">
       <label class="opt">단계 수
         <select id="optSteps"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select>
@@ -373,6 +382,50 @@ var PPQ = 480;                                   // 4분음표당 틱
   function firstPitch(a) { for (var i = 0; i < a.length; i++) if (a[i] !== null) return a[i]; return null; }
   function lastPitch(a) { for (var i = a.length - 1; i >= 0; i--) if (a[i] !== null) return a[i]; return null; }
 
+  /* ============ 코드 진행 반영 ============ */
+  var ROOT_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  function parseChordTones(sym) {
+    var m = String(sym).trim().match(/^([A-Ga-g])([#b]?)(m(?!aj)|min|dim|aug|\+)?/);
+    if (!m) return null;
+    var pc = ROOT_PC[m[1].toUpperCase()];
+    if (m[2] === '#') pc = (pc + 1) % 12; else if (m[2] === 'b') pc = (pc + 11) % 12;
+    var q = m[3] || '';
+    var third = /^(m|min|dim)/.test(q) ? 3 : 4;   // 단3도: 마이너·디미니시
+    var fifth = /dim/.test(q) ? 6 : (/(aug|\+)/.test(q) ? 8 : 7);
+    return { sym: String(sym).trim(), pcs: [pc, (pc + third) % 12, (pc + fifth) % 12] };
+  }
+  function parseChordList(str) {
+    return (str || '').split(/[\s,|]+/).filter(Boolean).map(parseChordTones).filter(Boolean);
+  }
+  function snapToChordTone(midi, pcs) {
+    for (var d = 0; d <= 5; d++) {
+      var cands = [midi - d, midi + d];
+      for (var k = 0; k < cands.length; k++) if (pcs.indexOf(((cands[k] % 12) + 12) % 12) >= 0) return cands[k];
+    }
+    return midi;
+  }
+  // 강박(마디 1·3박)에서 시작하는 음을 그 마디 코드의 코드톤으로 스냅(음 경계 보존)
+  function snapStepsToChords(steps, meter, chords) {
+    if (!chords || !chords.length) return steps;
+    var mm = /(\d+)\s*\/\s*(\d+)/.exec(meter || '4/4'), num = mm ? +mm[1] : 4, den = mm ? +mm[2] : 4;
+    var measureSteps = Math.max(1, Math.round((num * (4 / den)) / 0.5));
+    var beatSteps = Math.max(1, Math.round((4 / den) / 0.5));      // 한 박(4분음표)의 스텝 수
+    var strong = 2 * beatSteps;                                    // 강박 간격(1·3박)
+    var runs = [], i = 0;
+    while (i < steps.length) { var p = steps[i], c = 1; while (i + c < steps.length && steps[i + c] === p) c++; runs.push({ p: p, c: c }); i += c; }
+    var out = [], pos = 0;
+    runs.forEach(function (r) {
+      var pitch = r.p;
+      if (pitch !== null && (pos % measureSteps) % strong === 0) {
+        var chord = chords[Math.floor(pos / measureSteps) % chords.length];
+        pitch = snapToChordTone(pitch, chord.pcs);
+      }
+      for (var j = 0; j < r.c; j++) out.push(pitch);
+      pos += r.c;
+    });
+    return out;
+  }
+
   /* ============ 스텝 → ABC ============ */
   function stepsToAbc(steps, meter, keyName, title) {
     var mm = /(\d+)\s*\/\s*(\d+)/.exec(meter || '4/4'), num = mm ? +mm[1] : 4, den = mm ? +mm[2] : 4;
@@ -403,6 +456,7 @@ var PPQ = 480;                                   // 4분음표당 틱
     var as = resample(A.steps, L), bs = resample(B.steps, L);
     var N = Math.max(1, Math.min(8, opts.steps || 3));
     var includeEnds = opts.includeEnds !== false;
+    var chords = opts.chords || parseChordList(opts.chordStr);
     var ts = [];
     for (var k = 1; k <= N; k++) ts.push(k / (N + 1));
     if (includeEnds) { ts.unshift(0); ts.push(1); }
@@ -416,9 +470,11 @@ var PPQ = 480;                                   // 4분음표당 틱
         else pitch = null;
         out.push(pitch);
       }
+      // 양끝(t=0,1)은 원곡 유지, 중간 단계에만 코드 진행 반영
+      if (chords.length && t !== 0 && t !== 1) out = snapStepsToChords(out, A.meter, chords);
       return { t: t, steps: out, abc: stepsToAbc(out, A.meter, 'C', 'morph ' + Math.round(t * 100) + '%') };
     });
-    return { results: results, len: L, meter: A.meter };
+    return { results: results, len: L, meter: A.meter, chords: chords.map(function (c) { return c.sym; }) };
   }
 
   /* ============ Bridge: A 끝 → B 시작 연결 마디 ============ */
@@ -436,16 +492,19 @@ var PPQ = 480;                                   // 4분음표당 틱
       var frac = (s + 1) / (total + 1);              // aEnd에서 bStart 직전까지 성부진행
       bridgeSteps.push(DIA[clampIdx(ia * (1 - frac) + ib * frac)]);
     }
+    var chords = opts.chords || parseChordList(opts.chordStr);
+    if (chords.length) bridgeSteps = snapStepsToChords(bridgeSteps, A.meter, chords);
     var stitched = A.steps.concat(bridgeSteps).concat(B.steps);
     return {
       bridgeAbc: stepsToAbc(bridgeSteps, A.meter, 'C', 'bridge (' + bars + '마디)'),
       stitchedAbc: stepsToAbc(stitched, A.meter, 'C', 'A + bridge + B'),
-      aEnd: aEnd, bStart: bStart, steps: bridgeSteps, bars: bars
+      aEnd: aEnd, bStart: bStart, steps: bridgeSteps, bars: bars, chords: chords.map(function (c) { return c.sym; })
     };
   }
 
   return { parseABC: parseABC, flattenToSteps: flattenToSteps, resample: resample,
-           nearestDiaIdx: nearestDiaIdx, DIA: DIA, stepsToAbc: stepsToAbc, morph: morph, bridge: bridge };
+           nearestDiaIdx: nearestDiaIdx, DIA: DIA, stepsToAbc: stepsToAbc, morph: morph, bridge: bridge,
+           parseChordList: parseChordList, parseChordTones: parseChordTones, snapStepsToChords: snapStepsToChords };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Interp;
 if (typeof window !== 'undefined') window.Interp = Interp;
@@ -477,8 +536,26 @@ if (typeof window !== 'undefined') window.Interp = Interp;
   }
 
   function renderPreview(box, text) {
-    if (typeof ABCJS === 'undefined' || !text) return;
-    try { ABCJS.renderAbc(box, text, { responsive: 'resize', staffwidth: 840 }); } catch (e) {}
+    if (typeof ABCJS === 'undefined' || !text) return null;
+    try { return ABCJS.renderAbc(box, text, { responsive: 'resize', staffwidth: 840 })[0]; } catch (e) { return null; }
+  }
+
+  /* ---- 미리듣기(abcjs synth · 온라인일 때) ---- */
+  var currentSynth = null, currentBtn = null;
+  function resetBtn() { if (currentBtn) { currentBtn.innerHTML = '&#9654; 재생'; currentBtn = null; } }
+  function stopPlay() { if (currentSynth) { try { currentSynth.stop(); } catch (e) {} currentSynth = null; } resetBtn(); }
+  function playAbc(abc, btn, visual) {
+    if (currentBtn === btn && currentSynth) { stopPlay(); return; }
+    var canAudio = (typeof ABCJS !== 'undefined') && ABCJS.synth && ABCJS.synth.supportsAudio && ABCJS.synth.supportsAudio();
+    if (!canAudio) { btn.textContent = '재생 불가(온라인 필요)'; setTimeout(function () { btn.innerHTML = '&#9654; 재생'; }, 1800); return; }
+    stopPlay();
+    var v = visual || renderPreview(document.createElement('div'), abc);
+    if (!v) { btn.textContent = '재생 불가'; setTimeout(function () { btn.innerHTML = '&#9654; 재생'; }, 1600); return; }
+    var ac = new (window.AudioContext || window.webkitAudioContext)();
+    var synth = new ABCJS.synth.CreateSynth();
+    synth.init({ audioContext: ac, visualObj: v }).then(function () { return synth.prime(); }).then(function () {
+      synth.start(); currentSynth = synth; currentBtn = btn; btn.innerHTML = '&#9632; 정지';
+    }).catch(function () { btn.textContent = '재생 실패'; setTimeout(function () { btn.innerHTML = '&#9654; 재생'; }, 1600); });
   }
 
   function block(title, small, abc, stitched) {
@@ -486,11 +563,12 @@ if (typeof window !== 'undefined') window.Interp = Interp;
     wrap.className = 'resultblock' + (stitched ? ' stitched' : '');
     wrap.innerHTML =
       '<div class="rb-head"><div class="rb-title">' + title + (small ? ' <small>' + small + '</small>' : '') + '</div>' +
-      '<div><button class="alt sm rb-copy">복사</button></div></div>' +
+      '<div class="btns"><button class="alt sm rb-play">&#9654; 재생</button><button class="alt sm rb-copy">복사</button></div></div>' +
       '<div class="preview"></div>' +
       '<textarea readonly spellcheck="false"></textarea>';
     var ta = wrap.querySelector('textarea'); ta.value = abc;
-    renderPreview(wrap.querySelector('.preview'), abc);
+    var visual = renderPreview(wrap.querySelector('.preview'), abc);
+    wrap.querySelector('.rb-play').addEventListener('click', function () { playAbc(abc, this, visual); });
     wrap.querySelector('.rb-copy').addEventListener('click', function () {
       var self = this;
       function done() { self.textContent = '복사됨 ✓'; setTimeout(function () { self.textContent = '복사'; }, 1200); }
@@ -501,28 +579,44 @@ if (typeof window !== 'undefined') window.Interp = Interp;
   }
 
   function generate() {
+    stopPlay();
     var a = abcA.value.trim(), b = abcB.value.trim();
     results.innerHTML = '';
     if (!a || !b) { $('topNote').innerHTML = '<span class="err">멜로디 A와 B를 모두 입력하세요.</span>'; return; }
+    var chordStr = $('chordStr').value.trim();
     try {
       if (mode === 'morph') {
-        var out = Interp.morph(a, b, { steps: parseInt($('optSteps').value, 10) || 3, includeEnds: $('optEnds').checked });
+        var out = Interp.morph(a, b, { steps: parseInt($('optSteps').value, 10) || 3, includeEnds: $('optEnds').checked, chordStr: chordStr });
         out.results.forEach(function (r) {
           var pct = Math.round(r.t * 100);
           var title = r.t === 0 ? 'A (0%)' : r.t === 1 ? 'B (100%)' : pct + '%';
           results.appendChild(block('&#9834; ' + title, r.t === 0 || r.t === 1 ? '원곡' : 'A와 B 섞음', r.abc));
         });
-        $('topNote').textContent = 'Morph 완료 · 총 ' + out.results.length + '개 · 격자 ' + out.len + '스텝(8분음표)';
+        $('topNote').textContent = 'Morph 완료 · 총 ' + out.results.length + '개 · 격자 ' + out.len + '스텝(8분음표)' +
+          (out.chords && out.chords.length ? ' · 코드 진행 반영: ' + out.chords.join(' ') : '');
       } else {
-        var br = Interp.bridge(a, b, { bars: parseInt($('optBars').value, 10) || 1 });
+        var br = Interp.bridge(a, b, { bars: parseInt($('optBars').value, 10) || 1, chordStr: chordStr });
         results.appendChild(block('&#8594; 브릿지', br.bars + '마디 연결', br.bridgeAbc));
         results.appendChild(block('&#9835; A + 브릿지 + B', '이어붙인 전체', br.stitchedAbc, true));
-        $('topNote').textContent = 'Bridge 완료 · A 끝음 ' + br.aEnd + ' → B 첫음 ' + br.bStart + ' 를 ' + br.bars + '마디로 연결';
+        $('topNote').textContent = 'Bridge 완료 · A 끝음 ' + br.aEnd + ' → B 첫음 ' + br.bStart + ' 를 ' + br.bars + '마디로 연결' +
+          (br.chords && br.chords.length ? ' · 코드 반영: ' + br.chords.join(' ') : '');
       }
     } catch (e) {
       $('topNote').innerHTML = '<span class="err">생성 실패: ' + e.message + '</span>';
     }
   }
+
+  function wireFile(btnId, fileId, ta) {
+    $(btnId).addEventListener('click', function () { $(fileId).click(); });
+    $(fileId).addEventListener('change', function () {
+      var f = this.files && this.files[0]; if (!f) return;
+      var r = new FileReader();
+      r.onload = function () { ta.value = String(r.result); };
+      r.readAsText(f); this.value = '';
+    });
+  }
+  wireFile('btnFileA', 'fileA', abcA);
+  wireFile('btnFileB', 'fileB', abcB);
 
   $('mMorph').addEventListener('click', function () { setMode('morph'); });
   $('mBridge').addEventListener('click', function () { setMode('bridge'); });

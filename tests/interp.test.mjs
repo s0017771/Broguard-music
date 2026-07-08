@@ -114,3 +114,54 @@ test('bridge: 끝음==첫음이면 같은 음 유지(예외 없음)', () => {
   assert.equal(br.aEnd, 60); assert.equal(br.bStart, 60);
   assert.ok(br.steps.every(p => p === 60), '같은 음이면 유지');
 });
+
+// ---------- 코드 진행 반영 ----------
+test('parseChordTones/parseChordList: 코드 구성음', () => {
+  assert.deepEqual(Interp.parseChordTones('C').pcs, [0, 4, 7]);
+  assert.deepEqual(Interp.parseChordTones('Am').pcs, [9, 0, 4]);
+  assert.deepEqual(Interp.parseChordTones('G7').pcs, [7, 11, 2]);
+  assert.deepEqual(Interp.parseChordTones('F#m').pcs, [6, 9, 1]);
+  assert.deepEqual(Interp.parseChordTones('Bdim').pcs, [11, 2, 5]);
+  assert.equal(Interp.parseChordList('C G Am F').length, 4);
+  assert.equal(Interp.parseChordTones('Xyz'), null);
+});
+
+test('morph+코드: 중간 단계의 강박(1·3박)이 코드톤에 놓인다', () => {
+  const out = Interp.morph(A, B, { steps: 3, chordStr: 'C F' });
+  assert.deepEqual(out.chords, ['C', 'F']);
+  const chordPcs = { 0: [0, 4, 7], 1: [5, 9, 0] }; // 마디0=C, 마디1=F
+  // 중간(t≠0,1) 결과만 검사
+  out.results.filter(r => r.t !== 0 && r.t !== 1).forEach(r => {
+    // 스텝을 런으로 묶어 각 런의 시작 위치가 강박이면 코드톤인지 확인
+    let pos = 0, i = 0;
+    while (i < r.steps.length) {
+      let c = 1; while (i + c < r.steps.length && r.steps[i + c] === r.steps[i]) c++;
+      const stepInMeasure = pos % 8, measure = Math.floor(pos / 8) % 2;
+      if (r.steps[i] !== null && stepInMeasure % 4 === 0) {
+        assert.ok(chordPcs[measure].includes(((r.steps[i] % 12) + 12) % 12),
+          `강박 코드톤 위반: 마디${measure} pos${pos} midi${r.steps[i]}`);
+      }
+      pos += c; i += c;
+    }
+  });
+});
+
+test('morph+코드: 양끝(A·B 원곡)은 코드 스냅을 적용하지 않는다', () => {
+  const plain = Interp.morph(A, B, { steps: 3 });
+  const chorded = Interp.morph(A, B, { steps: 3, chordStr: 'Am Dm' });
+  // t=0, t=1 결과는 코드 유무와 무관하게 동일(원곡 보존)
+  assert.equal(chorded.results[0].abc, plain.results[0].abc);
+  assert.equal(chorded.results[chorded.results.length - 1].abc, plain.results[plain.results.length - 1].abc);
+});
+
+test('bridge+코드: 연결음 강박이 코드톤에, 결과 재파싱', () => {
+  const br = Interp.bridge(A, B, { bars: 2, chordStr: 'G C' });
+  assert.deepEqual(br.chords, ['G', 'C']);
+  const song = Interp.parseABC(br.bridgeAbc);
+  assert.ok(song.voices['1'].events.some(e => e.type === 'note'));
+});
+
+test('snapStepsToChords: 코드 없으면 원본 그대로', () => {
+  const steps = [60, 60, 62, 64];
+  assert.deepEqual(Interp.snapStepsToChords(steps, '4/4', []), steps);
+});

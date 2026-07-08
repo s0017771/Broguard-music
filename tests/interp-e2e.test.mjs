@@ -66,6 +66,33 @@ await check('샘플 A·B 넣기 버튼이 두 입력을 채운다', async () => 
   await page.waitForSelector('.resultblock', { timeout: 3000 });
 });
 
+await check('코드 진행 입력 시 topNote에 반영 표시', async () => {
+  await page.click('#mMorph');
+  await page.click('#btnSample');
+  await page.fill('#chordStr', 'C F G C');
+  await page.click('#btnGo');
+  await page.waitForFunction(() => /코드 진행 반영/.test(document.getElementById('topNote').textContent), undefined, { timeout: 3000 });
+  const note = await page.textContent('#topNote');
+  assert.ok(note.includes('C F G C'));
+});
+
+await check('각 결과 블록에 재생·복사 버튼이 있다', async () => {
+  const plays = await page.$$('.resultblock .rb-play');
+  const copies = await page.$$('.resultblock .rb-copy');
+  assert.ok(plays.length >= 1 && plays.length === copies.length, '블록마다 재생·복사 버튼');
+  // 오프라인(abcjs 미로드)에서 재생 클릭 시 오류 없이 안내로 대체
+  await plays[0].click();
+});
+
+await check('멜로디 A 파일 열기 → 내용이 채워진다', async () => {
+  await page.setInputFiles('#fileA', {
+    name: 'melodyA.abc', mimeType: 'text/plain',
+    buffer: Buffer.from('X:1\nT:불러온A\nM:4/4\nL:1/8\nK:C\nE2 E2 D2 C2 |'),
+  });
+  await page.waitForFunction(() => document.getElementById('abcA').value.includes('불러온A'), undefined, { timeout: 3000 });
+  assert.ok((await page.inputValue('#abcA')).includes('불러온A'));
+});
+
 await check('입력이 비면 오류 메시지', async () => {
   await page.fill('#abcA', '');
   await page.fill('#abcB', '');
