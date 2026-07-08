@@ -86,6 +86,13 @@
     </div>
     <div class="row">
       <button id="btnSample" class="alt sm">샘플 A·B 넣기</button>
+      <label class="opt" style="margin-left:4px">&#128266; 재생 음색
+        <select id="soundEngine">
+          <option value="auto" selected>자동</option>
+          <option value="synth">악기(온라인)</option>
+          <option value="tone">기본 톤(오프라인)</option>
+        </select>
+      </label>
       <span style="flex:1"></span>
       <div class="modes">
         <button class="modechip on" id="mMorph" data-m="morph">Morph (조합)</button>
@@ -580,21 +587,23 @@ if (typeof window !== 'undefined') window.Interp = Interp;
     try { return ABCJS.renderAbc(box, text, { responsive: 'resize', staffwidth: 840 })[0]; } catch (e) { return null; }
   }
 
-  /* ---- 미리듣기: 브라우저 내장 Web Audio 오실레이터(오프라인에서도 동작) ---- */
-  var audioCtx = null, playing = [], currentBtn = null, playTimer = null;
+  /* ---- 미리듣기: 음색 선택 (자동 / 악기 사운드폰트(온라인) / 기본 톤(오프라인)) ---- */
+  var audioCtx = null, playing = [], currentSynth = null, currentBtn = null, playTimer = null;
+  function isPlaying() { return playing.length > 0 || !!currentSynth; }
   function resetBtn() { if (currentBtn) { currentBtn.innerHTML = '&#9654; 재생'; currentBtn = null; } }
   function stopPlay() {
     playing.forEach(function (o) { try { o.stop(); } catch (e) {} }); playing = [];
+    if (currentSynth) { try { currentSynth.stop(); } catch (e) {} currentSynth = null; }
     if (playTimer) { clearTimeout(playTimer); playTimer = null; }
     resetBtn();
   }
-  function playAbc(abc, btn) {
-    if (currentBtn === btn && playing.length) { stopPlay(); return; }
-    stopPlay();
+  function flashBtn(btn, msg) { btn.textContent = msg; setTimeout(function () { if (currentBtn !== btn) btn.innerHTML = '&#9654; 재생'; }, 1700); }
+
+  // 기본 톤: 브라우저 내장 Web Audio 오실레이터(샘플 불필요 · 오프라인 OK)
+  function playTone(abc, btn) {
     var song; try { song = Interp.parseABC(abc); } catch (e) { return; }
-    var vid = song.voiceOrder[0] || '1';
-    var evs = (song.voices[vid] || { events: [] }).events;
-    var Lq = (song.unit || 1 / 8) * 4, qpm = song.tempoBpm || 120, spb = 60 / qpm;
+    var evs = (song.voices[song.voiceOrder[0] || '1'] || { events: [] }).events;
+    var Lq = (song.unit || 1 / 8) * 4, spb = 60 / (song.tempoBpm || 120);
     try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
     var ac = audioCtx; if (ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
     var t = ac.currentTime + 0.06;
@@ -603,8 +612,7 @@ if (typeof window !== 'undefined') window.Interp = Interp;
       var durSec = e.dur * Lq * spb;
       if (e.type === 'note') e.midis.forEach(function (midi) {
         var osc = ac.createOscillator(), g = ac.createGain();
-        osc.type = 'triangle';
-        osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+        osc.type = 'triangle'; osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
         g.gain.setValueAtTime(0.0001, t);
         g.gain.exponentialRampToValueAtTime(0.2, t + 0.012);
         g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.05, durSec * 0.92));
@@ -616,6 +624,28 @@ if (typeof window !== 'undefined') window.Interp = Interp;
     if (!playing.length) return;
     currentBtn = btn; btn.innerHTML = '&#9632; 정지';
     playTimer = setTimeout(function () { playing = []; resetBtn(); }, (t - ac.currentTime) * 1000 + 120);
+  }
+
+  // 악기 음색: abcjs 신스(사운드폰트) — 인터넷 필요
+  function playSynth(abc, btn, allowFallback) {
+    var v; try { v = ABCJS.renderAbc(document.createElement('div'), abc)[0]; } catch (e) { v = null; }
+    if (!v) { if (allowFallback) playTone(abc, btn); else flashBtn(btn, '재생 불가'); return; }
+    try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { if (allowFallback) playTone(abc, btn); return; }
+    var ac = audioCtx; if (ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+    var synth = new ABCJS.synth.CreateSynth();
+    synth.init({ audioContext: ac, visualObj: v }).then(function () { return synth.prime(); }).then(function () {
+      synth.start(); currentSynth = synth; currentBtn = btn; btn.innerHTML = '&#9632; 정지';
+    }).catch(function () { if (allowFallback) playTone(abc, btn); else flashBtn(btn, '악기음색 실패(온라인?)'); });
+  }
+
+  function playAbc(abc, btn) {
+    if (currentBtn === btn && isPlaying()) { stopPlay(); return; }
+    stopPlay();
+    var eng = $('soundEngine') ? $('soundEngine').value : 'auto';
+    if (eng === 'tone') { playTone(abc, btn); return; }
+    var canSynth = (typeof ABCJS !== 'undefined') && ABCJS.synth && ABCJS.synth.supportsAudio && ABCJS.synth.supportsAudio();
+    if (!canSynth) { if (eng === 'synth') flashBtn(btn, '악기음색 불가(온라인 필요)'); else playTone(abc, btn); return; }
+    playSynth(abc, btn, eng === 'auto');   // 자동이면 실패 시 기본 톤으로 폴백
   }
 
   function block(title, small, abc, stitched) {
@@ -638,6 +668,19 @@ if (typeof window !== 'undefined') window.Interp = Interp;
     return wrap;
   }
 
+  // 알고리즘 Morph 렌더링(공용) — 일반 Morph 모드와 AI 실패 폴백에서 함께 사용
+  function renderMorph(a, b, chordStr, includeEnds, tag) {
+    var out = Interp.morph(a, b, { steps: parseInt($('optSteps').value, 10) || 3, includeEnds: includeEnds, chordStr: chordStr });
+    results.innerHTML = '';
+    out.results.forEach(function (r) {
+      var pct = Math.round(r.t * 100);
+      var title = r.t === 0 ? 'A (0%)' : r.t === 1 ? 'B (100%)' : pct + '%';
+      var small = (r.t === 0 || r.t === 1) ? '원곡' : (tag || 'A와 B 섞음');
+      results.appendChild(block('&#9834; ' + title, small, r.abc));
+    });
+    return out;
+  }
+
   function generate() {
     stopPlay();
     var a = abcA.value.trim(), b = abcB.value.trim();
@@ -647,12 +690,7 @@ if (typeof window !== 'undefined') window.Interp = Interp;
     var chordStr = $('chordStr').value.trim();
     try {
       if (mode === 'morph') {
-        var out = Interp.morph(a, b, { steps: parseInt($('optSteps').value, 10) || 3, includeEnds: $('optEnds').checked, chordStr: chordStr });
-        out.results.forEach(function (r) {
-          var pct = Math.round(r.t * 100);
-          var title = r.t === 0 ? 'A (0%)' : r.t === 1 ? 'B (100%)' : pct + '%';
-          results.appendChild(block('&#9834; ' + title, r.t === 0 || r.t === 1 ? '원곡' : 'A와 B 섞음', r.abc));
-        });
+        var out = renderMorph(a, b, chordStr, $('optEnds').checked, null);
         $('topNote').textContent = 'Morph 완료 · 총 ' + out.results.length + '개 · 격자 ' + out.len + '스텝(8분음표)' +
           (out.chords && out.chords.length ? ' · 코드 진행 반영: ' + out.chords.join(' ') : '');
       } else {
@@ -714,7 +752,13 @@ if (typeof window !== 'undefined') window.Interp = Interp;
       $('topNote').textContent = '';
       $('btnGo').disabled = false;
     }).catch(function (e) {
-      aiStatus('AI 보간 실패: ' + e.message + ' — 인터넷 연결을 확인하거나 <b>Morph(알고리즘)</b> 모드를 사용하세요.', true);
+      // AI 실패(모델 로드 등) → 자동으로 알고리즘 Morph로 대체(결과가 비지 않도록)
+      try {
+        var out = renderMorph(a, b, '', true, '알고리즘 대체');
+        aiStatus('AI 보간 실패(' + e.message + ') → <b>알고리즘 Morph로 자동 대체</b>했습니다. 총 ' + out.results.length + '개.', true);
+      } catch (e2) {
+        aiStatus('AI 보간 실패: ' + e.message + ' — 인터넷 연결을 확인하거나 <b>Morph(알고리즘)</b> 모드를 사용하세요.', true);
+      }
       $('btnGo').disabled = false;
     });
   }
