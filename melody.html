@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Melody Maker — 브로가드 뮤직 랩</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js"></script>
+<style>
+  :root {
+    --paper: #F3F2EC;
+    --panel: #FFFFFF;
+    --ink: #22303A;
+    --sub: #6B7680;
+    --line: #DDDCD2;
+    --accent: #2F6B4F;      /* 오선지 초록 */
+    --z-ki: #9AAFBC;        /* 기 */
+    --z-seung: #7FA284;     /* 승 */
+    --z-jeon: #C97B4F;      /* 전 (클라이맥스) */
+    --z-gyeol: #5F6C7B;     /* 결 */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    line-height: 1.6;
+    padding: 24px 16px 80px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  header { margin-bottom: 20px; }
+  h1 {
+    font-family: "Nanum Myeongjo", "Noto Serif KR", serif;
+    font-size: 1.7rem; letter-spacing: -0.02em;
+  }
+  h1 .lab { color: var(--accent); }
+  .tagline { color: var(--sub); font-size: 0.92rem; margin-top: 2px; }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 18px; margin-bottom: 16px;
+  }
+  label { display: block; font-size: 0.82rem; color: var(--sub); margin-bottom: 4px; }
+  input[type=text], input[type=number] {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line);
+    border-radius: 7px; font-size: 1rem; background: #FCFCFA; color: var(--ink);
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .row > div { flex: 1; min-width: 110px; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chip {
+    border: 1px solid var(--line); background: #F7F7F2; color: var(--ink);
+    border-radius: 20px; padding: 3px 12px; font-size: 0.82rem; cursor: pointer;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  button.primary {
+    margin-top: 14px; width: 100%; padding: 12px;
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    font-size: 1.05rem; font-weight: 700; cursor: pointer;
+  }
+  button.primary:hover { background: #275B42; }
+  button.primary:disabled { background: #A9B5AE; cursor: wait; }
+
+  .meta { font-size: 0.82rem; color: var(--sub); margin: 10px 2px; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 18px; overflow: hidden; }
+  .zonebar { display: flex; height: 6px; }
+  .zonebar span { flex: 1; }
+  .z-ki { background: var(--z-ki); } .z-seung { background: var(--z-seung); }
+  .z-jeon { background: var(--z-jeon); } .z-gyeol { background: var(--z-gyeol); }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 0; flex-wrap: wrap; gap: 8px; }
+  .card-title { font-weight: 700; }
+  .score { color: var(--accent); font-size: 0.9rem; }
+  .btns { display: flex; gap: 6px; }
+  .btns button {
+    padding: 6px 13px; border: 1px solid var(--line); border-radius: 7px;
+    background: #F7F7F2; cursor: pointer; font-size: 0.86rem; color: var(--ink);
+  }
+  .btns button:hover { border-color: var(--accent); color: var(--accent); }
+  .sheet { padding: 4px 8px; overflow-x: auto; }
+  .abc-box { margin: 0 14px 14px; }
+  .abc-box textarea {
+    width: 100%; height: 120px; font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.82rem; border: 1px solid var(--line); border-radius: 7px;
+    padding: 8px; background: #FBFBF7; color: var(--ink); resize: vertical;
+  }
+  .legend { display: flex; gap: 14px; font-size: 0.78rem; color: var(--sub); padding: 0 14px 10px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+
+  .modes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .mode-chip {
+    border: 1px solid var(--line); background: #F7F7F2; color: var(--ink);
+    border-radius: 8px; padding: 7px 14px; font-size: 0.9rem; cursor: pointer;
+  }
+  .mode-chip.on { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
+  .mode-desc { font-size: 0.82rem; color: var(--sub); margin: -6px 0 12px; min-height: 1.4em; }
+  .notice { font-size: 0.85rem; color: var(--sub); background: #F0EFE8; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; }
+  .err { color: #A33; font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p style="margin-bottom:6px"><a href="index.html" style="color:var(--sub);font-size:.82rem;text-decoration:none">&larr; 랩 홈</a></p>
+    <h1>Melody Maker <span class="lab">· 무난작곡기 v4</span></h1>
+    <p class="tagline">코드 진행을 넣으면, 규칙(강박=코드톤 · 순차 우선 · 기승전결 단일 클라이맥스)을 지키는 무난하고 조화로운 멜로디 후보를 만들어 ABC 악보로 출력합니다.</p>
+  </header>
+
+  <div class="panel">
+    <div class="modes" id="modes">
+      <button class="mode-chip on" data-m="full">기승전결 (전체)</button>
+      <button class="mode-chip" data-m="ki">기 전용</button>
+      <button class="mode-chip" data-m="seung">승 전용</button>
+      <button class="mode-chip" data-m="jeon">전 전용</button>
+      <button class="mode-chip" data-m="gyeol">결 전용</button>
+    </div>
+    <p class="mode-desc" id="modeDesc"></p>
+    <label style="margin-top:2px">리듬 해상도</label>
+    <div class="modes" id="resolution">
+      <button class="mode-chip on" data-r="8">8분음표까지</button>
+      <button class="mode-chip" data-r="16">16분음표까지</button>
+    </div>
+    <p class="mode-desc">16분음표는 기·승·전·결 전체에 등장하되 빈도가 기승전결 곡선을 따릅니다 — 기·결은 드물게(마디당 최대 1쌍), 전은 풍부하게. 항상 짝으로, 순차진행으로만, 마지막 마디는 제외. 복사된 리듬도 독립적으로 장식되어 "변형 반복"이 됩니다.</p>
+    <label for="chords">코드 진행 (2~16개, 공백으로 구분 · C장조 다이어토닉 권장)</label>
+    <input type="text" id="chords" value="C G Am Em F C F G">
+    <div class="presets">
+      <button class="chip" data-p="C G Am Em F C F G">캐논</button>
+      <button class="chip" data-p="C G Am F C G Am F">팝 4코드</button>
+      <button class="chip" data-p="Am F C G Am F C G">감성 마이너</button>
+      <button class="chip" data-p="C Am Dm G C Am Dm G">50년대 진행</button>
+    </div>
+    <div class="row">
+      <div><label for="count">후보 수</label><input type="number" id="count" value="5" min="1" max="10"></div>
+      <div><label for="tempo">템포 (BPM)</label><input type="number" id="tempo" value="90" min="40" max="200"></div>
+      <div><label for="seed">시드 (비우면 무작위 · 같은 시드=같은 결과)</label><input type="text" id="seed" placeholder="예: 42"></div>
+    </div>
+    <button class="primary" id="go">멜로디 후보 생성</button>
+    <p class="meta" id="meta"></p>
+  </div>
+
+  <p class="notice">사용 순서: 모드 선택 → 생성 → ▶로 미리 듣고 → 괜찮은 후보의 <b>ABC 복사</b> → 뮤직랩에서 블록 조합. 구간 전용 블록은 이어붙일 때 앞 블록의 끝 음역과 뒤 블록의 시작 음역이 비슷한 후보끼리 고르면 이음새가 매끄럽습니다. 재생은 인터넷 연결이 필요하며(사운드폰트 로드), 재생이 안 되더라도 ABC 복사는 항상 동작합니다.</p>
+
+  <div id="results"></div>
+</div>
+
+<script>
+// ===================================================================
+// 무난작곡기 엔진 v1 — 코드 진행 → 골격 → 리듬 → 살붙이기 → 점수화
+// 규칙: ① 강박=코드톤 ② 순차 70:도약 30 ③ 기승전결(단일 최고음, 밀도 곡선)
+// ===================================================================
+
+const SCALE_PC = [0, 2, 4, 5, 7, 9, 11]; // C장조 다이어토닉 피치클래스
+const LO = 57, HI = 81;                   // 멜로디 음역: A3 ~ A5
+
+// 다이어토닉 미디 배열 (계단 이동의 기준 공간)
+const DIA = [];
+for (let m = 48; m <= 96; m++) if (SCALE_PC.includes(m % 12)) DIA.push(m);
+const DIA_IDX = new Map(DIA.map((m, i) => [m, i]));
+
+function nearestDiaIdx(midi) {
+  if (DIA_IDX.has(midi)) return DIA_IDX.get(midi);
+  let best = 0, bd = 999;
+  for (let i = 0; i < DIA.length; i++) {
+    const d = Math.abs(DIA[i] - midi);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+const clampIdx = i => Math.max(0, Math.min(DIA.length - 1, i));
+
+// ---------------- 코드 파싱 ----------------
+const ROOT_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+function parseChord(sym) {
+  const m = sym.trim().match(/^([A-Ga-g])([#b]?)(m(?!aj)|min)?/);
+  if (!m) return null;
+  let pc = ROOT_PC[m[1].toUpperCase()];
+  if (m[2] === '#') pc = (pc + 1) % 12;
+  if (m[2] === 'b') pc = (pc + 11) % 12;
+  const minor = !!m[3];
+  return { sym: sym.trim(), pcs: [pc, (pc + (minor ? 3 : 4)) % 12, (pc + 7) % 12] };
+}
+
+function chordTones(chord, lo, hi) {
+  const out = [];
+  for (let m = lo; m <= hi; m++) if (chord.pcs.includes(m % 12)) out.push(m);
+  return out;
+}
+
+function snapToChordTone(midi, chord) {
+  let best = midi, bd = 99;
+  for (let d = 0; d <= 4; d++) {
+    for (const cand of [midi - d, midi + d]) {
+      if (cand < LO || cand > HI) continue;
+      if (chord.pcs.includes(cand % 12) && d < bd) { bd = d; best = cand; break; }
+    }
+    if (bd < 99) break;
+  }
+  return best;
+}
+
+// ---------------- 유틸 ----------------
+function rngFactory(seed) { // mulberry32 — 시드 고정 시 재현 가능
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const pick = (arr, rnd) => arr[Math.floor(rnd() * arr.length)];
+
+// ---------------- 1단계: 골격 생성 ----------------
+function climaxZone(n) { // 최고음이 놓일 마디 구간 (전 구간)
+  return [Math.floor(n * 0.5), Math.max(Math.floor(n * 0.5), Math.ceil(n * 0.75) - 1)];
+}
+
+function sampleSkeleton(chords, rnd, mode = 'full') {
+  const n = chords.length;
+  const s = [];
+  if (mode === 'full') {
+    // 첫 음: 중음역의 코드톤
+    const first = chordTones(chords[0], 60, 72);
+    if (!first.length) return null;
+    s.push(pick(first, rnd));
+    for (let i = 1; i < n; i++) {
+      const prev = s[i - 1];
+      const opts = chordTones(chords[i], Math.max(LO, prev - 5), Math.min(HI, prev + 5))
+        .filter(m => m !== prev || rnd() < 0.25); // 같은 음 유지도 가끔 허용
+      if (!opts.length) return null;
+      s.push(pick(opts, rnd));
+    }
+    // 제약 검사
+    const mx = Math.max(...s), mn = Math.min(...s);
+    const range = mx - mn;
+    if (range < 5 || range > 16) return null;
+    const peakIdxs = s.map((v, i) => (v === mx ? i : -1)).filter(i => i >= 0);
+    if (peakIdxs.length !== 1) return null;                 // 최고음은 단 한 번
+    const [zA, zB] = climaxZone(n);
+    if (peakIdxs[0] < zA || peakIdxs[0] > zB) return null;  // 전(클라이맥스) 구간에
+    if (Math.abs(s[n - 1] - s[0]) > 5) return null;         // 낮게 착지
+    if (s[n - 1] === mx) return null;
+    return s;
+  }
+
+  // ---- 구간 전용 모드 ----
+  const cfg = MODE_CFG[mode];
+  const lo = cfg.noteLo || LO, hi = cfg.noteHi || HI;
+  const first = chordTones(chords[0], cfg.firstLo, cfg.firstHi);
+  if (!first.length) return null;
+  s.push(pick(first, rnd));
+  for (let i = 1; i < n; i++) {
+    const prev = s[i - 1];
+    let opts = chordTones(chords[i], Math.max(lo, prev - 5), Math.min(hi, prev + 5));
+    if (mode === 'gyeol' && i === n - 1) {
+      // 종지: 마지막 골격은 마지막 코드의 근음에 순차~작은 도약으로 착지
+      const rootPc = chords[i].pcs[0];
+      opts = opts.filter(m => m % 12 === rootPc && Math.abs(m - prev) <= 4);
+    }
+    opts = opts.filter(m => m !== prev || rnd() < 0.25);
+    if (!opts.length) return null;
+    s.push(pick(opts, rnd));
+  }
+  const mx = Math.max(...s), mn = Math.min(...s), range = mx - mn;
+  if (range < cfg.rangeMin || range > cfg.rangeMax) return null;
+  const drift = s[n - 1] - s[0];
+  if (drift < cfg.drift[0] || drift > cfg.drift[1]) return null;
+  const peakIdxs = s.map((v, i) => (v === mx ? i : -1)).filter(i => i >= 0);
+  if (mode === 'seung' && peakIdxs[peakIdxs.length - 1] < n - 3) return null; // 최고음은 뒤쪽에
+  if (mode === 'jeon') {
+    if (peakIdxs.length !== 1) return null;                                    // 단일 클라이맥스
+    const p = peakIdxs[0];
+    if (p < Math.floor(n * 0.25) || p > Math.ceil(n * 0.7)) return null;       // 블록 중앙부에
+  }
+  if (mode === 'gyeol' && peakIdxs[0] > Math.max(1, Math.floor(n * 0.3))) return null; // 앞에서 정점 후 하강
+  return s;
+}
+
+// ---------------- 2단계: 리듬 템플릿 (8분음표 단위, 마디=8) ----------------
+const R_SPARSE = [[4, 4], [4, 2, 2], [2, 2, 4], [6, 2], [2, 4, 2]];
+const R_DENSE = [[2, 2, 2, 2], [1, 1, 2, 2, 2], [2, 1, 1, 2, 2], [2, 2, 1, 1, 2], [2, 2, 2, 1, 1]];
+// 16분음표 풀: 0.5 = 16분음표. 쌍(0.5+0.5)은 반드시 붙어 다니며,
+// 시작 위치를 1,2,5,6박(8분 그리드)으로 제한 → 강박(0,4) 직전·직후·위에 쌍이 오지 않음
+const R_DENSE16 = [
+  [2, 0.5, 0.5, 1, 2, 2],           // 쌍 @2
+  [1, 0.5, 0.5, 2, 2, 2],           // 쌍 @1
+  [2, 2, 2, 0.5, 0.5, 1],           // 쌍 @6
+  [2, 2, 1, 0.5, 0.5, 2],           // 쌍 @5
+  [1, 0.5, 0.5, 2, 2, 0.5, 0.5, 1], // 쌍 2개 (마디당 최대)
+  [2, 2, 2, 2],                     // 쉬어가는 마디
+  [2, 2, 1, 1, 2]
+];
+const R_CADENCE = [[4, 2, 2], [2, 2, 4], [4, 4], [2, 2, 2, 2]];
+const R_FINAL = [[8], [8], [8], [6, 2], [4, 4]]; // 마지막 마디는 긴 음 선호
+const R_MED = [[2, 2, 2, 2], [4, 2, 2], [2, 2, 4], [2, 4, 2], [4, 4]];
+
+// ---------------- 모드별 골격 제약 ----------------
+const MODE_CFG = {
+  ki:    { firstLo: 60, firstHi: 67, noteHi: 71, rangeMin: 4, rangeMax: 9,  drift: [-4, 4] },
+  seung: { firstLo: 60, firstHi: 69, noteHi: 76, rangeMin: 5, rangeMax: 12, drift: [2, 12] },
+  jeon:  { firstLo: 65, firstHi: 76, noteLo: 62, rangeMin: 7, rangeMax: 16, drift: [-12, 12] },
+  gyeol: { firstLo: 65, firstHi: 76, rangeMin: 5, rangeMax: 14, drift: [-14, -5] }
+};
+const MODE_LABEL = { full: '기승전결', ki: '기 전용', seung: '승 전용', jeon: '전 전용', gyeol: '결 전용' };
+
+// 8분음표 슬롯 하나를 16분 쌍으로 쪼개는 장식 (쌍 시작 위치는 1,2,5,6박만 — 강박 앞뒤 회피)
+const SPLIT_OK = [1, 2, 5, 6];
+function splitSlot(pat, rnd) {
+  const opts = [];
+  let onset = 0;
+  pat.forEach((d, k) => {
+    if (d === 1 && SPLIT_OK.includes(onset)) opts.push({ k, m: 'one' });
+    if (d === 2) {
+      if (SPLIT_OK.includes(onset)) opts.push({ k, m: 'front' });      // [0.5,0.5,1]
+      if (SPLIT_OK.includes(onset + 1)) opts.push({ k, m: 'back' });   // [1,0.5,0.5]
+    }
+    onset += d;
+  });
+  if (!opts.length) return pat;
+  const o = pick(opts, rnd);
+  const np = [];
+  pat.forEach((d, k) => {
+    if (k !== o.k) np.push(d);
+    else if (o.m === 'one') np.push(0.5, 0.5);
+    else if (o.m === 'front') np.push(0.5, 0.5, 1);
+    else np.push(1, 0.5, 0.5);
+  });
+  return np;
+}
+// 구간별 16분 장식 확률 (경사형: 기·결 드묾 → 승 가끔 → 전은 전용 풀로 풍부)
+const SIX_PROB = { ki: 0.2, seung: 0.35, jeon: 0, gyeol: 0.2 };
+
+function zoneOf(i, n) {
+  const a = Math.max(1, Math.floor(n / 4));
+  if (i < a) return 'ki';
+  if (i < 2 * a) return 'seung';
+  if (i >= n - a) return 'gyeol';
+  return 'jeon';
+}
+
+function sampleRhythm(n, rnd, mode = 'full', six = false) {
+  const a = Math.max(1, Math.floor(n / 4));
+  const rh = new Array(n);
+  const densePool = six ? R_DENSE16 : R_DENSE;
+  if (mode === 'full') {
+    for (let i = 0; i < n; i++) {
+      const z = zoneOf(i, n);
+      if (z === 'ki') rh[i] = pick(R_SPARSE, rnd);
+      else if (z === 'seung') rh[i] = rh[i - a];            // 동형진행: 기 리듬 복사
+      else if (z === 'jeon') rh[i] = pick(densePool, rnd);  // 16분음표는 전 구간에만
+      else rh[i] = (i === n - 1) ? pick(R_FINAL, rnd) : pick(R_CADENCE, rnd);
+    }
+  } else {
+    // 구간 전용: 단일 밀도 풀 + 동형진행 (앞 그룹 리듬을 뒤 그룹이 복사)
+    const pool = { ki: R_SPARSE, seung: R_MED, jeon: densePool, gyeol: R_CADENCE }[mode];
+    for (let i = 0; i < n; i++) {
+      if (i < a || (i >= 2 * a && i < 3 * a)) rh[i] = pick(pool, rnd);
+      else rh[i] = rh[i - a];
+    }
+    if (mode === 'gyeol') rh[n - 1] = [8];                  // 결은 온음표로 확실히 마무리
+  }
+  if (rh[n - 1].includes(0.5)) rh[n - 1] = pick(R_DENSE, rnd); // 마지막 마디에 16분음표 금지
+  // 경사형 장식 패스: 기·승·결에도 낮은 확률로 16분 쌍 1개씩 (복사된 마디도 독립 적용 → 변형 반복)
+  if (six) {
+    for (let i = 0; i < n - 1; i++) {
+      if (rh[i].includes(0.5)) continue;                    // 이미 쌍이 있으면 유지 (마디당 상한 보호)
+      const z = (mode === 'full') ? zoneOf(i, n) : mode;
+      if (rnd() < (SIX_PROB[z] || 0)) rh[i] = splitSlot(rh[i], rnd);
+    }
+  }
+  // 16분 옵션이 켜졌는데 쌍이 하나도 없으면, 밀도 구간의 첫 마디에 최소 1쌍 보장
+  if (six && !rh.some(p => p.includes(0.5))) {
+    const sixPool = R_DENSE16.filter(p => p.includes(0.5));
+    let t = -1;
+    if (mode === 'full') { for (let i = 0; i < n - 1; i++) if (zoneOf(i, n) === 'jeon') { t = i; break; } }
+    else if (mode === 'jeon') t = Math.min(2, n - 2);
+    if (t >= 0) rh[t] = pick(sixPool, rnd);
+  }
+  return rh;
+}
+
+// ---------------- 3단계: 살 붙이기 ----------------
+function fillBar(skel, target, rhythm, chord, rnd, isLast) {
+  const nSlots = rhythm.length;
+  const notes = [skel];
+  if (nSlots === 1) return notes;
+  const sI = nearestDiaIdx(skel), tI = nearestDiaIdx(target);
+  // 각 슬롯의 시작 위치(8분음표 그리드) — 1·3박(0,4)이 강박
+  const onsets = [0];
+  for (let k = 0; k < nSlots - 1; k++) onsets.push(onsets[k] + rhythm[k]);
+  const dirUp = rnd() < 0.5;
+
+  for (let k = 1; k < nSlots; k++) {
+    const prevNote = notes[notes.length - 1];
+    const isSix = rhythm[k] === 0.5;
+    const afterSix = rhythm[k - 1] === 0.5;
+    let idx;
+    if (isSix || afterSix) {
+      // 16분음표와 그 직후 음: 반드시 순차진행 (도약 금지 — 무난함의 안전핀)
+      const pIdx = nearestDiaIdx(prevNote);
+      const step = (tI !== pIdx) ? Math.sign(tI - pIdx)
+                 : (((k % 2 === 1) === dirUp) ? 1 : -1);   // 목표가 같으면 이웃 왕복
+      idx = pIdx + step;
+    } else if (sI === tI) {
+      // 정지 마디: 이웃음 장식 (윗/아랫 이웃 ↔ 복귀)
+      idx = (k % 2 === 1) ? sI + (dirUp ? 1 : -1) : sI;
+      if (isLast) idx = (k === nSlots - 1) ? sI : sI + (k % 2 === 1 ? -1 : 0); // 마지막 마디는 골격음으로 착지
+    } else {
+      // 다음 골격을 향해 계단식 보간
+      idx = Math.round(sI + (tI - sI) * (k / nSlots));
+      // 도약 양념 (낮은 확률): 3도 위/아래 코드톤 방향으로 살짝
+      if (rnd() < 0.12 && onsets[k] % 4 !== 0) idx += (tI > sI ? 2 : -2);
+    }
+    idx = clampIdx(idx);
+    let midi = DIA[idx];
+    // 3연속 동일음 방지
+    if (notes.length >= 2 && notes[notes.length - 1] === midi && notes[notes.length - 2] === midi) {
+      midi = DIA[clampIdx(idx + (tI >= sI ? 1 : -1))];
+    }
+    if (onsets[k] % 4 === 0) midi = snapToChordTone(midi, chord); // 강박=코드톤 (최종 확정)
+    // 대위법 규칙: 비화성음은 순차로만 진입 (도약해서 도착했다면 코드톤으로 교정)
+    const prev = notes[notes.length - 1];
+    if (!chord.pcs.includes(midi % 12) && Math.abs(midi - prev) > 2) {
+      midi = snapToChordTone(midi, chord);
+    }
+    notes.push(Math.max(LO, Math.min(HI, midi)));
+  }
+  return notes;
+}
+
+// ---------------- 4단계: 점수화 ----------------
+function scoreMelody(bars, mode = 'full') {
+  const flat = bars.flatMap(b => b.notes);
+  const dif = [];
+  for (let i = 1; i < flat.length; i++) dif.push(flat[i] - flat[i - 1]);
+  const moves = dif.filter(d => d !== 0);
+  if (!moves.length) return 0;
+  const stepR = moves.filter(d => Math.abs(d) <= 2).length / moves.length;
+  const repR = (dif.length - moves.length) / dif.length;
+  const mx = Math.max(...flat);
+  const peakCnt = flat.filter(v => v === mx).length;
+  const range = mx - Math.min(...flat);
+  let dirCh = 0;
+  for (let i = 1; i < moves.length; i++) if (Math.sign(moves[i]) !== Math.sign(moves[i - 1])) dirCh++;
+  const zig = dirCh / moves.length;
+  const bigLeaps = moves.filter(d => Math.abs(d) > 7).length;
+
+  let sc = 0;
+  sc += 30 * (1 - Math.min(1, Math.abs(stepR - 0.75) * 2.5)); // 순차:도약 ≈ 75:25
+  sc += 15 * (range >= 7 && range <= 15 ? 1 : range < 7 ? 0.3 : 0.5);
+  const strictPeak = (mode === 'full' || mode === 'jeon');
+  sc += 15 * (strictPeak
+    ? (peakCnt === 1 ? 1 : peakCnt === 2 ? 0.6 : 0.2)      // 클라이맥스형: 최고음 단일
+    : (peakCnt <= 2 ? 1 : peakCnt === 3 ? 0.7 : 0.4));     // 구간형: 완화
+  sc += 15 * (1 - Math.min(1, Math.max(0, repR - 0.12) * 3));  // 반복 과다 억제
+  sc += 15 * (zig >= 0.3 && zig <= 0.6 ? 1 : 0.5);             // 자연스러운 굴곡
+  sc += 10 * (bigLeaps === 0 ? 1 : bigLeaps === 1 ? 0.5 : 0);  // 큰 도약 억제
+  return Math.round(sc * 10) / 10;
+}
+
+// ---------------- ABC 변환 ----------------
+const PC_LETTER = { 0: 'C', 2: 'D', 4: 'E', 5: 'F', 7: 'G', 9: 'A', 11: 'B' };
+function midiToAbc(m) {
+  const pc = m % 12, letter = PC_LETTER[pc];
+  if (letter === undefined) return midiToAbc(m - 1); // 방어 (비다이어토닉)
+  if (m < 60) return letter + ',';
+  if (m < 72) return letter;
+  if (m < 84) return letter.toLowerCase();
+  return letter.toLowerCase() + "'";
+}
+
+function toAbc(candidate, idx, tempo, mode = 'full') {
+  const { bars, score } = candidate;
+  let body = '';
+  bars.forEach((b, i) => {
+    body += `"${b.chord}"`;
+    let onset = 0;
+    b.notes.forEach((n, k) => {
+      const d = b.rhythm[k];
+      if (k > 0 && onset === 4) body += ' '; // 마디 중간(3박)에서만 빔 분리
+      body += midiToAbc(n) + (d === 0.5 ? '/' : d > 1 ? d : '');
+      onset += d;
+    });
+    body += (i === bars.length - 1) ? ' |]' : ' | ';
+    if ((i + 1) % 4 === 0 && i !== bars.length - 1) body += '\n';
+  });
+  return `X:${idx}\nT:후보 ${idx} · ${MODE_LABEL[mode]} (점수 ${score})\nM:4/4\nL:1/8\nQ:1/4=${tempo}\nK:C\n${body}`;
+}
+
+// ---------------- 메인 ----------------
+function generate(chordStr, opts = {}) {
+  const nOut = opts.count || 5;
+  const tempo = opts.tempo || 90;
+  const mode = MODE_LABEL[opts.mode] ? opts.mode : 'full';
+  const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
+  const rnd = rngFactory(seed);
+
+  const chords = chordStr.split(/[\s,|]+/).filter(Boolean).map(parseChord);
+  if (chords.some(c => !c)) return { error: '코드 기호를 해석할 수 없습니다. 예: C G Am Em F C F G' };
+  if (chords.length < 2 || chords.length > 16) return { error: '코드는 2~16개 사이로 입력해 주세요.' };
+
+  // 결 모드 종지 규칙: 마지막 코드가 으뜸화음(C)이 아니면 C로 치환해 착지
+  let cadenceNote = '';
+  if (mode === 'gyeol' && chords[chords.length - 1].pcs[0] !== 0) {
+    const orig = chords[chords.length - 1].sym;
+    chords[chords.length - 1] = parseChord('C');
+    cadenceNote = `종지 규칙 적용: 마지막 코드 ${orig} → C (으뜸화음 착지)`;
+  }
+
+  const candidates = [];
+  const seen = new Set();
+  let attempts = 0;
+  while (candidates.length < nOut * 40 && attempts < 8000) {
+    attempts++;
+    const skel = sampleSkeleton(chords, rnd, mode);
+    if (!skel) continue;
+    const rhythm = sampleRhythm(chords.length, rnd, mode, !!opts.sixteenth);
+    const bars = chords.map((c, i) => {
+      const target = i < chords.length - 1 ? skel[i + 1] : skel[i];
+      const notes = fillBar(skel[i], target, rhythm[i], c, rnd, i === chords.length - 1);
+      return { chord: c.sym, notes, rhythm: rhythm[i] };
+    });
+    const key = bars.map(b => b.notes.join('.')).join('/');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ bars, score: scoreMelody(bars, mode) });
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  const top = candidates.slice(0, nOut);
+  return {
+    seed,
+    mode,
+    cadenceNote,
+    attempts,
+    valid: candidates.length,
+    results: top.map((c, i) => ({ ...c, abc: toAbc(c, i + 1, tempo, mode) }))
+  };
+}
+
+if (typeof module !== 'undefined') module.exports = { generate };
+
+</script>
+
+<script>
+// ---------------- UI ----------------
+const $ = id => document.getElementById(id);
+let currentSynth = null;
+
+document.querySelectorAll('.chip').forEach(c =>
+  c.addEventListener('click', () => { $('chords').value = c.dataset.p; }));
+
+let mode = 'full';
+const MODE_DESC = {
+  full: '한 블록 안에 기승전결이 모두 들어간 완결형 8마디 (기본).',
+  ki: '조용한 도입 블록 — 낮은 음역, 성긴 리듬, 좁은 음폭. 곡의 맨 앞에.',
+  seung: '끌어올리는 블록 — 끝이 시작보다 높게 상승하며 다음 블록에 바통을 넘깁니다.',
+  jeon: '클라이맥스 블록 — 가장 높고 촘촘하며, 최고음이 블록 중앙에 한 번 등장.',
+  gyeol: '마무리 블록 — 하강 곡선, 마지막 코드를 C로 착지시키고 으뜸음(도)에서 끝납니다.'
+};
+$('modeDesc').textContent = MODE_DESC[mode];
+let sixteenth = false;
+document.querySelectorAll('#resolution .mode-chip').forEach(c =>
+  c.addEventListener('click', () => {
+    sixteenth = c.dataset.r === '16';
+    document.querySelectorAll('#resolution .mode-chip').forEach(x => x.classList.toggle('on', x === c));
+  }));
+document.querySelectorAll('#modes .mode-chip').forEach(c =>
+  c.addEventListener('click', () => {
+    mode = c.dataset.m;
+    document.querySelectorAll('#modes .mode-chip').forEach(x => x.classList.toggle('on', x === c));
+    $('modeDesc').textContent = MODE_DESC[mode];
+  }));
+
+$('go').addEventListener('click', run);
+
+function zoneClass(i, n, m) {
+  const z = (m === 'full') ? zoneOf(i, n) : m;
+  return { ki: 'z-ki', seung: 'z-seung', jeon: 'z-jeon', gyeol: 'z-gyeol' }[z];
+}
+
+function run() {
+  stopPlay();
+  const btn = $('go');
+  btn.disabled = true; btn.textContent = '생성 중…';
+  setTimeout(() => {
+    try {
+      const seedRaw = $('seed').value.trim();
+      const out = generate($('chords').value, {
+        count: Math.max(1, Math.min(10, parseInt($('count').value) || 5)),
+        tempo: Math.max(40, Math.min(200, parseInt($('tempo').value) || 90)),
+        seed: seedRaw ? (parseInt(seedRaw) || 1) : undefined,
+        mode,
+        sixteenth
+      });
+      render(out);
+    } catch (e) {
+      $('results').innerHTML = '<p class="err">오류: ' + e.message + '</p>';
+    }
+    btn.disabled = false; btn.textContent = '멜로디 후보 생성';
+  }, 30);
+}
+
+function render(out) {
+  const box = $('results');
+  if (out.error) { box.innerHTML = '<p class="err">' + out.error + '</p>'; $('meta').textContent = ''; return; }
+  $('meta').textContent = `[${MODE_LABEL[out.mode]}${sixteenth ? ' · 16분음표' : ''}] 시도 ${out.attempts.toLocaleString()}회 → 규칙 통과 ${out.valid}개 → 상위 ${out.results.length}개 선별 · 시드 ${out.seed}` + (out.cadenceNote ? ' · ' + out.cadenceNote : '');
+  box.innerHTML = '';
+  const n = out.results[0]?.bars.length || 8;
+
+  out.results.forEach((c, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const zb = c.bars.map((_, bi) => `<span class="${zoneClass(bi, n, out.mode)}"></span>`).join('');
+    card.innerHTML = `
+      <div class="zonebar">${zb}</div>
+      <div class="card-head">
+        <div><span class="card-title">후보 ${i + 1} · ${MODE_LABEL[out.mode]}</span> <span class="score">규칙 적합도 ${c.score}/100</span></div>
+        <div class="btns">
+          <button data-act="play">▶ 재생</button>
+          <button data-act="stop">■ 정지</button>
+          <button data-act="copy">ABC 복사</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="z-ki"></i>기</span><span><i class="z-seung"></i>승</span>
+        <span><i class="z-jeon"></i>전 (최고음)</span><span><i class="z-gyeol"></i>결</span>
+      </div>
+      <div class="sheet" id="sheet-${i}"></div>
+      <div class="abc-box"><textarea id="abc-${i}" readonly>${c.abc}</textarea></div>`;
+    box.appendChild(card);
+
+    let visual = null;
+    if (window.ABCJS) {
+      try { visual = ABCJS.renderAbc(`sheet-${i}`, c.abc, { responsive: 'resize', add_classes: true })[0]; }
+      catch (e) { $(`sheet-${i}`).innerHTML = '<p class="meta">악보 렌더링 실패 — ABC 텍스트를 이용해 주세요.</p>'; }
+    } else {
+      $(`sheet-${i}`).innerHTML = '<p class="meta">악보 라이브러리(abcjs)를 불러오지 못했습니다. ABC 텍스트 복사는 정상 동작합니다.</p>';
+    }
+
+    card.querySelector('[data-act=copy]').addEventListener('click', ev => {
+      const ta = $(`abc-${i}`);
+      ta.select();
+      navigator.clipboard.writeText(ta.value).then(() => {
+        ev.target.textContent = '복사됨 ✓';
+        setTimeout(() => ev.target.textContent = 'ABC 복사', 1500);
+      }).catch(() => { document.execCommand('copy'); ev.target.textContent = '복사됨 ✓'; });
+    });
+    card.querySelector('[data-act=play]').addEventListener('click', () => playVisual(visual));
+    card.querySelector('[data-act=stop]').addEventListener('click', stopPlay);
+  });
+}
+
+async function playVisual(visual) {
+  if (!window.ABCJS || !ABCJS.synth || !visual) { alert('이 환경에서는 재생을 지원하지 않습니다. ABC를 복사해 뮤직랩에서 들어보세요.'); return; }
+  stopPlay();
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const synth = new ABCJS.synth.CreateSynth();
+    await synth.init({ audioContext: ac, visualObj: visual, millisecondsPerMeasure: visual.millisecondsPerMeasure() });
+    await synth.prime();
+    synth.start();
+    currentSynth = synth;
+  } catch (e) {
+    alert('재생 실패 (사운드폰트 로드 문제일 수 있습니다). ABC를 복사해 뮤직랩에서 확인해 주세요.');
+  }
+}
+function stopPlay() { if (currentSynth) { try { currentSynth.stop(); } catch (e) {} currentSynth = null; } }
+
+run(); // 첫 화면에서 캐논 진행으로 즉시 생성
+</script>
+</body>
+</html>
