@@ -80,8 +80,24 @@ await check('각 결과 블록에 재생·복사 버튼이 있다', async () => 
   const plays = await page.$$('.resultblock .rb-play');
   const copies = await page.$$('.resultblock .rb-copy');
   assert.ok(plays.length >= 1 && plays.length === copies.length, '블록마다 재생·복사 버튼');
-  // 오프라인(abcjs 미로드)에서 재생 클릭 시 오류 없이 안내로 대체
-  await plays[0].click();
+});
+
+await check('오프라인 내장 신스로 재생 클릭 시 오류 없이 정지 상태로 토글', async () => {
+  const play = await page.$('.resultblock .rb-play');
+  await play.click();                                  // Web Audio 오실레이터 재생(오프라인 OK)
+  // 재생 시작하면 버튼이 "정지"로 바뀜(음표가 있으므로)
+  const label = await play.evaluate(el => el.textContent);
+  assert.ok(/정지|재생/.test(label));
+  await play.click();                                  // 다시 눌러 정지 — 오류 없어야 함
+});
+
+await check('AI Morph 모드 칩이 있고 전환 시 안내가 표시된다', async () => {
+  await page.click('#mAI');
+  await page.waitForFunction(() => document.getElementById('mAI').classList.contains('on'), undefined, { timeout: 3000 });
+  const desc = await page.textContent('#modeDesc');
+  assert.ok(desc.includes('MusicVAE'), '모드 설명에 MusicVAE');
+  assert.ok(await page.isVisible('#aiStatus'), 'AI 상태 안내 표시');
+  await page.click('#mMorph');   // 원복
 });
 
 await check('멜로디 A 파일 열기 → 내용이 채워진다', async () => {

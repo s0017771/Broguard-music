@@ -90,9 +90,11 @@
       <div class="modes">
         <button class="modechip on" id="mMorph" data-m="morph">Morph (조합)</button>
         <button class="modechip" id="mBridge" data-m="bridge">Bridge (전환)</button>
+        <button class="modechip" id="mAI" data-m="ai">AI Morph &#10024;</button>
       </div>
     </div>
     <p class="modedesc" id="modeDesc"></p>
+    <p id="aiStatus" class="note" style="display:none"></p>
     <div class="row">
       <label class="opt" style="flex:1">코드 진행 반영 <span style="font-weight:400;color:var(--ink-soft)">(선택 · 비우면 미적용)</span>
         <input type="text" id="chordStr" placeholder="예: C G Am F  (마디 순서대로 순환)"
@@ -502,9 +504,44 @@ var PPQ = 480;                                   // 4분음표당 틱
     };
   }
 
+  /* ============ ABC ↔ Magenta NoteSequence (AI 모드용) ============ */
+  // MusicVAE 멜로디 모델(mel_2bar)에 맞춰 2마디·16분 양자화 시퀀스로 변환
+  function abcToNoteSequence(abc, opts) {
+    opts = opts || {};
+    var A = flattenToSteps(abc, 0.5);                 // 8분음표 스텝
+    var mm = /(\d+)\s*\/\s*(\d+)/.exec(A.meter || '4/4'), num = mm ? +mm[1] : 4, den = mm ? +mm[2] : 4;
+    var measureSteps = Math.max(1, Math.round((num * (4 / den)) / 0.5));
+    var bars = opts.bars || 2;
+    var want = measureSteps * bars;
+    var steps = A.steps.slice(0, want);
+    while (steps.length < want) steps.push(null);
+    var notes = [], i = 0, pos = 0;
+    while (i < steps.length) {
+      var p = steps[i], c = 1; while (i + c < steps.length && steps[i + c] === p) c++;
+      if (p !== null) notes.push({ pitch: p, quantizedStartStep: pos * 2, quantizedEndStep: (pos + c) * 2 }); // 8분→16분(×2)
+      pos += c; i += c;
+    }
+    return { notes: notes, quantizationInfo: { stepsPerQuarter: 4 }, totalQuantizedSteps: want * 2,
+             tempos: [{ time: 0, qpm: opts.qpm || A.tempoBpm || 120 }] };
+  }
+
+  function noteSequenceToAbc(ns, opts) {
+    opts = opts || {};
+    var total = ns.totalQuantizedSteps || 0;
+    (ns.notes || []).forEach(function (n) { total = Math.max(total, n.quantizedEndStep || 0); });
+    var eighthLen = Math.max(1, Math.ceil(total / 2));
+    var steps = []; for (var k = 0; k < eighthLen; k++) steps.push(null);
+    (ns.notes || []).forEach(function (n) {
+      var s = Math.round((n.quantizedStartStep || 0) / 2), e = Math.round((n.quantizedEndStep || 0) / 2);
+      for (var q = s; q < e && q < eighthLen; q++) steps[q] = n.pitch;
+    });
+    return stepsToAbc(steps, opts.meter || '4/4', 'C', opts.title || 'AI interp');
+  }
+
   return { parseABC: parseABC, flattenToSteps: flattenToSteps, resample: resample,
            nearestDiaIdx: nearestDiaIdx, DIA: DIA, stepsToAbc: stepsToAbc, morph: morph, bridge: bridge,
-           parseChordList: parseChordList, parseChordTones: parseChordTones, snapStepsToChords: snapStepsToChords };
+           parseChordList: parseChordList, parseChordTones: parseChordTones, snapStepsToChords: snapStepsToChords,
+           abcToNoteSequence: abcToNoteSequence, noteSequenceToAbc: noteSequenceToAbc };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Interp;
 if (typeof window !== 'undefined') window.Interp = Interp;
@@ -522,17 +559,20 @@ if (typeof window !== 'undefined') window.Interp = Interp;
   var SAMPLE_B = ['X:1', 'T:멜로디 B (하강)', 'M:4/4', 'L:1/8', 'K:C', 'g2 e2 c2 e2 | d2 c2 C4 |'].join('\n');
 
   var DESC = {
-    morph: '<b>Morph</b>: A와 B "사이"의 중간 멜로디들을 단계별로 만듭니다 (A → 섞임 → B). 두 멜로디를 조합할 때.',
-    bridge: '<b>Bridge</b>: A의 끝 음에서 B의 첫 음으로 자연스럽게 잇는 <b>연결 마디</b>를 만들고, A+연결+B를 이어붙입니다. 곡을 전환할 때.'
+    morph: '<b>Morph</b>: A와 B "사이"의 중간 멜로디들을 단계별로 만듭니다 (A → 섞임 → B). 알고리즘 방식 · 오프라인.',
+    bridge: '<b>Bridge</b>: A의 끝 음에서 B의 첫 음으로 자연스럽게 잇는 <b>연결 마디</b>를 만들고, A+연결+B를 이어붙입니다. 곡을 전환할 때.',
+    ai: '<b>AI Morph</b> &#10024;: 구글 <b>Magenta MusicVAE</b> 신경망으로 A↔B를 보간합니다. 각 멜로디의 <b>앞 2마디</b>를 사용 · <b>인터넷 필요</b>(처음 실행 시 모델 다운로드, 이후 브라우저에서 로컬 실행 · 무료).'
   };
 
   function setMode(m) {
     mode = m;
-    $('mMorph').classList.toggle('on', m === 'morph');
-    $('mBridge').classList.toggle('on', m === 'bridge');
-    $('morphOpts').style.display = m === 'morph' ? '' : 'none';
+    ['mMorph', 'mBridge', 'mAI'].forEach(function (id) { $(id).classList.toggle('on', $(id).dataset.m === m); });
+    $('morphOpts').style.display = (m === 'morph' || m === 'ai') ? '' : 'none';
+    $('optEnds').parentNode.style.display = m === 'ai' ? 'none' : '';   // AI는 양끝 항상 포함
     $('bridgeOpts').style.display = m === 'bridge' ? '' : 'none';
     $('modeDesc').innerHTML = DESC[m];
+    $('aiStatus').style.display = m === 'ai' ? '' : 'none';
+    if (m === 'ai') $('aiStatus').innerHTML = '&#10024; AI 모드: 코드 진행 반영은 무시됩니다. 인터넷에 연결되어 있어야 합니다.';
   }
 
   function renderPreview(box, text) {
@@ -540,22 +580,42 @@ if (typeof window !== 'undefined') window.Interp = Interp;
     try { return ABCJS.renderAbc(box, text, { responsive: 'resize', staffwidth: 840 })[0]; } catch (e) { return null; }
   }
 
-  /* ---- 미리듣기(abcjs synth · 온라인일 때) ---- */
-  var currentSynth = null, currentBtn = null;
+  /* ---- 미리듣기: 브라우저 내장 Web Audio 오실레이터(오프라인에서도 동작) ---- */
+  var audioCtx = null, playing = [], currentBtn = null, playTimer = null;
   function resetBtn() { if (currentBtn) { currentBtn.innerHTML = '&#9654; 재생'; currentBtn = null; } }
-  function stopPlay() { if (currentSynth) { try { currentSynth.stop(); } catch (e) {} currentSynth = null; } resetBtn(); }
-  function playAbc(abc, btn, visual) {
-    if (currentBtn === btn && currentSynth) { stopPlay(); return; }
-    var canAudio = (typeof ABCJS !== 'undefined') && ABCJS.synth && ABCJS.synth.supportsAudio && ABCJS.synth.supportsAudio();
-    if (!canAudio) { btn.textContent = '재생 불가(온라인 필요)'; setTimeout(function () { btn.innerHTML = '&#9654; 재생'; }, 1800); return; }
+  function stopPlay() {
+    playing.forEach(function (o) { try { o.stop(); } catch (e) {} }); playing = [];
+    if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+    resetBtn();
+  }
+  function playAbc(abc, btn) {
+    if (currentBtn === btn && playing.length) { stopPlay(); return; }
     stopPlay();
-    var v = visual || renderPreview(document.createElement('div'), abc);
-    if (!v) { btn.textContent = '재생 불가'; setTimeout(function () { btn.innerHTML = '&#9654; 재생'; }, 1600); return; }
-    var ac = new (window.AudioContext || window.webkitAudioContext)();
-    var synth = new ABCJS.synth.CreateSynth();
-    synth.init({ audioContext: ac, visualObj: v }).then(function () { return synth.prime(); }).then(function () {
-      synth.start(); currentSynth = synth; currentBtn = btn; btn.innerHTML = '&#9632; 정지';
-    }).catch(function () { btn.textContent = '재생 실패'; setTimeout(function () { btn.innerHTML = '&#9654; 재생'; }, 1600); });
+    var song; try { song = Interp.parseABC(abc); } catch (e) { return; }
+    var vid = song.voiceOrder[0] || '1';
+    var evs = (song.voices[vid] || { events: [] }).events;
+    var Lq = (song.unit || 1 / 8) * 4, qpm = song.tempoBpm || 120, spb = 60 / qpm;
+    try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+    var ac = audioCtx; if (ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+    var t = ac.currentTime + 0.06;
+    evs.forEach(function (e) {
+      if (e.type === 'bar') return;
+      var durSec = e.dur * Lq * spb;
+      if (e.type === 'note') e.midis.forEach(function (midi) {
+        var osc = ac.createOscillator(), g = ac.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.2, t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.05, durSec * 0.92));
+        osc.connect(g); g.connect(ac.destination);
+        osc.start(t); osc.stop(t + durSec); playing.push(osc);
+      });
+      t += durSec;
+    });
+    if (!playing.length) return;
+    currentBtn = btn; btn.innerHTML = '&#9632; 정지';
+    playTimer = setTimeout(function () { playing = []; resetBtn(); }, (t - ac.currentTime) * 1000 + 120);
   }
 
   function block(title, small, abc, stitched) {
@@ -568,7 +628,7 @@ if (typeof window !== 'undefined') window.Interp = Interp;
       '<textarea readonly spellcheck="false"></textarea>';
     var ta = wrap.querySelector('textarea'); ta.value = abc;
     var visual = renderPreview(wrap.querySelector('.preview'), abc);
-    wrap.querySelector('.rb-play').addEventListener('click', function () { playAbc(abc, this, visual); });
+    wrap.querySelector('.rb-play').addEventListener('click', function () { playAbc(abc, this); });
     wrap.querySelector('.rb-copy').addEventListener('click', function () {
       var self = this;
       function done() { self.textContent = '복사됨 ✓'; setTimeout(function () { self.textContent = '복사'; }, 1200); }
@@ -583,6 +643,7 @@ if (typeof window !== 'undefined') window.Interp = Interp;
     var a = abcA.value.trim(), b = abcB.value.trim();
     results.innerHTML = '';
     if (!a || !b) { $('topNote').innerHTML = '<span class="err">멜로디 A와 B를 모두 입력하세요.</span>'; return; }
+    if (mode === 'ai') { runAI(a, b); return; }
     var chordStr = $('chordStr').value.trim();
     try {
       if (mode === 'morph') {
@@ -606,6 +667,58 @@ if (typeof window !== 'undefined') window.Interp = Interp;
     }
   }
 
+  /* ---- AI 모드: Magenta MusicVAE (온라인·브라우저 로컬 실행) ---- */
+  var magentaPromise = null, mvae = null;
+  var MAGENTA_SRC = 'https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1';   // UMD 번들(전역 mm, tf 포함)
+  var MVAE_CKPT = 'https://storage.googleapis.com/magentadata/js/checkpoints/music_vae/mel_2bar_small';
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script'); s.src = src; s.crossOrigin = 'anonymous';
+      s.onload = resolve; s.onerror = function () { reject(new Error('스크립트 로드 실패: ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  function loadMagenta() {
+    if (magentaPromise) return magentaPromise;
+    magentaPromise = loadScript(MAGENTA_SRC).then(function () {
+      if (typeof mm === 'undefined' || !mm.MusicVAE) throw new Error('Magenta(mm) 전역을 찾을 수 없습니다.');
+      return mm;
+    });
+    return magentaPromise;
+  }
+  function aiStatus(msg, isErr) { $('aiStatus').style.display = ''; $('aiStatus').innerHTML = (isErr ? '<span class="err">' : '') + msg + (isErr ? '</span>' : ''); }
+
+  function runAI(a, b) {
+    var steps = parseInt($('optSteps').value, 10) || 3;
+    var numInterps = Math.max(3, Math.min(10, steps + 2));   // 양끝 포함
+    aiStatus('&#10024; MusicVAE 모델 로딩 중… (처음엔 수 MB 다운로드, 이후 캐시)');
+    $('btnGo').disabled = true;
+    loadMagenta().then(function (mmLib) {
+      if (!mvae) { mvae = new mmLib.MusicVAE(MVAE_CKPT); }
+      return mvae.initialized ? mvae : mvae.initialize().then(function () { return mvae; });
+    }).then(function () {
+      aiStatus('&#10024; 신경망으로 보간 중…');
+      var nsA = Interp.abcToNoteSequence(a, { bars: 2 });
+      var nsB = Interp.abcToNoteSequence(b, { bars: 2 });
+      return mvae.interpolate([nsA, nsB], numInterps);
+    }).then(function (seqs) {
+      results.innerHTML = '';
+      seqs.forEach(function (ns, i) {
+        var t = i / (seqs.length - 1);
+        var title = i === 0 ? 'A (0%)' : i === seqs.length - 1 ? 'B (100%)' : Math.round(t * 100) + '%';
+        var abc = Interp.noteSequenceToAbc(ns, { title: 'AI morph ' + Math.round(t * 100) + '%' });
+        results.appendChild(block('&#10024; ' + title, i === 0 || i === seqs.length - 1 ? '원곡(재구성)' : 'MusicVAE 보간', abc));
+      });
+      aiStatus('&#10024; AI Morph 완료 · MusicVAE(mel_2bar) · 각 멜로디 앞 2마디 사용 · 총 ' + seqs.length + '개');
+      $('topNote').textContent = '';
+      $('btnGo').disabled = false;
+    }).catch(function (e) {
+      aiStatus('AI 보간 실패: ' + e.message + ' — 인터넷 연결을 확인하거나 <b>Morph(알고리즘)</b> 모드를 사용하세요.', true);
+      $('btnGo').disabled = false;
+    });
+  }
+
   function wireFile(btnId, fileId, ta) {
     $(btnId).addEventListener('click', function () { $(fileId).click(); });
     $(fileId).addEventListener('change', function () {
@@ -620,6 +733,7 @@ if (typeof window !== 'undefined') window.Interp = Interp;
 
   $('mMorph').addEventListener('click', function () { setMode('morph'); });
   $('mBridge').addEventListener('click', function () { setMode('bridge'); });
+  $('mAI').addEventListener('click', function () { setMode('ai'); });
   $('btnGo').addEventListener('click', generate);
   $('btnSample').addEventListener('click', function () { abcA.value = SAMPLE_A; abcB.value = SAMPLE_B; generate(); });
 

@@ -165,3 +165,41 @@ test('snapStepsToChords: 코드 없으면 원본 그대로', () => {
   const steps = [60, 60, 62, 64];
   assert.deepEqual(Interp.snapStepsToChords(steps, '4/4', []), steps);
 });
+
+// ---------- AI 모드용 NoteSequence 변환 ----------
+test('abcToNoteSequence: 2마디·16분 양자화 시퀀스', () => {
+  const ns = Interp.abcToNoteSequence(A, { bars: 2 });
+  assert.equal(ns.quantizationInfo.stepsPerQuarter, 4);
+  assert.equal(ns.totalQuantizedSteps, 32);              // 2마디 4/4 = 32 십육분음
+  assert.equal(ns.notes.length, 8);
+  assert.deepEqual(ns.notes[0], { pitch: 60, quantizedStartStep: 0, quantizedEndStep: 4 });
+  assert.ok(ns.tempos[0].qpm > 0);
+});
+
+test('abcToNoteSequence: 2마디보다 짧으면 쉼표로 패딩, 길면 자름', () => {
+  const short = 'X:1\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |';   // 1마디
+  const nsShort = Interp.abcToNoteSequence(short, { bars: 2 });
+  assert.equal(nsShort.totalQuantizedSteps, 32);          // 여전히 2마디 길이
+  const long = 'X:1\nM:4/4\nL:1/8\nK:C\nC8 | D8 | E8 |';   // 3마디
+  const nsLong = Interp.abcToNoteSequence(long, { bars: 2 });
+  assert.equal(nsLong.totalQuantizedSteps, 32);           // 앞 2마디만
+  assert.equal(nsLong.notes.length, 2);
+});
+
+test('noteSequenceToAbc: 양자화 시퀀스 → ABC (왕복 음정 보존)', () => {
+  const ns = Interp.abcToNoteSequence(A, { bars: 2 });
+  const abc = Interp.noteSequenceToAbc(ns, {});
+  assert.ok(abc.includes('K:C') && abc.trim().endsWith('|]'));
+  const notes = Interp.parseABC(abc).voices['1'].events.filter(e => e.type === 'note');
+  assert.deepEqual(notes.map(n => n.midis[0]), [60, 62, 64, 65, 67, 69, 67, 64]); // A와 동일 음정
+});
+
+test('noteSequenceToAbc: MusicVAE식 출력(다른 음길이)도 변환', () => {
+  const fake = { notes: [
+    { pitch: 60, quantizedStartStep: 0, quantizedEndStep: 8 },
+    { pitch: 64, quantizedStartStep: 8, quantizedEndStep: 16 },
+    { pitch: 67, quantizedStartStep: 16, quantizedEndStep: 32 }],
+    quantizationInfo: { stepsPerQuarter: 4 }, totalQuantizedSteps: 32 };
+  const notes = Interp.parseABC(Interp.noteSequenceToAbc(fake, {})).voices['1'].events.filter(e => e.type === 'note');
+  assert.deepEqual(notes.map(n => n.midis[0]), [60, 64, 67]);
+});
