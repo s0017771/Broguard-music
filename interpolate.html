@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interpolate (곡 조합·전환) — 브로가드 뮤직 랩</title>
+<style>
+  :root { --ink:#1c2b3a; --ink-soft:#46586b; --paper:#faf8f2; --card:#fff; --line:#ddd6c8;
+    --brass:#b08a2e; --brass-deep:#8f6e1f; --warn:#a33c2e; --beta:#7a5cc0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family:'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
+    background:var(--paper); color:var(--ink); min-height:100vh; display:flex; flex-direction:column; }
+  header { position:relative; background:var(--ink); color:#f3efe4; padding:26px 22px 22px; overflow:hidden; }
+  .staff-lines { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; gap:11px; opacity:.2; pointer-events:none; }
+  .staff-lines span { display:block; height:1px; background:#f3efe4; }
+  header h1 { position:relative; font-size:1.3rem; font-weight:800; letter-spacing:.04em; }
+  header h1 .clef { color:var(--brass); font-size:1.6rem; vertical-align:-3px; margin-right:9px; }
+  header h1 .beta { background:var(--beta); color:#fff; font-size:.6rem; font-weight:800; padding:2px 7px; border-radius:6px; vertical-align:3px; margin-left:6px; letter-spacing:.08em; }
+  header p { position:relative; margin-top:5px; font-size:.8rem; color:#c9c2b0; }
+  header a.home { position:absolute; right:16px; top:16px; color:#c9c2b0; font-size:.78rem; text-decoration:none; z-index:1; }
+  header a.home:hover { color:var(--brass); }
+  main { flex:1; max-width:940px; width:100%; margin:0 auto; padding:18px 14px 50px; display:flex; flex-direction:column; gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .card h2 { font-size:.95rem; font-weight:800; color:var(--brass-deep); margin-bottom:6px; letter-spacing:.03em; }
+  .twocol { display:flex; gap:12px; flex-wrap:wrap; }
+  .twocol > div { flex:1; min-width:260px; }
+  label.fld { display:block; font-size:.78rem; font-weight:700; color:var(--ink-soft); margin-bottom:4px; }
+  textarea { width:100%; min-height:96px; resize:vertical; font-family:'D2Coding',Consolas,Menlo,monospace;
+    font-size:.82rem; line-height:1.5; border:1px solid var(--line); border-radius:10px; padding:9px; background:#fffdf7; color:var(--ink); }
+  textarea:focus { outline:2px solid var(--brass); border-color:transparent; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
+  button { font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; background:var(--ink); color:#f3efe4; border:0; border-radius:9px; padding:8px 14px; }
+  button.alt { background:transparent; color:var(--ink); border:1px solid var(--line); }
+  button.sm { padding:5px 10px; font-size:.76rem; }
+  button:active { transform:scale(.97); }
+  label.opt { display:flex; align-items:center; gap:5px; font-size:.78rem; color:var(--ink-soft); font-weight:700; }
+  select, input[type=number] { font:inherit; font-size:.8rem; padding:5px 6px; border:1px solid var(--line); border-radius:7px; background:#fffdf7; color:var(--ink); }
+  .modes { display:flex; gap:6px; }
+  .modechip { border:1px solid var(--line); background:#f7f4ec; color:var(--ink); border-radius:9px; padding:7px 15px; font-size:.86rem; font-weight:700; cursor:pointer; }
+  .modechip.on { background:var(--ink); color:#f3efe4; border-color:var(--ink); }
+  .modedesc { font-size:.78rem; color:var(--ink-soft); margin-top:8px; line-height:1.6; min-height:1.4em; }
+  .modedesc b { color:var(--brass-deep); }
+  .resultblock { border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:12px; background:#fffdf7; }
+  .resultblock .rb-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  .resultblock .rb-title { font-weight:800; font-size:.86rem; color:var(--ink); }
+  .resultblock .rb-title small { color:var(--brass-deep); font-weight:700; margin-left:6px; }
+  .preview { overflow-x:auto; }
+  .resultblock textarea { min-height:52px; font-size:.78rem; }
+  .stitched { border-color:var(--brass); background:#fdf7e8; }
+  .note { font-size:.76rem; color:var(--ink-soft); margin-top:8px; line-height:1.6; }
+  .err { color:var(--warn); font-weight:700; }
+  .flow { padding:12px 14px; background:var(--card); border:1px dashed var(--line); border-radius:12px; font-size:.78rem; color:var(--ink-soft); line-height:1.7; }
+  .flow b { color:var(--brass-deep); }
+  footer { text-align:center; padding:14px; font-size:.72rem; color:#b6ae9c; }
+</style>
+</head>
+<body>
+<header>
+  <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
+  <a class="home" href="index.html">&larr; 랩 홈</a>
+  <h1><span class="clef">&#8734;</span>Interpolate <span style="font-size:.8rem;font-weight:700;color:#c9c2b0;">곡 조합·전환</span><span class="beta">BETA</span></h1>
+  <p>두 멜로디 A·B를 <b>Morph</b>(사이를 단계별로 채우기) 또는 <b>Bridge</b>(A→B 자연스러운 연결 마디)로 이어줍니다</p>
+</header>
+<main>
+
+  <div class="flow">
+    <b>&#127925; Magenta Interpolate 아이디어를 알고리즘으로:</b> 두 멜로디를 8분음표 격자로 정렬한 뒤,
+    음높이 윤곽을 조성(C장조)에 맞춰 섞습니다. <b>모델 다운로드·인터넷 없이 오프라인</b>에서 동작합니다.
+    결과 ABC는 <b>ABC↔MIDI 변환기</b>로 .mid 내보내거나 <b>악보 연구소</b>에서 다듬을 수 있어요.
+  </div>
+
+  <div class="card">
+    <h2>&#9834; 두 멜로디 입력 (ABC)</h2>
+    <div class="twocol">
+      <div>
+        <label class="fld">멜로디 A</label>
+        <textarea id="abcA" spellcheck="false" placeholder="시작 멜로디의 ABC"></textarea>
+      </div>
+      <div>
+        <label class="fld">멜로디 B</label>
+        <textarea id="abcB" spellcheck="false" placeholder="도착 멜로디의 ABC"></textarea>
+      </div>
+    </div>
+    <div class="row">
+      <button id="btnSample" class="alt sm">샘플 A·B 넣기</button>
+      <span style="flex:1"></span>
+      <div class="modes">
+        <button class="modechip on" id="mMorph" data-m="morph">Morph (조합)</button>
+        <button class="modechip" id="mBridge" data-m="bridge">Bridge (전환)</button>
+      </div>
+    </div>
+    <p class="modedesc" id="modeDesc"></p>
+    <div class="row" id="morphOpts">
+      <label class="opt">단계 수
+        <select id="optSteps"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select>
+      </label>
+      <label class="opt"><input type="checkbox" id="optEnds" checked> 양끝(A·B) 포함</label>
+    </div>
+    <div class="row" id="bridgeOpts" style="display:none">
+      <label class="opt">연결 마디
+        <select id="optBars"><option selected>1</option><option>2</option></select>
+      </label>
+    </div>
+    <div class="row">
+      <span style="flex:1"></span>
+      <button id="btnGo">&#8734; 생성</button>
+    </div>
+  </div>
+
+  <div id="results"></div>
+  <p id="topNote" class="note"></p>
+
+</main>
+<footer>Broguard Music Lab &middot; Interpolate (BETA) &middot; Built with Claude</footer>
+
+<script id="interp-core">
+/* Interp — 두 멜로디 보간(Morph)·전환(Bridge) 코어 (자체 구현, 오프라인/테스트 가능) */
+var Interp = (function () {
+  'use strict';
+var PPQ = 480;                                   // 4분음표당 틱
+  var NOTE_BASE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  var SHARP_ORDER = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+  var FLAT_ORDER = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+  var MAJOR_ACC = { 'C':0,'G':1,'D':2,'A':3,'E':4,'B':5,'F#':6,'C#':7,'F':-1,'BB':-2,'EB':-3,'AB':-4,'DB':-5,'GB':-6,'CB':-7 };
+  var MINOR_ACC = { 'A':0,'E':1,'B':2,'F#':3,'C#':4,'G#':5,'D#':6,'A#':7,'D':-1,'G':-2,'C':-3,'F':-4,'BB':-5,'EB':-6,'AB':-7 };
+
+  /* ============ ABC 파싱 ============ */
+  function parseKey(str) {
+    var out = { name: (str || '').trim() || 'C', map: {} };
+    var s = out.name;
+    if (!s || /^none$/i.test(s)) return out;
+    var m = s.match(/^([A-Ga-g])\s*([#b♯♭]?)\s*([A-Za-z]*)/);
+    if (!m) return out;
+    var accCh = (m[2] === '#' || m[2] === '♯') ? '#' : ((m[2] === 'b' || m[2] === '♭') ? 'B' : '');
+    var tonic = m[1].toUpperCase() + accCh;
+    var mode = (m[3] || '').toLowerCase();
+    var minor = /^(m|min|minor|aeo|aeolian)/.test(mode) && !/^maj/.test(mode);
+    var count = (minor ? MINOR_ACC : MAJOR_ACC)[tonic];
+    if (count === undefined) count = 0;
+    var i;
+    if (count > 0) for (i = 0; i < count; i++) out.map[SHARP_ORDER[i]] = 1;
+    else for (i = 0; i < -count; i++) out.map[FLAT_ORDER[i]] = -1;
+    return out;
+  }
+
+  function parseFraction(s) {
+    var m = /^(\d+)\s*\/\s*(\d+)/.exec(s || '');
+    if (!m) return /^\s*(C\|?)\s*$/.test(s || '') ? 1 : null;
+    return parseInt(m[1], 10) / parseInt(m[2], 10);
+  }
+
+  function parseTempo(s) {
+    if (!s) return 120;
+    var m = /=\s*(\d+)/.exec(s);
+    if (m) return parseInt(m[1], 10);
+    m = /(\d+)/.exec(s);
+    return m ? parseInt(m[1], 10) : 120;
+  }
+
+  function readDuration(str, pos) {
+    var num = null, den = 1, slashes = 0;
+    var m = /^(\d+)/.exec(str.slice(pos));
+    if (m) { num = parseInt(m[1], 10); pos += m[1].length; }
+    while (str[pos] === '/') { slashes++; pos++; }
+    if (slashes) {
+      m = /^(\d+)/.exec(str.slice(pos));
+      if (m && slashes === 1) { den = parseInt(m[1], 10); pos += m[1].length; }
+      else den = Math.pow(2, slashes);
+    }
+    return { dur: (num === null ? 1 : num) / den, pos: pos };
+  }
+
+  function readNote(line, pos, key, measureAcc) {
+    var m = /^(\^{1,2}|_{1,2}|=)?([A-Ga-g])([,']*)/.exec(line.slice(pos));
+    if (!m) return null;
+    pos += m[0].length;
+    var accStr = m[1] || null, letter = m[2], marks = m[3] || '';
+    var upper = letter.toUpperCase();
+    var octave = 4 + (letter === letter.toLowerCase() ? 1 : 0);
+    for (var i = 0; i < marks.length; i++) octave += marks[i] === "'" ? 1 : -1;
+    var accKey = upper + octave, alter;
+    if (accStr === '=') { alter = 0; measureAcc[accKey] = 0; }
+    else if (accStr) { alter = (accStr[0] === '^' ? 1 : -1) * accStr.length; measureAcc[accKey] = alter; }
+    else if (accKey in measureAcc) alter = measureAcc[accKey];
+    else alter = key.map[upper] || 0;
+    var midi = 12 * (octave + 1) + NOTE_BASE[upper] + alter;
+    var d = readDuration(line, pos);
+    return { midi: midi, dur: d.dur, pos: d.pos };
+  }
+
+  function applyBroken(line, pos, dur, pending) {
+    if (pending !== null && pending !== undefined) { dur *= pending; pending = null; }
+    if (line[pos] === '>') { dur *= 1.5; pending = 0.5; pos++; while (line[pos] === '>') pos++; }
+    else if (line[pos] === '<') { dur *= 0.5; pending = 1.5; pos++; while (line[pos] === '<') pos++; }
+    return { pos: pos, dur: dur, next: pending };
+  }
+
+  function sameMidis(a, b) {
+    if (a.length !== b.length) return false;
+    var x = a.slice().sort(), y = b.slice().sort();
+    for (var i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+    return true;
+  }
+
+  function pushNote(events, midis, dur, tie) {
+    var j = events.length - 1;
+    while (j >= 0 && events[j].type === 'bar') j--;      // 붙임줄은 마디선을 건너뛰어 병합(MIDI엔 마디 없음)
+    var prev = j >= 0 ? events[j] : null;
+    if (prev && prev.type === 'note' && prev.tie && sameMidis(prev.midis, midis)) {
+      prev.dur += dur; prev.tie = tie; return;
+    }
+    events.push({ type: 'note', midis: midis.slice().sort(function (a, b) { return a - b; }), dur: dur, tie: !!tie });
+  }
+
+  function parseABC(text) {
+    var song = { title: '', meter: '4/4', unit: null, tempoBpm: 120, key: parseKey('C'), voices: {}, voiceOrder: [] };
+    var lines = String(text || '').replace(/\r/g, '').split('\n');
+    var bodyStarted = false, curVoice = null;
+    function voice(id) { if (!song.voices[id]) { song.voices[id] = { id: id, events: [] }; song.voiceOrder.push(id); } return song.voices[id]; }
+
+    for (var li = 0; li < lines.length; li++) {
+      var line = lines[li];
+      if (/^\s*%/.test(line)) continue;
+      var hm = line.match(/^([A-Za-z]):\s?(.*)$/);
+      if (hm && !/^\[/.test(line)) {
+        var f = hm[1], v = hm[2];
+        if (f === 'w' || f === 'W') continue;
+        if (f === 'T') { if (!song.title) song.title = v.trim(); continue; }
+        if (f === 'M') { song.meter = v.trim() || '4/4'; continue; }
+        if (f === 'L') { song.unit = parseFraction(v.trim()); continue; }
+        if (f === 'Q') { song.tempoBpm = parseTempo(v.trim()); continue; }
+        if (f === 'K') { song.key = parseKey(v); bodyStarted = true; continue; }
+        if (f === 'V') { curVoice = voice((v.trim().split(/\s+/)[0] || '1')).id; continue; }
+        continue;
+      }
+      if (!bodyStarted) continue;
+      parseBodyLine(line, song, function (id) { curVoice = voice(id).id; }, function () { return curVoice === null ? voice('1').id : curVoice; });
+    }
+    if (song.unit === null) { var mf = parseFraction(song.meter); song.unit = (mf !== null && mf < 0.75) ? 1 / 16 : 1 / 8; }
+    return song;
+  }
+
+  function parseBodyLine(line, song, setVoice, getVoice) {
+    var pos = 0, len = line.length, brokenNext = null, tuplet = null, measureAcc = {};
+    function curEvents() { return song.voices[getVoice()].events; }
+    function pushBar() { measureAcc = {}; var evs = curEvents(); if (evs.length && evs[evs.length - 1].type !== 'bar') evs.push({ type: 'bar' }); }
+
+    while (pos < len) {
+      var ch = line[pos], rest = line.slice(pos), m;
+      if (ch === ' ' || ch === '\t' || ch === '\\') { pos++; continue; }
+      if ((m = rest.match(/^\[V:\s*([^\]\s]+)\s*\]/))) { setVoice(m[1]); pos += m[0].length; continue; }
+      if ((m = rest.match(/^\[([KMLQ]):([^\]]*)\]/))) {
+        if (m[1] === 'K') song.key = parseKey(m[2]);
+        else if (m[1] === 'L') song.unit = parseFraction(m[2]) || song.unit;
+        else if (m[1] === 'M') song.meter = m[2].trim() || song.meter;
+        else if (m[1] === 'Q') song.tempoBpm = parseTempo(m[2]);
+        pos += m[0].length; continue;
+      }
+      if ((m = rest.match(/^"([^"]*)"/))) { pos += m[0].length; continue; }        // 코드 심볼 무시
+      if ((m = rest.match(/^![^!]*!/)) || (m = rest.match(/^\+[^+]*\+/))) { pos += m[0].length; continue; }
+      if ((m = rest.match(/^\{[^}]*\}/))) { pos += m[0].length; continue; }
+      if ((m = rest.match(/^\((\d)(?::(\d))?(?::(\d))?/))) {
+        var p = parseInt(m[1], 10);
+        var q = m[2] ? parseInt(m[2], 10) : (p === 2 ? 3 : p === 3 ? 2 : p === 4 ? 3 : p === 6 ? 2 : 2);
+        var r = m[3] ? parseInt(m[3], 10) : p;
+        tuplet = { factor: q / p, remain: r }; pos += m[0].length; continue;
+      }
+      if ((m = rest.match(/^(\|\]|\[\||\|\||:\|+|\|:|::|\|)/))) { pushBar(); pos += m[0].length; continue; }
+      if ((m = rest.match(/^\[(\d)/))) { pos += m[0].length; continue; }
+      if (ch === '(' || ch === ')') { pos++; continue; }
+
+      if (ch === '[') {                                                            // 화음
+        var chordNotes = [], innerMax = 0; pos++;
+        while (pos < len && line[pos] !== ']') {
+          if (line[pos] === ' ') { pos++; continue; }
+          var n = readNote(line, pos, song.key, measureAcc);
+          if (!n) { pos++; continue; }
+          chordNotes.push(n); if (n.dur > innerMax) innerMax = n.dur; pos = n.pos;
+        }
+        if (line[pos] === ']') pos++;
+        var d = readDuration(line, pos); pos = d.pos;
+        var cd = (innerMax || 1) * d.dur;
+        var br = applyBroken(line, pos, cd, brokenNext); pos = br.pos; cd = br.dur; brokenNext = br.next;
+        if (tuplet) { cd *= tuplet.factor; if (--tuplet.remain <= 0) tuplet = null; }
+        var t1 = line[pos] === '-'; if (t1) pos++;
+        if (chordNotes.length) pushNote(curEvents(), chordNotes.map(function (x) { return x.midi; }), cd, t1);
+        continue;
+      }
+      if (/^[zxZX]/.test(ch)) {                                                     // 쉼표
+        pos++; var rd = readDuration(line, pos); pos = rd.pos; var rdur = rd.dur;
+        if (ch === 'Z' || ch === 'X') rdur *= (parseFraction(song.meter) / song.unit) || 8;
+        if (tuplet) { rdur *= tuplet.factor; if (--tuplet.remain <= 0) tuplet = null; }
+        curEvents().push({ type: 'rest', dur: rdur });
+        continue;
+      }
+      var note = readNote(line, pos, song.key, measureAcc);
+      if (note) {
+        pos = note.pos; var nd = note.dur;
+        var br2 = applyBroken(line, pos, nd, brokenNext); pos = br2.pos; nd = br2.dur; brokenNext = br2.next;
+        if (tuplet) { nd *= tuplet.factor; if (--tuplet.remain <= 0) tuplet = null; }
+        var t2 = line[pos] === '-'; if (t2) pos++;
+        pushNote(curEvents(), [note.midi], nd, t2);
+        continue;
+      }
+      pos++;
+    }
+  }
+
+  var SHARP_ABC = ['C', '^C', 'D', '^D', 'E', 'F', '^F', 'G', '^G', 'A', '^A', 'B'];
+  function midiToAbcNote(m) {
+    var pc = ((m % 12) + 12) % 12, name = SHARP_ABC[pc];
+    var letter = name.slice(-1), acc = name.length > 1 ? name[0] : '';
+    // 옥타브: 60~71 대문자, 72~ 소문자+', 48~59 대문자+',' ...
+    var out;
+    if (m >= 60 && m < 72) out = letter;
+    else if (m >= 72) { out = letter.toLowerCase(); var up = Math.floor((m - 72) / 12); for (var i = 0; i < up; i++) out += "'"; }
+    else { out = letter; var dn = Math.floor((59 - m) / 12) + 1; for (var j = 0; j < dn; j++) out += ','; }
+    return acc + out;
+  }
+  function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { var t = b; b = a % b; a = t; } return a || 1; }
+  function durToAbc(units) {
+    // units = L 단위 개수 (예: 2, 0.5, 1.5)
+    var num = Math.round(units * 4), den = 4, g = gcd(num, den); num /= g; den /= g;
+    if (num === 1 && den === 1) return '';
+    if (den === 1) return String(num);
+    if (num === 1) return '/' + (den === 2 ? '' : den);
+    return num + '/' + den;
+  }
+
+  
+  /* ============ 다이어토닉(C장조) 공간 ============ */
+  var SCALE_PC = [0, 2, 4, 5, 7, 9, 11];
+  var DIA = [];
+  for (var _m = 48; _m <= 84; _m++) if (SCALE_PC.indexOf(_m % 12) >= 0) DIA.push(_m);
+  var DIA_IDX = {}; DIA.forEach(function (m, i) { DIA_IDX[m] = i; });
+  function nearestDiaIdx(midi) {
+    if (midi in DIA_IDX) return DIA_IDX[midi];
+    var best = 0, bd = 999;
+    for (var i = 0; i < DIA.length; i++) { var d = Math.abs(DIA[i] - midi); if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+  function clampIdx(i) { return Math.max(0, Math.min(DIA.length - 1, Math.round(i))); }
+
+  /* ============ ABC → 스텝(8분음표 격자) 펼치기 ============ */
+  function flattenToSteps(abc, gridQ) {
+    var song = parseABC(abc);
+    var vid = null, bestAvg = -1;                    // 평균 음높이 높은 보이스=멜로디
+    song.voiceOrder.forEach(function (id) {
+      var evs = song.voices[id].events, sum = 0, n = 0;
+      evs.forEach(function (e) { if (e.type === 'note' && e.midis.length) { sum += e.midis[e.midis.length - 1]; n++; } });
+      var avg = n ? sum / n : -1; if (avg > bestAvg) { bestAvg = avg; vid = id; }
+    });
+    vid = vid || song.voiceOrder[0] || '1';
+    var evs = (song.voices[vid] || { events: [] }).events;
+    var Lq = (song.unit || 1 / 8) * 4;
+    var steps = [];
+    evs.forEach(function (e) {
+      if (e.type === 'bar') return;
+      var nSteps = Math.max(1, Math.round((e.dur * Lq) / gridQ));
+      var pitch = (e.type === 'note' && e.midis.length) ? e.midis[e.midis.length - 1] : null;
+      for (var i = 0; i < nSteps; i++) steps.push(pitch);
+    });
+    return { steps: steps, key: song.key, meter: song.meter, title: song.title, tempoBpm: song.tempoBpm };
+  }
+
+  function resample(a, len) {
+    if (a.length === len) return a.slice();
+    if (a.length === 0) { var z = []; for (var i = 0; i < len; i++) z.push(null); return z; }
+    var out = [];
+    for (var j = 0; j < len; j++) out.push(a[Math.min(a.length - 1, Math.round(j * (a.length - 1) / Math.max(1, len - 1)))]);
+    return out;
+  }
+  function firstPitch(a) { for (var i = 0; i < a.length; i++) if (a[i] !== null) return a[i]; return null; }
+  function lastPitch(a) { for (var i = a.length - 1; i >= 0; i--) if (a[i] !== null) return a[i]; return null; }
+
+  /* ============ 스텝 → ABC ============ */
+  function stepsToAbc(steps, meter, keyName, title) {
+    var mm = /(\d+)\s*\/\s*(\d+)/.exec(meter || '4/4'), num = mm ? +mm[1] : 4, den = mm ? +mm[2] : 4;
+    var measureSteps = Math.max(1, Math.round((num * (4 / den)) / 0.5));   // 마디당 8분음표 수
+    var runs = [], i = 0;
+    while (i < steps.length) { var p = steps[i], c = 1; while (i + c < steps.length && steps[i + c] === p) c++; runs.push({ p: p, c: c }); i += c; }
+    var body = '', pos = 0;
+    runs.forEach(function (r) {
+      var remain = r.c, st = pos;
+      while (remain > 0) {
+        var nextBar = (Math.floor(st / measureSteps) + 1) * measureSteps;
+        var seg = Math.min(remain, nextBar - st), crosses = seg < remain;
+        if (r.p === null) body += 'z' + durToAbc(seg) + ' ';
+        else body += midiToAbcNote(r.p) + durToAbc(seg) + (crosses ? '-' : '') + ' ';
+        st += seg; remain -= seg; pos = st;
+        if (pos % measureSteps === 0) body += '| ';
+      }
+    });
+    return 'X:1\nT:' + (title || 'interp') + '\nM:' + num + '/' + den + '\nL:1/8\nK:' + (keyName || 'C') + '\n' +
+           body.replace(/\|\s*$/, '').trim() + ' |]';
+  }
+
+  /* ============ Morph: A↔B 사이 단계별 멜로디 ============ */
+  function morph(abcA, abcB, opts) {
+    opts = opts || {};
+    var A = flattenToSteps(abcA, 0.5), B = flattenToSteps(abcB, 0.5);
+    var L = Math.max(A.steps.length, B.steps.length, 1);
+    var as = resample(A.steps, L), bs = resample(B.steps, L);
+    var N = Math.max(1, Math.min(8, opts.steps || 3));
+    var includeEnds = opts.includeEnds !== false;
+    var ts = [];
+    for (var k = 1; k <= N; k++) ts.push(k / (N + 1));
+    if (includeEnds) { ts.unshift(0); ts.push(1); }
+    var results = ts.map(function (t) {
+      var out = [];
+      for (var i = 0; i < L; i++) {
+        var pa = as[i], pb = bs[i], pitch;
+        if (pa !== null && pb !== null) pitch = DIA[clampIdx(nearestDiaIdx(pa) * (1 - t) + nearestDiaIdx(pb) * t)];
+        else if (pa !== null) pitch = (t < 0.5) ? pa : null;
+        else if (pb !== null) pitch = (t >= 0.5) ? pb : null;
+        else pitch = null;
+        out.push(pitch);
+      }
+      return { t: t, steps: out, abc: stepsToAbc(out, A.meter, 'C', 'morph ' + Math.round(t * 100) + '%') };
+    });
+    return { results: results, len: L, meter: A.meter };
+  }
+
+  /* ============ Bridge: A 끝 → B 시작 연결 마디 ============ */
+  function bridge(abcA, abcB, opts) {
+    opts = opts || {};
+    var A = flattenToSteps(abcA, 0.5), B = flattenToSteps(abcB, 0.5);
+    var aEnd = lastPitch(A.steps), bStart = firstPitch(B.steps);
+    if (aEnd === null) aEnd = 60; if (bStart === null) bStart = 60;
+    var bars = Math.max(1, Math.min(2, opts.bars || 1));
+    var mm = /(\d+)\s*\/\s*(\d+)/.exec(A.meter || '4/4'), num = mm ? +mm[1] : 4, den = mm ? +mm[2] : 4;
+    var measureSteps = Math.max(1, Math.round((num * (4 / den)) / 0.5));
+    var total = measureSteps * bars;
+    var ia = nearestDiaIdx(aEnd), ib = nearestDiaIdx(bStart), bridgeSteps = [];
+    for (var s = 0; s < total; s++) {
+      var frac = (s + 1) / (total + 1);              // aEnd에서 bStart 직전까지 성부진행
+      bridgeSteps.push(DIA[clampIdx(ia * (1 - frac) + ib * frac)]);
+    }
+    var stitched = A.steps.concat(bridgeSteps).concat(B.steps);
+    return {
+      bridgeAbc: stepsToAbc(bridgeSteps, A.meter, 'C', 'bridge (' + bars + '마디)'),
+      stitchedAbc: stepsToAbc(stitched, A.meter, 'C', 'A + bridge + B'),
+      aEnd: aEnd, bStart: bStart, steps: bridgeSteps, bars: bars
+    };
+  }
+
+  return { parseABC: parseABC, flattenToSteps: flattenToSteps, resample: resample,
+           nearestDiaIdx: nearestDiaIdx, DIA: DIA, stepsToAbc: stepsToAbc, morph: morph, bridge: bridge };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = Interp;
+if (typeof window !== 'undefined') window.Interp = Interp;
+</script>
+
+<script>
+/* ===================== UI ===================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var abcA = $('abcA'), abcB = $('abcB'), results = $('results');
+  var mode = 'morph';
+
+  var SAMPLE_A = ['X:1', 'T:멜로디 A (상승)', 'M:4/4', 'L:1/8', 'K:C', 'C2 D2 E2 F2 | G2 A2 G2 E2 |'].join('\n');
+  var SAMPLE_B = ['X:1', 'T:멜로디 B (하강)', 'M:4/4', 'L:1/8', 'K:C', 'g2 e2 c2 e2 | d2 c2 C4 |'].join('\n');
+
+  var DESC = {
+    morph: '<b>Morph</b>: A와 B "사이"의 중간 멜로디들을 단계별로 만듭니다 (A → 섞임 → B). 두 멜로디를 조합할 때.',
+    bridge: '<b>Bridge</b>: A의 끝 음에서 B의 첫 음으로 자연스럽게 잇는 <b>연결 마디</b>를 만들고, A+연결+B를 이어붙입니다. 곡을 전환할 때.'
+  };
+
+  function setMode(m) {
+    mode = m;
+    $('mMorph').classList.toggle('on', m === 'morph');
+    $('mBridge').classList.toggle('on', m === 'bridge');
+    $('morphOpts').style.display = m === 'morph' ? '' : 'none';
+    $('bridgeOpts').style.display = m === 'bridge' ? '' : 'none';
+    $('modeDesc').innerHTML = DESC[m];
+  }
+
+  function renderPreview(box, text) {
+    if (typeof ABCJS === 'undefined' || !text) return;
+    try { ABCJS.renderAbc(box, text, { responsive: 'resize', staffwidth: 840 }); } catch (e) {}
+  }
+
+  function block(title, small, abc, stitched) {
+    var wrap = document.createElement('div');
+    wrap.className = 'resultblock' + (stitched ? ' stitched' : '');
+    wrap.innerHTML =
+      '<div class="rb-head"><div class="rb-title">' + title + (small ? ' <small>' + small + '</small>' : '') + '</div>' +
+      '<div><button class="alt sm rb-copy">복사</button></div></div>' +
+      '<div class="preview"></div>' +
+      '<textarea readonly spellcheck="false"></textarea>';
+    var ta = wrap.querySelector('textarea'); ta.value = abc;
+    renderPreview(wrap.querySelector('.preview'), abc);
+    wrap.querySelector('.rb-copy').addEventListener('click', function () {
+      var self = this;
+      function done() { self.textContent = '복사됨 ✓'; setTimeout(function () { self.textContent = '복사'; }, 1200); }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(abc).then(done, fb); else fb();
+      function fb() { ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} }
+    });
+    return wrap;
+  }
+
+  function generate() {
+    var a = abcA.value.trim(), b = abcB.value.trim();
+    results.innerHTML = '';
+    if (!a || !b) { $('topNote').innerHTML = '<span class="err">멜로디 A와 B를 모두 입력하세요.</span>'; return; }
+    try {
+      if (mode === 'morph') {
+        var out = Interp.morph(a, b, { steps: parseInt($('optSteps').value, 10) || 3, includeEnds: $('optEnds').checked });
+        out.results.forEach(function (r) {
+          var pct = Math.round(r.t * 100);
+          var title = r.t === 0 ? 'A (0%)' : r.t === 1 ? 'B (100%)' : pct + '%';
+          results.appendChild(block('&#9834; ' + title, r.t === 0 || r.t === 1 ? '원곡' : 'A와 B 섞음', r.abc));
+        });
+        $('topNote').textContent = 'Morph 완료 · 총 ' + out.results.length + '개 · 격자 ' + out.len + '스텝(8분음표)';
+      } else {
+        var br = Interp.bridge(a, b, { bars: parseInt($('optBars').value, 10) || 1 });
+        results.appendChild(block('&#8594; 브릿지', br.bars + '마디 연결', br.bridgeAbc));
+        results.appendChild(block('&#9835; A + 브릿지 + B', '이어붙인 전체', br.stitchedAbc, true));
+        $('topNote').textContent = 'Bridge 완료 · A 끝음 ' + br.aEnd + ' → B 첫음 ' + br.bStart + ' 를 ' + br.bars + '마디로 연결';
+      }
+    } catch (e) {
+      $('topNote').innerHTML = '<span class="err">생성 실패: ' + e.message + '</span>';
+    }
+  }
+
+  $('mMorph').addEventListener('click', function () { setMode('morph'); });
+  $('mBridge').addEventListener('click', function () { setMode('bridge'); });
+  $('btnGo').addEventListener('click', generate);
+  $('btnSample').addEventListener('click', function () { abcA.value = SAMPLE_A; abcB.value = SAMPLE_B; generate(); });
+
+  /* abcjs 동적 로드(실패해도 생성은 동작) */
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js';
+  s.onload = function () { if (results.children.length) generate(); };
+  document.head.appendChild(s);
+
+  setMode('morph');
+
+  /* 테스트 훅 */
+  if (/[?&]autotest=1/.test(location.search)) {
+    abcA.value = SAMPLE_A; abcB.value = SAMPLE_B;
+    try {
+      var m = Interp.morph(SAMPLE_A, SAMPLE_B, { steps: 3 });
+      var br = Interp.bridge(SAMPLE_A, SAMPLE_B, { bars: 1 });
+      generate();
+      window.__autotest = { morphCount: m.results.length, hasBridge: !!br.bridgeAbc, ok: true };
+    } catch (e) { window.__autotest = { ok: false, error: e.message }; }
+    window.__autotestDone = true;
+  }
+})();
+</script>
+</body>
+</html>
