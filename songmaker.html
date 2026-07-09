@@ -154,9 +154,29 @@
     </details>
   </div>
 
+  <div class="card" id="mvCard" style="display:none">
+    <h2>&#9316; 뮤직비디오 (3단계 · 커버 + 가라오케 자막)</h2>
+    <p class="sub">분위기 색으로 <b>커버 이미지</b>를 그리고, 반주에 맞춰 <b>가사를 한 줄씩</b> 보여줍니다. (가사를 먼저 만들어 두면 그 가사로, 없으면 초안으로.)</p>
+    <div class="row" style="margin-top:0">
+      <button id="btnMv">&#127916; 뮤직비디오 만들기</button>
+      <button id="btnMvPlay" class="alt" disabled>&#9654; 가라오케 재생</button>
+      <button id="btnMvStop" class="alt" disabled>&#9632; 정지</button>
+      <button id="btnSaveCover" class="alt" disabled>&#128190; 커버 PNG 저장</button>
+      <span id="mvStatus" class="note" style="margin:0"></span>
+    </div>
+    <div id="stage" style="display:none; margin-top:12px; position:relative; border-radius:12px; overflow:hidden; border:1px solid var(--line)">
+      <canvas id="cover" width="800" height="450" style="width:100%; display:block"></canvas>
+      <div id="karaoke" style="position:absolute; left:0; right:0; bottom:0; padding:18px 16px; text-align:center; background:linear-gradient(transparent, rgba(0,0,0,.55)); color:#fff">
+        <div id="kLine" style="font-size:1.5rem; font-weight:800; text-shadow:0 2px 8px rgba(0,0,0,.6); min-height:1.6em"></div>
+        <div id="kNext" style="font-size:.95rem; opacity:.8; margin-top:4px; min-height:1.2em"></div>
+      </div>
+      <div id="kTitle" style="position:absolute; left:16px; top:14px; color:#fff; font-weight:800; font-size:1.2rem; text-shadow:0 2px 8px rgba(0,0,0,.5)"></div>
+    </div>
+    <midi-player id="mvPlayer" sound-font style="display:none"></midi-player>
+  </div>
+
   <div class="flow">
-    <b>다음 단계 예고:</b> 가사 음절을 음표에 맞춰 <b>가라오케 자막</b>으로 흐르게 하고, 분위기 색으로 <b>커버 이미지</b>를 자동 생성합니다.
-    그 다음 <b>4단계</b>에서 보컬(노래 목소리)을 얹습니다.
+    <b>다음 단계 예고(4단계):</b> 여기에 <b>보컬(노래 목소리)</b>을 얹으면 완성입니다 — 로컬 오픈소스 모델 또는 ElevenLabs 같은 서비스로.
   </div>
 
 </main>
@@ -1010,12 +1030,74 @@ if (typeof module !== 'undefined' && module.exports) module.exports = MidiCore;
 if (typeof window !== 'undefined') window.MidiCore = MidiCore;
 </script>
 
+<script id="stage3">
+/* Stage3 — 가라오케 가사 타임라인 + 커버 이미지 스펙 (자체·오프라인·테스트 가능) */
+var Stage3 = (function () {
+  'use strict';
+  function rng(seed) { var s = (seed >>> 0) || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  function norm(s) { return String(s || '').toLowerCase().replace(/\s+/g, ''); }
+
+  // 설계도(plan) + 가사블록([{name,text}]) → 시간표: 각 줄의 startSec/endSec
+  function buildKaraoke(plan, blocks) {
+    var tempo = plan.tempo || 100;
+    var secPerBar = 4 * (60 / tempo); // 4/4
+    blocks = blocks || [];
+    var used = new Array(blocks.length).fill(false);
+    function pick(name) {
+      var i;
+      for (i = 0; i < blocks.length; i++) if (!used[i] && norm(blocks[i].name) === norm(name)) { used[i] = true; return blocks[i]; }
+      for (i = 0; i < blocks.length; i++) if (!used[i]) { used[i] = true; return blocks[i]; }
+      return null;
+    }
+    var lines = [], t = 0;
+    plan.sections.forEach(function (sec) {
+      var seclen = sec.bars * secPerBar;
+      var blk = pick(sec.name);
+      var secLines = blk ? blk.text.split('\n').map(function (x) { return x.trim(); }).filter(Boolean) : [];
+      if (!secLines.length) secLines = ['(' + sec.name + ')'];
+      var per = seclen / secLines.length;
+      secLines.forEach(function (ln, i) {
+        lines.push({ section: sec.name, text: ln, startSec: round2(t + i * per), endSec: round2(t + (i + 1) * per) });
+      });
+      t += seclen;
+    });
+    return { totalSec: round2(t), lines: lines, tempo: tempo };
+  }
+  function round2(x) { return Math.round(x * 100) / 100; }
+  function lineAt(karaoke, sec) {
+    var L = karaoke.lines;
+    for (var i = 0; i < L.length; i++) if (sec >= L[i].startSec && sec < L[i].endSec) return i;
+    return sec >= karaoke.totalSec ? L.length - 1 : -1;
+  }
+
+  var MOOD_COLORS = {
+    bright:  ['#ffd66b', '#ff9f68', '#c97b4f'],
+    sad:     ['#6b7aa1', '#3d4a6b', '#232c46'],
+    excited: ['#ff7a6b', '#ffa63d', '#ffd93d'],
+    calm:    ['#9fd8cb', '#6fb3a8', '#3f7a70']
+  };
+  function coverSpec(plan) {
+    var rnd = rng((plan.seed || 1) + 99);
+    var c = MOOD_COLORS[plan.moodKey] || MOOD_COLORS.bright;
+    var n = 5 + Math.floor((plan.energy || 0.5) * 6);
+    var shapes = [];
+    for (var i = 0; i < n; i++) shapes.push({ x: rnd(), y: rnd(), r: 0.06 + rnd() * 0.26, c: c[i % c.length] });
+    return { bg: [c[0], c[c.length - 1]], accent: c[1], shapes: shapes,
+             title: plan.title || '무제', sub: (plan.genre || '') + ' · ' + (plan.mood || ''),
+             dark: plan.moodKey === 'sad' };
+  }
+  return { buildKaraoke: buildKaraoke, lineAt: lineAt, coverSpec: coverSpec, MOOD_COLORS: MOOD_COLORS };
+})();
+if (typeof module !== 'undefined') module.exports = Stage3;
+
+</script>
+
 <script>
 /* ===================== UI ===================== */
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var mood = 'bright', plan = null;
+  var mood = 'bright', plan = null, curLyrics = null;
 
   /* 분위기 칩 · 장르 옵션 채우기 */
   var moodBox = $('moods');
@@ -1033,7 +1115,7 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
   function energyColor(e) { return e >= 0.8 ? 'var(--e2)' : e >= 0.55 ? 'var(--e1)' : 'var(--e0)'; }
 
   function renderPlan(p) {
-    $('planCard').style.display = ''; $('lyricCard').style.display = ''; $('arrCard').style.display = '';
+    $('planCard').style.display = ''; $('lyricCard').style.display = ''; $('arrCard').style.display = ''; $('mvCard').style.display = '';
     var sum = $('summary'); sum.innerHTML = '';
     [['제목', p.title], ['분위기', p.mood], ['장르', p.genre], ['조성', p.key], ['템포', p.tempo + ' BPM'],
      ['박자', p.meter], ['드럼', p.drumStyle], ['구성', p.sections.length + '섹션 · ' + p.totalBars + '마디'],
@@ -1063,6 +1145,7 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
   });
 
   function renderLyrics(blocks, src) {
+    curLyrics = blocks;
     var box = $('lyrics'); box.innerHTML = '';
     blocks.forEach(function (b) {
       var d = document.createElement('div'); d.className = 'lyric-sec';
@@ -1178,6 +1261,97 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
   $('btnToLab').addEventListener('click', function () {
     try { localStorage.setItem('broguard_lab_abc', $('arrAbc').value); } catch (e) {}
     window.open('lab.html', '_blank');
+  });
+
+  /* ---------- 3단계: 뮤직비디오(커버 + 가라오케) ---------- */
+  var karaoke = null, mvUrl = null, rafId = null;
+
+  function drawCover(spec) {
+    var cv = $('cover'), ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+    var g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, spec.bg[0]); g.addColorStop(1, spec.bg[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    spec.shapes.forEach(function (s) {
+      ctx.globalAlpha = 0.28; ctx.fillStyle = s.c;
+      ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r * Math.min(W, H), 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    // 살짝 어둡게(자막 가독성)
+    var vg = ctx.createLinearGradient(0, H * 0.5, 0, H);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.35)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+    $('kTitle').textContent = spec.title;
+  }
+
+  function buildMv() {
+    if (!plan) { $('mvStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
+    // 커버
+    drawCover(Stage3.coverSpec(plan));
+    // 가사(있으면 그걸로, 없으면 초안)
+    var blocks = (curLyrics && curLyrics.length) ? curLyrics : SongCore.draftLyrics(plan);
+    karaoke = Stage3.buildKaraoke(plan, blocks);
+    $('kLine').textContent = karaoke.lines[0] ? karaoke.lines[0].text : '';
+    $('kNext').textContent = karaoke.lines[1] ? karaoke.lines[1].text : '';
+    // 반주 MIDI 준비(없으면 생성)
+    try {
+      var out = buildArrangement();
+      var blob = new Blob([out.bytes], { type: 'audio/midi' });
+      if (mvUrl) URL.revokeObjectURL(mvUrl);
+      mvUrl = URL.createObjectURL(blob);
+      var el = $('mvPlayer'); el.setAttribute('src', mvUrl); try { el.src = mvUrl; } catch (e) {}
+    } catch (e) { $('mvStatus').innerHTML = '<span class="err">반주 생성 실패: ' + e.message + '</span>'; return; }
+    $('stage').style.display = '';
+    $('btnMvPlay').disabled = false; $('btnSaveCover').disabled = false;
+    var ready = !!(window.customElements && customElements.get('midi-player'));
+    $('mvStatus').innerHTML = ready
+      ? '<span class="ok">✓ 준비 완료 · ▶ 가라오케 재생을 누르세요 (' + karaoke.lines.length + '줄 · 약 ' + Math.round(karaoke.totalSec) + '초)</span>'
+      : '<span class="ok">✓ 커버·가사 준비됨</span> <span class="err">(재생기는 인터넷 연결 시 · 커버 저장은 항상 가능)</span>';
+  }
+
+  function highlight(sec) {
+    var i = Stage3.lineAt(karaoke, sec);
+    if (i < 0) return;
+    $('kLine').textContent = karaoke.lines[i].text;
+    $('kNext').textContent = karaoke.lines[i + 1] ? karaoke.lines[i + 1].text : '';
+  }
+  function loop() {
+    var p = $('mvPlayer');
+    var t = (p && typeof p.currentTime === 'number') ? p.currentTime : 0;
+    highlight(t);
+    rafId = requestAnimationFrame(loop);
+  }
+  function stopMv() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    var p = $('mvPlayer'); try { if (p && p.stop) p.stop(); } catch (e) {}
+    $('btnMvStop').disabled = true;
+  }
+
+  $('btnMv').addEventListener('click', buildMv);
+  $('btnMvPlay').addEventListener('click', function () {
+    if (!karaoke) return;
+    var p = $('mvPlayer');
+    if (!(window.customElements && customElements.get('midi-player')) || !p || !p.start) {
+      $('mvStatus').innerHTML = '<span class="err">재생기를 불러오지 못했습니다(오프라인). 커버·가사는 보이고, .mid는 반주 카드에서 저장할 수 있어요.</span>'; return;
+    }
+    try { p.currentTime = 0; } catch (e) {}
+    try { p.start(); } catch (e) {}
+    $('btnMvStop').disabled = false;
+    if (rafId) cancelAnimationFrame(rafId); loop();
+  });
+  $('btnMvStop').addEventListener('click', stopMv);
+  $('btnSaveCover').addEventListener('click', function () {
+    var cv = $('cover');
+    // 커버에 제목을 구워서 저장
+    var ctx = cv.getContext('2d');
+    ctx.save(); ctx.fillStyle = '#fff'; ctx.font = '800 34px "Apple SD Gothic Neo", sans-serif';
+    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 8;
+    ctx.fillText(plan.title || '무제', 24, 52); ctx.restore();
+    cv.toBlob(function (blob) {
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = (plan.title || 'cover').replace(/[\\/:*?"<>|]/g, '_') + '.png';
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
+    });
   });
 })();
 </script>

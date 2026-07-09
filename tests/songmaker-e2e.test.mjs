@@ -95,6 +95,34 @@ await check('.mid 저장 버튼이 표준 MIDI 파일을 내려준다', async ()
   assert.ok(bytes.length > 500, '실제 곡 크기: ' + bytes.length);
 });
 
+await check('뮤직비디오 만들기 → 커버 그려지고 가사 첫 줄이 표시된다', async () => {
+  // 가사 붙여넣어 두면 그 가사로
+  await page.fill('#lyricPaste', '[벌스]\n거울 속 흰머리 하나 늘어도\n[코러스]\n어깨 펴고 화이팅');
+  await page.click('#btnApplyLyric');
+  await page.click('#btnMv');
+  await page.waitForFunction(() => document.getElementById('stage').style.display !== 'none', undefined, { timeout: 8000 });
+  // 커버 캔버스가 비어있지 않다(픽셀 존재)
+  const painted = await page.evaluate(() => {
+    const cv = document.getElementById('cover');
+    const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+    let nonzero = 0; for (let i = 0; i < d.length; i += 400) if (d[i] || d[i + 1] || d[i + 2]) nonzero++;
+    return nonzero;
+  });
+  assert.ok(painted > 50, '커버가 실제로 그려짐: ' + painted);
+  const kline = await page.textContent('#kLine');
+  assert.ok(kline.trim().length > 0, '가라오케 첫 줄 표시: ' + kline);
+  assert.equal(await page.textContent('#kTitle'), '여름밤의 약속');
+});
+
+await check('커버 PNG 저장 버튼이 이미지를 내려준다', async () => {
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 5000 }),
+    page.click('#btnSaveCover'),
+  ]);
+  const bytes = readFileSync(await download.path());
+  assert.equal(bytes.slice(1, 4).toString(), 'PNG', 'PNG 시그니처');
+});
+
 await check('심각한 JS 오류가 없다', async () => {
   assert.deepEqual(errors, []);
 });
