@@ -102,18 +102,28 @@
 
   <div class="card" id="lyricCard" style="display:none">
     <h2>&#9314; 가사</h2>
+    <p class="sub" style="margin-bottom:8px"><b>설치 없이:</b> ① <b>프롬프트 복사</b> → 클로드/다른 AI에 붙여 가사 받기 → ② 아래에 <b>붙여넣고 적용</b>. &nbsp;(섹션은 <code>[벌스] [코러스]</code>처럼 표시하면 예쁘게 나뉩니다.)</p>
     <div class="row" style="margin-top:0">
-      <button id="btnLyric">&#9997;&#65039; 가사 만들기</button>
+      <button id="btnCopyPrompt">&#128203; 가사 프롬프트 복사</button>
+      <button id="btnDraft" class="alt">&#9998; 오프라인 초안 넣기</button>
+      <button id="btnLyric" class="alt">&#129302; 로컬 AI 자동(Ollama)</button>
       <span id="lyricStatus" class="note" style="margin:0"></span>
+    </div>
+    <label class="fld" style="margin-top:12px">가사 붙여넣기
+      <textarea id="lyricPaste" placeholder="여기에 가사를 붙여넣고 '적용'을 누르세요.&#10;예:&#10;[벌스]&#10;바닷가 그 여름을 떠올리면&#10;[코러스]&#10;너와 나의 약속을 노래해"></textarea>
+    </label>
+    <div class="row" style="margin-top:8px">
+      <button id="btnApplyLyric">&#10003; 붙여넣은 가사 적용</button>
     </div>
     <div id="lyrics" style="margin-top:12px"></div>
     <details>
-      <summary>⚙️ 로컬 AI(가사) 설정 — Ollama</summary>
-      <p class="note">내 PC에 <b>Ollama</b>가 있으면 더 좋은 가사를 만듭니다(무료·오프라인). 없으면 자동으로 간단 초안으로 대체합니다.<br>
-        설치: <code>ollama run qwen2.5</code> 실행 후 아래 모델명 확인. (기본 주소 <code>http://localhost:11434</code>)</p>
+      <summary>⚙️ 로컬 AI(가사) 자동 설정 — Ollama (선택)</summary>
+      <p class="note">설치 없이 쓰려면 위의 <b>프롬프트 복사</b>를 쓰세요. 로컬 자동화를 원하면 <b>Ollama</b>를 켜세요(무료·오프라인).<br>
+        1) <b>ollama.com</b> 설치 → <code>ollama run exaone3.5</code> (한국어 우수) 또는 <code>qwen2.5</code><br>
+        2) 브라우저 접근 허용: 환경변수 <code>OLLAMA_ORIGINS=*</code> 설정 후 재시작 · 이 페이지는 <b>로컬 서버로 열기</b>(더블클릭 file:// 은 막힘)</p>
       <div class="row">
         <label class="fld grow">Ollama 주소 <input type="text" id="ollamaUrl" value="http://localhost:11434"></label>
-        <label class="fld grow">모델명 <input type="text" id="ollamaModel" value="qwen2.5"></label>
+        <label class="fld grow">모델명 <input type="text" id="ollamaModel" value="exaone3.5"></label>
       </div>
     </details>
   </div>
@@ -314,6 +324,31 @@ if (typeof module !== 'undefined') module.exports = SongCore;
     });
     $('lyricStatus').innerHTML = src;
   }
+
+  /* ① 프롬프트 복사 — 클로드/다른 AI에 붙여넣어 가사 받기 (설치 불필요) */
+  $('btnCopyPrompt').addEventListener('click', function () {
+    if (!plan) { $('lyricStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
+    var prompt = SongCore.buildLyricPrompt(plan);
+    var self = this;
+    function done() { self.innerHTML = '✓ 복사됨 — AI에 붙여넣으세요'; setTimeout(function () { self.innerHTML = '&#128203; 가사 프롬프트 복사'; }, 1800); }
+    if (navigator.clipboard) navigator.clipboard.writeText(prompt).then(done, fb); else fb();
+    function fb() { var t = $('lyricPaste'); t.value = prompt; t.select(); try { document.execCommand('copy'); done(); } catch (e) {} t.value = ''; }
+  });
+
+  /* ② 붙여넣은 가사 적용 */
+  $('btnApplyLyric').addEventListener('click', function () {
+    var txt = $('lyricPaste').value.trim();
+    if (!txt) { $('lyricStatus').innerHTML = '<span class="err">붙여넣을 가사를 입력하세요.</span>'; return; }
+    var blocks = SongCore.parseLyricText(txt);
+    if (!blocks.length) blocks = [{ name: '가사', text: txt }];
+    renderLyrics(blocks, '<span class="ok">✓ 붙여넣은 가사를 적용했습니다.</span>');
+  });
+
+  /* 오프라인 초안 바로 넣기 */
+  $('btnDraft').addEventListener('click', function () {
+    if (!plan) { $('lyricStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
+    renderLyrics(SongCore.draftLyrics(plan), '<span class="ok">✓ 오프라인 초안을 넣었습니다.</span> 더 좋은 가사는 프롬프트 복사 → AI로.');
+  });
 
   $('btnLyric').addEventListener('click', function () {
     if (!plan) { $('lyricStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
