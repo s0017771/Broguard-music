@@ -138,7 +138,8 @@ await check('가사+스타일 복사 → 송 생성 AI용 브리프가 클립보
   await page.click('#btnCopyBrief');
   const clip = await page.evaluate(() => navigator.clipboard.readText());
   assert.ok(clip.includes('[Style]') && clip.includes('[Lyrics]'), '스타일·가사 섹션');
-  assert.ok(/BPM/.test(clip) && /Korean vocal/.test(clip), '스타일 태그');
+  assert.ok(/BPM/.test(clip) && /korean vocal/i.test(clip), '스타일 태그');
+  assert.ok(!/[가-힣]/.test(clip.split('\n')[0]), '[Style] 줄은 영어(한글 없음)');
   assert.ok(clip.includes('[Verse]') || clip.includes('[Chorus]'), '영어 섹션 태그');
 });
 
