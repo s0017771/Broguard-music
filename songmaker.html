@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>송메이커 (1단계: 곡 설계 + 가사) — 브로가드 뮤직 랩</title>
+<style>
+  :root {
+    --ink: #1c2b3a; --ink-soft: #46586b;
+    --paper: #faf8f2; --card: #ffffff; --line: #ddd6c8;
+    --brass: #b08a2e; --brass-deep: #8f6e1f; --warn: #a33c2e; --ok: #2f7d5b;
+    --e0: #cdd7df; --e1: #e7c56b; --e2: #c97b4f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Segoe UI', sans-serif;
+    background: var(--paper); color: var(--ink); min-height: 100vh; display: flex; flex-direction: column; }
+  header { position: relative; background: var(--ink); color: #f3efe4; padding: 26px 22px 22px; overflow: hidden; }
+  .staff-lines { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 11px; opacity: .2; pointer-events: none; }
+  .staff-lines span { display: block; height: 1px; background: #f3efe4; }
+  header h1 { position: relative; font-size: 1.3rem; font-weight: 800; letter-spacing: .04em; }
+  header h1 .clef { color: var(--brass); font-size: 1.6rem; vertical-align: -3px; margin-right: 9px; }
+  header p { position: relative; margin-top: 5px; font-size: .8rem; color: #c9c2b0; }
+  header a.home { position: absolute; right: 16px; top: 16px; color: #c9c2b0; font-size: .78rem; text-decoration: none; z-index: 1; }
+  main { flex: 1; max-width: 920px; width: 100%; margin: 0 auto; padding: 18px 14px 50px; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .card h2 { font-size: .95rem; font-weight: 800; color: var(--brass-deep); margin-bottom: 8px; letter-spacing: .02em; }
+  .flow { padding: 12px 14px; background: var(--card); border: 1px dashed var(--line); border-radius: 12px; font-size: .78rem; color: var(--ink-soft); line-height: 1.7; }
+  .flow b { color: var(--brass-deep); }
+  label.fld { font-size: .76rem; color: var(--ink-soft); display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+  input[type=text], select, textarea { font: inherit; font-size: .86rem; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fffdf7; color: var(--ink); width: 100%; }
+  textarea { min-height: 90px; resize: vertical; font-family: 'D2Coding', Consolas, monospace; line-height: 1.6; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 10px; }
+  .grow { flex: 1; min-width: 160px; }
+  button { font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; background: var(--ink); color: #f3efe4; border: 0; border-radius: 9px; padding: 9px 16px; }
+  button.alt { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .45; cursor: default; }
+  .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+  .chip { font-size: .8rem; font-weight: 700; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line); background: #fffdf7; color: var(--ink-soft); cursor: pointer; }
+  .chip.on { background: var(--brass); border-color: var(--brass); color: #fff; }
+  .summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .pill { font-size: .78rem; font-weight: 700; padding: 5px 11px; border-radius: 8px; background: #f2ecdd; color: var(--brass-deep); }
+  .sections { display: flex; flex-direction: column; gap: 8px; }
+  .sec { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; }
+  .sec .nm { font-weight: 800; min-width: 74px; }
+  .sec .ch { font-family: 'D2Coding', Consolas, monospace; font-size: .84rem; color: var(--ink-soft); flex: 1; }
+  .sec .bars { font-size: .74rem; color: var(--ink-soft); }
+  .ebar { width: 70px; height: 8px; border-radius: 4px; background: #eee5d2; overflow: hidden; }
+  .ebar > i { display: block; height: 100%; }
+  .note { font-size: .76rem; color: var(--ink-soft); margin-top: 8px; line-height: 1.6; }
+  .err { color: var(--warn); font-weight: 700; }
+  .ok { color: var(--ok); font-weight: 700; }
+  .lyric-sec { margin-bottom: 10px; }
+  .lyric-sec h3 { font-size: .82rem; color: var(--brass-deep); margin-bottom: 3px; }
+  .lyric-sec p { font-size: .9rem; line-height: 1.7; white-space: pre-wrap; }
+  details { margin-top: 8px; } summary { cursor: pointer; font-size: .8rem; color: var(--brass-deep); font-weight: 700; }
+  footer { text-align: center; padding: 14px; font-size: .72rem; color: #b6ae9c; }
+</style>
+</head>
+<body>
+<header>
+  <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
+  <a class="home" href="index.html">&larr; 랩 홈</a>
+  <h1><span class="clef">&#127908;</span>송메이커 <small style="font-size:.7rem;color:var(--brass);">1단계 · 곡 설계 + 가사</small></h1>
+  <p>주제·분위기·장르 → 곡 설계도(조성·템포·섹션·코드) + 가사. 반주·커버·가사싱크는 다음 단계.</p>
+</header>
+<main>
+
+  <div class="flow">
+    <b>&#127925; 지금 단계:</b> "어떤 노래를 만들지" <b>설계도</b>를 먼저 짭니다 — 분위기에 맞는 조성·템포와
+    인트로/벌스/코러스 같은 <b>구성</b>, 섹션별 <b>코드 진행</b>. 그 위에 <b>가사</b>를 붙입니다(로컬 AI 또는 오프라인 초안).
+    <br>다음 단계에서 이 설계도로 <b>실제 반주 오디오</b>와 <b>가사 싱크</b>를 만듭니다.
+  </div>
+
+  <div class="card">
+    <h2>&#9312; 무엇을, 어떤 느낌으로</h2>
+    <div class="row">
+      <label class="fld grow">제목 <input type="text" id="title" placeholder="예: 여름밤의 약속"></label>
+      <label class="fld grow">주제 / 소재 (가사 재료) <input type="text" id="theme" placeholder="예: 바닷가, 첫사랑, 그리움"></label>
+    </div>
+    <div class="row">
+      <div class="fld"><span>분위기</span>
+        <div class="chips" id="moods"></div>
+      </div>
+      <label class="fld">장르 <select id="genre"></select></label>
+      <label class="fld">길이 <select id="length">
+        <option value="short">짧게</option>
+        <option value="full" selected>보통</option>
+      </select></label>
+      <label class="fld">시드 <input type="text" id="seed" placeholder="비우면 무작위" style="width:100px"></label>
+      <span style="flex:1"></span>
+      <button id="btnPlan">&#127899;&#65039; 곡 설계하기</button>
+    </div>
+  </div>
+
+  <div class="card" id="planCard" style="display:none">
+    <h2>&#9313; 곡 설계도</h2>
+    <div class="summary" id="summary"></div>
+    <div class="sections" id="sections"></div>
+    <p class="note" id="planNote"></p>
+  </div>
+
+  <div class="card" id="lyricCard" style="display:none">
+    <h2>&#9314; 가사</h2>
+    <div class="row" style="margin-top:0">
+      <button id="btnLyric">&#9997;&#65039; 가사 만들기</button>
+      <span id="lyricStatus" class="note" style="margin:0"></span>
+    </div>
+    <div id="lyrics" style="margin-top:12px"></div>
+    <details>
+      <summary>⚙️ 로컬 AI(가사) 설정 — Ollama</summary>
+      <p class="note">내 PC에 <b>Ollama</b>가 있으면 더 좋은 가사를 만듭니다(무료·오프라인). 없으면 자동으로 간단 초안으로 대체합니다.<br>
+        설치: <code>ollama run qwen2.5</code> 실행 후 아래 모델명 확인. (기본 주소 <code>http://localhost:11434</code>)</p>
+      <div class="row">
+        <label class="fld grow">Ollama 주소 <input type="text" id="ollamaUrl" value="http://localhost:11434"></label>
+        <label class="fld grow">모델명 <input type="text" id="ollamaModel" value="qwen2.5"></label>
+      </div>
+    </details>
+  </div>
+
+  <div class="flow">
+    <b>다음 단계 예고:</b> 이 설계도의 섹션별 코드로 <b>멜로디(Melody Maker) → 베이스 → 드럼 → MIDI → 오디오</b>를 만들고,
+    가사 음절을 음표에 맞춰 <b>가라오케 자막</b>으로 흐르게 합니다. 커버 이미지도 분위기 색으로 자동 생성합니다.
+  </div>
+
+</main>
+<footer>Broguard Music Lab &middot; 송메이커 1단계 &middot; 곡 설계 엔진(SongCore) + 로컬 AI 가사</footer>
+
+<script id="songcore">
+/* SongCore — 곡 설계도 엔진 (자체 규칙, 오프라인/테스트 가능) */
+var SongCore = (function () {
+  'use strict';
+  var GENRES = {
+    pop:    { label: '팝',     tempo: [96, 118],  drum: '팝',              form: ['인트로', '벌스', '프리코러스', '코러스', '벌스', '프리코러스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    ballad: { label: '발라드', tempo: [64, 80],   drum: '발라드',          form: ['인트로', '벌스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    dance:  { label: '댄스',   tempo: [120, 130], drum: '포 온 더 플로어', form: ['인트로', '벌스', '프리코러스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    rock:   { label: '록',     tempo: [112, 138], drum: '기본 록',         form: ['인트로', '벌스', '코러스', '벌스', '코러스', '솔로', '코러스', '아웃트로'] },
+    trot:   { label: '트로트', tempo: [100, 126], drum: '팝',              form: ['인트로', '벌스', '코러스', '벌스', '코러스', '간주', '코러스', '아웃트로'] }
+  };
+  var MOODS = {
+    bright:  { label: '밝음', minor: false, energy: 0.7,  tempoAdj: 6 },
+    sad:     { label: '슬픔', minor: true,  energy: 0.35, tempoAdj: -10 },
+    excited: { label: '신남', minor: false, energy: 0.9,  tempoAdj: 12 },
+    calm:    { label: '잔잔', minor: false, energy: 0.3,  tempoAdj: -8 }
+  };
+  var PROG_MAJOR = {
+    '인트로': ['C', 'G', 'Am', 'F'], '벌스': ['C', 'G', 'Am', 'F'], '프리코러스': ['F', 'G', 'Em', 'Am'],
+    '코러스': ['C', 'G', 'Am', 'F'], '브릿지': ['Am', 'F', 'C', 'G'], '솔로': ['C', 'G', 'Am', 'F'],
+    '간주': ['C', 'G', 'Am', 'F'], '아웃트로': ['F', 'C', 'G', 'C']
+  };
+  var PROG_MINOR = {
+    '인트로': ['Am', 'F', 'C', 'G'], '벌스': ['Am', 'F', 'C', 'G'], '프리코러스': ['Dm', 'G', 'C', 'Am'],
+    '코러스': ['Am', 'F', 'C', 'G'], '브릿지': ['F', 'G', 'Am', 'Am'], '솔로': ['Am', 'F', 'C', 'G'],
+    '간주': ['Am', 'F', 'C', 'G'], '아웃트로': ['Dm', 'Am', 'E', 'Am']
+  };
+  var SECTION_BARS = { '인트로': 4, '벌스': 8, '프리코러스': 4, '코러스': 8, '브릿지': 8, '솔로': 8, '간주': 4, '아웃트로': 4 };
+  var SECTION_ENERGY = { '인트로': 0.4, '벌스': 0.5, '프리코러스': 0.7, '코러스': 1.0, '브릿지': 0.6, '솔로': 0.85, '간주': 0.6, '아웃트로': 0.3 };
+
+  function rng(seed) { var s = (seed >>> 0) || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+
+  function shortenForm(form) {
+    var seenVerse = 0, seenChorus = 0, out = [];
+    for (var i = 0; i < form.length; i++) {
+      var n = form[i];
+      if (n === '벌스') { seenVerse++; if (seenVerse > 1) continue; }
+      if (n === '코러스') { seenChorus++; if (seenChorus > 2) continue; }
+      if (n === '프리코러스' && seenVerse > 1) continue;
+      out.push(n);
+    }
+    return out;
+  }
+
+  function planSong(opts) {
+    opts = opts || {};
+    var genreKey = GENRES[opts.genre] ? opts.genre : 'pop';
+    var moodKey = MOODS[opts.mood] ? opts.mood : 'bright';
+    var g = GENRES[genreKey], m = MOODS[moodKey];
+    var seed = (opts.seed != null && opts.seed !== '') ? (parseInt(opts.seed, 10) || 1) : 12345;
+    var rnd = rng(seed);
+    var tempo = Math.round(g.tempo[0] + rnd() * (g.tempo[1] - g.tempo[0]) + m.tempoAdj);
+    tempo = Math.max(50, Math.min(160, tempo));
+    var prog = m.minor ? PROG_MINOR : PROG_MAJOR;
+    var form = g.form.slice();
+    if (opts.length === 'short') form = shortenForm(form);
+    var sections = form.map(function (name) {
+      return {
+        name: name,
+        bars: SECTION_BARS[name] || 8,
+        chords: (prog[name] || prog['벌스']).slice(),
+        energy: SECTION_ENERGY[name] != null ? SECTION_ENERGY[name] : 0.5
+      };
+    });
+    var totalBars = sections.reduce(function (a, s) { return a + s.bars; }, 0);
+    var estSec = Math.round(totalBars * 4 * (60 / tempo)); // 4/4 기준
+    return {
+      title: opts.title || '무제', theme: opts.theme || '',
+      genre: g.label, genreKey: genreKey, mood: m.label, moodKey: moodKey,
+      key: m.minor ? 'Am(단조)' : 'C(장조)', minor: m.minor, tempo: tempo, meter: '4/4',
+      drumStyle: g.drum, energy: m.energy, seed: seed,
+      sections: sections, totalBars: totalBars, estSec: estSec
+    };
+  }
+
+  /* 오프라인 가사 초안 — 로컬 LLM이 없을 때의 자리표시(간단) */
+  function draftLyrics(plan) {
+    var theme = (plan.theme || plan.title || '우리 이야기').trim();
+    var kw = theme.split(/[\s,·]+/).filter(Boolean);
+    var word = kw[0] || theme;
+    var moodLine = { 밝음: '햇살처럼 웃어요', 슬픔: '조용히 눈을 감아요', 신남: '함께 뛰어올라요', 잔잔: '천천히 숨을 쉬어요' }[plan.mood] || '나란히 걸어가요';
+    var out = [];
+    plan.sections.forEach(function (s) {
+      var lines;
+      if (s.name === '코러스') lines = [word + ', ' + moodLine, '이 순간을 노래해요'];
+      else if (s.name === '벌스') lines = [word + '을(를) 떠올리면', '마음이 이렇게 물들어요'];
+      else if (s.name === '브릿지') lines = ['잠시 멈춰 서서', '우리를 바라봐요'];
+      else lines = ['(' + s.name + ')'];
+      out.push({ name: s.name, text: lines.join('\n') });
+    });
+    return out;
+  }
+
+  function buildLyricPrompt(plan) {
+    var structure = plan.sections.map(function (s) { return s.name; }).join(' → ');
+    return [
+      '너는 한국어 작사가야. 아래 조건으로 노래 가사를 써줘.',
+      '제목: ' + plan.title,
+      '주제/소재: ' + (plan.theme || plan.title),
+      '분위기: ' + plan.mood + ', 장르: ' + plan.genre + ', 템포: ' + plan.tempo + 'BPM',
+      '곡 구성: ' + structure,
+      '규칙: 각 섹션 제목을 대괄호로 표시([벌스],[코러스] 등)하고 그 아래 2~4줄. 코러스는 반복돼도 좋아. 자연스럽고 담백하게.',
+      '가사만 출력해.'
+    ].join('\n');
+  }
+  /* 로컬 LLM(Ollama) 응답을 섹션별로 파싱 */
+  function parseLyricText(text) {
+    var blocks = [], cur = null;
+    text.split('\n').forEach(function (raw) {
+      var line = raw.replace(/\r/, '');
+      var m = line.match(/^\s*[\[\(【]\s*([^\]\)】]+?)\s*[\]\)】]\s*$/);
+      if (m) { if (cur) blocks.push(cur); cur = { name: m[1].trim(), text: '' }; }
+      else if (cur) { cur.text += (cur.text ? '\n' : '') + line.trim(); }
+      else if (line.trim()) { cur = { name: '가사', text: line.trim() }; }
+    });
+    if (cur) blocks.push(cur);
+    blocks.forEach(function (b) { b.text = b.text.replace(/\n{2,}/g, '\n').trim(); });
+    return blocks.filter(function (b) { return b.text; });
+  }
+
+  return { GENRES: GENRES, MOODS: MOODS, planSong: planSong,
+           draftLyrics: draftLyrics, buildLyricPrompt: buildLyricPrompt, parseLyricText: parseLyricText };
+})();
+if (typeof module !== 'undefined') module.exports = SongCore;
+</script>
+
+<script>
+/* ===================== UI ===================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var mood = 'bright', plan = null;
+
+  /* 분위기 칩 · 장르 옵션 채우기 */
+  var moodBox = $('moods');
+  Object.keys(SongCore.MOODS).forEach(function (k, i) {
+    var b = document.createElement('button');
+    b.className = 'chip' + (i === 0 ? ' on' : ''); b.textContent = SongCore.MOODS[k].label; b.dataset.m = k;
+    b.addEventListener('click', function () { mood = k; moodBox.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('on', x === b); }); });
+    moodBox.appendChild(b);
+  });
+  var genreSel = $('genre');
+  Object.keys(SongCore.GENRES).forEach(function (k) {
+    var o = document.createElement('option'); o.value = k; o.textContent = SongCore.GENRES[k].label; genreSel.appendChild(o);
+  });
+
+  function energyColor(e) { return e >= 0.8 ? 'var(--e2)' : e >= 0.55 ? 'var(--e1)' : 'var(--e0)'; }
+
+  function renderPlan(p) {
+    $('planCard').style.display = ''; $('lyricCard').style.display = '';
+    var sum = $('summary'); sum.innerHTML = '';
+    [['제목', p.title], ['분위기', p.mood], ['장르', p.genre], ['조성', p.key], ['템포', p.tempo + ' BPM'],
+     ['박자', p.meter], ['드럼', p.drumStyle], ['구성', p.sections.length + '섹션 · ' + p.totalBars + '마디'],
+     ['예상 길이', '약 ' + p.estSec + '초']].forEach(function (kv) {
+      var el = document.createElement('span'); el.className = 'pill'; el.textContent = kv[0] + ': ' + kv[1]; sum.appendChild(el);
+    });
+    var box = $('sections'); box.innerHTML = '';
+    p.sections.forEach(function (s) {
+      var d = document.createElement('div'); d.className = 'sec';
+      d.innerHTML = '<span class="nm">' + s.name + '</span>' +
+        '<span class="ch">' + s.chords.join(' · ') + '</span>' +
+        '<span class="bars">' + s.bars + '마디</span>' +
+        '<span class="ebar"><i style="width:' + Math.round(s.energy * 100) + '%;background:' + energyColor(s.energy) + '"></i></span>';
+      box.appendChild(d);
+    });
+    $('planNote').textContent = '시드 ' + p.seed + ' · 같은 값이면 같은 설계가 나옵니다. 마음에 들 때까지 다시 눌러보세요.';
+  }
+
+  $('btnPlan').addEventListener('click', function () {
+    plan = SongCore.planSong({
+      title: $('title').value.trim() || '무제', theme: $('theme').value.trim(),
+      mood: mood, genre: genreSel.value, length: $('length').value,
+      seed: $('seed').value.trim() || String(Math.floor(Math.random() * 1e9))
+    });
+    renderPlan(plan);
+    $('lyrics').innerHTML = ''; $('lyricStatus').textContent = '';
+  });
+
+  function renderLyrics(blocks, src) {
+    var box = $('lyrics'); box.innerHTML = '';
+    blocks.forEach(function (b) {
+      var d = document.createElement('div'); d.className = 'lyric-sec';
+      var h = document.createElement('h3'); h.textContent = b.name;
+      var p = document.createElement('p'); p.textContent = b.text;
+      d.appendChild(h); d.appendChild(p); box.appendChild(d);
+    });
+    $('lyricStatus').innerHTML = src;
+  }
+
+  $('btnLyric').addEventListener('click', function () {
+    if (!plan) { $('lyricStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
+    $('btnLyric').disabled = true; $('lyricStatus').textContent = '가사 만드는 중…';
+    var url = $('ollamaUrl').value.trim(), model = $('ollamaModel').value.trim();
+    var prompt = SongCore.buildLyricPrompt(plan);
+    var ctrl = new AbortController(); var to = setTimeout(function () { ctrl.abort(); }, 20000);
+    fetch(url.replace(/\/$/, '') + '/api/generate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+      body: JSON.stringify({ model: model, prompt: prompt, stream: false })
+    }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        clearTimeout(to);
+        var blocks = SongCore.parseLyricText(j.response || '');
+        if (!blocks.length) throw new Error('빈 응답');
+        renderLyrics(blocks, '<span class="ok">✓ 로컬 AI(' + model + ')로 작사했습니다.</span>');
+      })
+      .catch(function (e) {
+        clearTimeout(to);
+        var blocks = SongCore.draftLyrics(plan);
+        renderLyrics(blocks, '<span class="err">로컬 AI 연결 실패(' + e.message + ') → 오프라인 초안으로 대체.</span> Ollama를 켜면 더 좋은 가사가 나옵니다.');
+      })
+      .then(function () { $('btnLyric').disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>
