@@ -146,7 +146,12 @@
     <div class="row">
       <button id="btnSaveMidi" class="alt" disabled>&#8681; .mid 저장</button>
       <button id="btnToDrum" class="alt" disabled>&#129345; 드럼 얹기로</button>
-      <button id="btnToLab" class="alt" disabled>&#127925; 악보 연구소로</button>
+      <button id="btnToLab" class="alt" disabled>&#127925; 연구소로(반주)</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <span style="font-size:.76rem;color:var(--brass-deep);font-weight:700">🎵 멜로디만 (편집용 단선율 · 베이스·드럼 없음):</span>
+      <button id="btnMelodyLab" class="alt" disabled>악보 연구소로</button>
+      <button id="btnMelodyAbc" class="alt" disabled>.abc 저장</button>
     </div>
     <details style="margin-top:6px">
       <summary>🎼 편곡 ABC 보기</summary>
@@ -404,15 +409,17 @@ var Arranger = (function () {
     opts = opts || {};
     var rnd = rng(opts.seed != null ? opts.seed : (plan.seed || 1));
     var lo = 67, hi = 83; // 멜로디 음역 G4~B5
-    var rhBars = [], lhBars = [], prev = 74;
+    var rhBars = [], lhBars = [], melBars = [], prev = 74;
     plan.sections.forEach(function (sec) {
       var dense = sec.energy >= 0.7;
       for (var b = 0; b < sec.bars; b++) {
         var chord = parseChord(sec.chords[b % sec.chords.length]);
         var mel = melodyBar(chord, prev, dense, rnd, lo, hi);
         prev = mel[mel.length - 1].midi;
-        rhBars.push(barToAbc(mel, b === 0 ? sec.name + ' ' + chord.sym : chord.sym));
+        rhBars.push(barToAbc(mel, chord.sym));
         lhBars.push(barToAbc(bassBar(chord), ''));
+        // 멜로디 전용: 섹션 시작에 "^섹션" 텍스트 주석 + 코드 + 음
+        melBars.push((b === 0 ? '"^' + sec.name + '"' : '') + barToAbc(mel, chord.sym));
       }
     });
     function join(bars) {
@@ -421,10 +428,13 @@ var Arranger = (function () {
       return out.trim();
     }
     var tempo = plan.tempo || 100;
-    var abc = 'X:1\nT:' + (plan.title || '무제') + '\nM:4/4\nL:1/8\nQ:1/4=' + tempo + '\nK:C\n' +
+    var head = 'M:4/4\nL:1/8\nQ:1/4=' + tempo + '\nK:C\n';
+    var abc = 'X:1\nT:' + (plan.title || '무제') + '\n' + head +
       '%%score {RH LH}\nV:RH\nV:LH\n' +
       '[V:RH] ' + join(rhBars) + '\n[V:LH] ' + join(lhBars) + '\n';
-    return { abc: abc, bars: rhBars.length, tempo: tempo };
+    // 멜로디만(단선율·편집용): 베이스·드럼 없이 멜로디+코드만
+    var melodyAbc = 'X:1\nT:' + (plan.title || '무제') + ' (멜로디)\n' + head + join(melBars) + ' |]\n';
+    return { abc: abc, melodyAbc: melodyAbc, bars: rhBars.length, tempo: tempo };
   }
   return { parseChord: parseChord, melodyBar: melodyBar, bassBar: bassBar, arrange: arrange, midiToAbc: midiToAbc };
 })();
@@ -1252,13 +1262,14 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   });
 
   /* ---------- 2단계: 반주(멜로디+베이스+드럼) ---------- */
-  var lastMidi = null, curUrl = null;
+  var lastMidi = null, curUrl = null, lastMelodyAbc = '';
   var DRUM_MAP = { '기본 록': 0, '8비트 드라이브': 1, '하프타임': 2, '발라드': 3, '팝': 4, '포 온 더 플로어': 5 };
   function playerReady() { return !!(window.customElements && customElements.get('midi-player')); }
 
   function buildArrangement() {
     var arr = Arranger.arrange(plan, { seed: plan.seed });
     $('arrAbc').value = arr.abc;
+    lastMelodyAbc = arr.melodyAbc;
     var mel = AbcMidi.abcToMidi(arr.abc);                                  // 멜로디+베이스(멀티보이스)
     var drums = MidiCore.makeBasicBeat(mel, { pattern: DRUM_MAP[plan.drumStyle] || 4, tempoBpm: plan.tempo });
     var merged = MidiCore.mergeMidis(mel, drums, { tempoBpm: plan.tempo });
@@ -1277,7 +1288,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
         curUrl = URL.createObjectURL(blob);
         $('playerWrap').style.display = '';
         try { $('player').src = curUrl; } catch (e) {}
-        ['btnSaveMidi', 'btnToDrum', 'btnToLab'].forEach(function (id) { $(id).disabled = false; });
+        ['btnSaveMidi', 'btnToDrum', 'btnToLab', 'btnMelodyLab', 'btnMelodyAbc'].forEach(function (id) { $(id).disabled = false; });
         var msg = '✓ 반주 완성 · ' + out.info.melBars + '마디 · 멜로디+베이스 ' + out.info.melNotes + '음 · 드럼 ' + out.info.drmNotes + '음 · ' + plan.tempo + ' BPM · 드럼 ' + plan.drumStyle;
         $('arrStatus').innerHTML = playerReady()
           ? '<span class="ok">' + msg + '</span>'
@@ -1307,6 +1318,20 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   $('btnToLab').addEventListener('click', function () {
     try { localStorage.setItem('broguard_lab_abc', $('arrAbc').value); } catch (e) {}
     window.open('lab.html', '_blank');
+  });
+  /* 멜로디만(단선율) — 악보 연구소로 / .abc 저장 */
+  $('btnMelodyLab').addEventListener('click', function () {
+    if (!lastMelodyAbc) return;
+    try { localStorage.setItem('broguard_lab_abc', lastMelodyAbc); } catch (e) {}
+    window.open('lab.html', '_blank');
+  });
+  $('btnMelodyAbc').addEventListener('click', function () {
+    if (!lastMelodyAbc) return;
+    var blob = new Blob([lastMelodyAbc], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = (plan.title || 'melody').replace(/[\\/:*?"<>|]/g, '_') + '-melody.abc';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
   });
 
   /* ---------- 3단계: 뮤직비디오(커버 + 가라오케) ---------- */
