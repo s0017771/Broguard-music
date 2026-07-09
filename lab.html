@@ -5,6 +5,392 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ABC 악보 연구소 ver.11</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js"></script>
+<!-- MIDI 불러오기 지원: ABC↔MIDI 엔진 -->
+<script id="abcmidi-core">
+/* AbcMidi — ABC ↔ MIDI(SMF) 변환 코어 (자체 구현, 오프라인/테스트 가능) */
+var AbcMidi = (function () {
+  'use strict';
+  var PPQ = 480;                                   // 4분음표당 틱
+  var NOTE_BASE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  var SHARP_ORDER = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+  var FLAT_ORDER = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+  var MAJOR_ACC = { 'C':0,'G':1,'D':2,'A':3,'E':4,'B':5,'F#':6,'C#':7,'F':-1,'BB':-2,'EB':-3,'AB':-4,'DB':-5,'GB':-6,'CB':-7 };
+  var MINOR_ACC = { 'A':0,'E':1,'B':2,'F#':3,'C#':4,'G#':5,'D#':6,'A#':7,'D':-1,'G':-2,'C':-3,'F':-4,'BB':-5,'EB':-6,'AB':-7 };
+
+  /* ============ ABC 파싱 ============ */
+  function parseKey(str) {
+    var out = { name: (str || '').trim() || 'C', map: {} };
+    var s = out.name;
+    if (!s || /^none$/i.test(s)) return out;
+    var m = s.match(/^([A-Ga-g])\s*([#b♯♭]?)\s*([A-Za-z]*)/);
+    if (!m) return out;
+    var accCh = (m[2] === '#' || m[2] === '♯') ? '#' : ((m[2] === 'b' || m[2] === '♭') ? 'B' : '');
+    var tonic = m[1].toUpperCase() + accCh;
+    var mode = (m[3] || '').toLowerCase();
+    var minor = /^(m|min|minor|aeo|aeolian)/.test(mode) && !/^maj/.test(mode);
+    var count = (minor ? MINOR_ACC : MAJOR_ACC)[tonic];
+    if (count === undefined) count = 0;
+    var i;
+    if (count > 0) for (i = 0; i < count; i++) out.map[SHARP_ORDER[i]] = 1;
+    else for (i = 0; i < -count; i++) out.map[FLAT_ORDER[i]] = -1;
+    return out;
+  }
+
+  function parseFraction(s) {
+    var m = /^(\d+)\s*\/\s*(\d+)/.exec(s || '');
+    if (!m) return /^\s*(C\|?)\s*$/.test(s || '') ? 1 : null;
+    return parseInt(m[1], 10) / parseInt(m[2], 10);
+  }
+
+  function parseTempo(s) {
+    if (!s) return 120;
+    var m = /=\s*(\d+)/.exec(s);
+    if (m) return parseInt(m[1], 10);
+    m = /(\d+)/.exec(s);
+    return m ? parseInt(m[1], 10) : 120;
+  }
+
+  function readDuration(str, pos) {
+    var num = null, den = 1, slashes = 0;
+    var m = /^(\d+)/.exec(str.slice(pos));
+    if (m) { num = parseInt(m[1], 10); pos += m[1].length; }
+    while (str[pos] === '/') { slashes++; pos++; }
+    if (slashes) {
+      m = /^(\d+)/.exec(str.slice(pos));
+      if (m && slashes === 1) { den = parseInt(m[1], 10); pos += m[1].length; }
+      else den = Math.pow(2, slashes);
+    }
+    return { dur: (num === null ? 1 : num) / den, pos: pos };
+  }
+
+  function readNote(line, pos, key, measureAcc) {
+    var m = /^(\^{1,2}|_{1,2}|=)?([A-Ga-g])([,']*)/.exec(line.slice(pos));
+    if (!m) return null;
+    pos += m[0].length;
+    var accStr = m[1] || null, letter = m[2], marks = m[3] || '';
+    var upper = letter.toUpperCase();
+    var octave = 4 + (letter === letter.toLowerCase() ? 1 : 0);
+    for (var i = 0; i < marks.length; i++) octave += marks[i] === "'" ? 1 : -1;
+    var accKey = upper + octave, alter;
+    if (accStr === '=') { alter = 0; measureAcc[accKey] = 0; }
+    else if (accStr) { alter = (accStr[0] === '^' ? 1 : -1) * accStr.length; measureAcc[accKey] = alter; }
+    else if (accKey in measureAcc) alter = measureAcc[accKey];
+    else alter = key.map[upper] || 0;
+    var midi = 12 * (octave + 1) + NOTE_BASE[upper] + alter;
+    var d = readDuration(line, pos);
+    return { midi: midi, dur: d.dur, pos: d.pos };
+  }
+
+  function applyBroken(line, pos, dur, pending) {
+    if (pending !== null && pending !== undefined) { dur *= pending; pending = null; }
+    if (line[pos] === '>') { dur *= 1.5; pending = 0.5; pos++; while (line[pos] === '>') pos++; }
+    else if (line[pos] === '<') { dur *= 0.5; pending = 1.5; pos++; while (line[pos] === '<') pos++; }
+    return { pos: pos, dur: dur, next: pending };
+  }
+
+  function sameMidis(a, b) {
+    if (a.length !== b.length) return false;
+    var x = a.slice().sort(), y = b.slice().sort();
+    for (var i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+    return true;
+  }
+
+  function pushNote(events, midis, dur, tie) {
+    var j = events.length - 1;
+    while (j >= 0 && events[j].type === 'bar') j--;      // 붙임줄은 마디선을 건너뛰어 병합(MIDI엔 마디 없음)
+    var prev = j >= 0 ? events[j] : null;
+    if (prev && prev.type === 'note' && prev.tie && sameMidis(prev.midis, midis)) {
+      prev.dur += dur; prev.tie = tie; return;
+    }
+    events.push({ type: 'note', midis: midis.slice().sort(function (a, b) { return a - b; }), dur: dur, tie: !!tie });
+  }
+
+  function parseABC(text) {
+    var song = { title: '', meter: '4/4', unit: null, tempoBpm: 120, key: parseKey('C'), voices: {}, voiceOrder: [] };
+    var lines = String(text || '').replace(/\r/g, '').split('\n');
+    var bodyStarted = false, curVoice = null;
+    function voice(id) { if (!song.voices[id]) { song.voices[id] = { id: id, events: [] }; song.voiceOrder.push(id); } return song.voices[id]; }
+
+    for (var li = 0; li < lines.length; li++) {
+      var line = lines[li];
+      if (/^\s*%/.test(line)) continue;
+      var hm = line.match(/^([A-Za-z]):\s?(.*)$/);
+      if (hm && !/^\[/.test(line)) {
+        var f = hm[1], v = hm[2];
+        if (f === 'w' || f === 'W') continue;
+        if (f === 'T') { if (!song.title) song.title = v.trim(); continue; }
+        if (f === 'M') { song.meter = v.trim() || '4/4'; continue; }
+        if (f === 'L') { song.unit = parseFraction(v.trim()); continue; }
+        if (f === 'Q') { song.tempoBpm = parseTempo(v.trim()); continue; }
+        if (f === 'K') { song.key = parseKey(v); bodyStarted = true; continue; }
+        if (f === 'V') { curVoice = voice((v.trim().split(/\s+/)[0] || '1')).id; continue; }
+        continue;
+      }
+      if (!bodyStarted) continue;
+      parseBodyLine(line, song, function (id) { curVoice = voice(id).id; }, function () { return curVoice === null ? voice('1').id : curVoice; });
+    }
+    if (song.unit === null) { var mf = parseFraction(song.meter); song.unit = (mf !== null && mf < 0.75) ? 1 / 16 : 1 / 8; }
+    return song;
+  }
+
+  function parseBodyLine(line, song, setVoice, getVoice) {
+    var pos = 0, len = line.length, brokenNext = null, tuplet = null, measureAcc = {};
+    function curEvents() { return song.voices[getVoice()].events; }
+    function pushBar() { measureAcc = {}; var evs = curEvents(); if (evs.length && evs[evs.length - 1].type !== 'bar') evs.push({ type: 'bar' }); }
+
+    while (pos < len) {
+      var ch = line[pos], rest = line.slice(pos), m;
+      if (ch === ' ' || ch === '\t' || ch === '\\') { pos++; continue; }
+      if ((m = rest.match(/^\[V:\s*([^\]\s]+)\s*\]/))) { setVoice(m[1]); pos += m[0].length; continue; }
+      if ((m = rest.match(/^\[([KMLQ]):([^\]]*)\]/))) {
+        if (m[1] === 'K') song.key = parseKey(m[2]);
+        else if (m[1] === 'L') song.unit = parseFraction(m[2]) || song.unit;
+        else if (m[1] === 'M') song.meter = m[2].trim() || song.meter;
+        else if (m[1] === 'Q') song.tempoBpm = parseTempo(m[2]);
+        pos += m[0].length; continue;
+      }
+      if ((m = rest.match(/^"([^"]*)"/))) { pos += m[0].length; continue; }        // 코드 심볼 무시
+      if ((m = rest.match(/^![^!]*!/)) || (m = rest.match(/^\+[^+]*\+/))) { pos += m[0].length; continue; }
+      if ((m = rest.match(/^\{[^}]*\}/))) { pos += m[0].length; continue; }
+      if ((m = rest.match(/^\((\d)(?::(\d))?(?::(\d))?/))) {
+        var p = parseInt(m[1], 10);
+        var q = m[2] ? parseInt(m[2], 10) : (p === 2 ? 3 : p === 3 ? 2 : p === 4 ? 3 : p === 6 ? 2 : 2);
+        var r = m[3] ? parseInt(m[3], 10) : p;
+        tuplet = { factor: q / p, remain: r }; pos += m[0].length; continue;
+      }
+      if ((m = rest.match(/^(\|\]|\[\||\|\||:\|+|\|:|::|\|)/))) { pushBar(); pos += m[0].length; continue; }
+      if ((m = rest.match(/^\[(\d)/))) { pos += m[0].length; continue; }
+      if (ch === '(' || ch === ')') { pos++; continue; }
+
+      if (ch === '[') {                                                            // 화음
+        var chordNotes = [], innerMax = 0; pos++;
+        while (pos < len && line[pos] !== ']') {
+          if (line[pos] === ' ') { pos++; continue; }
+          var n = readNote(line, pos, song.key, measureAcc);
+          if (!n) { pos++; continue; }
+          chordNotes.push(n); if (n.dur > innerMax) innerMax = n.dur; pos = n.pos;
+        }
+        if (line[pos] === ']') pos++;
+        var d = readDuration(line, pos); pos = d.pos;
+        var cd = (innerMax || 1) * d.dur;
+        var br = applyBroken(line, pos, cd, brokenNext); pos = br.pos; cd = br.dur; brokenNext = br.next;
+        if (tuplet) { cd *= tuplet.factor; if (--tuplet.remain <= 0) tuplet = null; }
+        var t1 = line[pos] === '-'; if (t1) pos++;
+        if (chordNotes.length) pushNote(curEvents(), chordNotes.map(function (x) { return x.midi; }), cd, t1);
+        continue;
+      }
+      if (/^[zxZX]/.test(ch)) {                                                     // 쉼표
+        pos++; var rd = readDuration(line, pos); pos = rd.pos; var rdur = rd.dur;
+        if (ch === 'Z' || ch === 'X') rdur *= (parseFraction(song.meter) / song.unit) || 8;
+        if (tuplet) { rdur *= tuplet.factor; if (--tuplet.remain <= 0) tuplet = null; }
+        curEvents().push({ type: 'rest', dur: rdur });
+        continue;
+      }
+      var note = readNote(line, pos, song.key, measureAcc);
+      if (note) {
+        pos = note.pos; var nd = note.dur;
+        var br2 = applyBroken(line, pos, nd, brokenNext); pos = br2.pos; nd = br2.dur; brokenNext = br2.next;
+        if (tuplet) { nd *= tuplet.factor; if (--tuplet.remain <= 0) tuplet = null; }
+        var t2 = line[pos] === '-'; if (t2) pos++;
+        pushNote(curEvents(), [note.midi], nd, t2);
+        continue;
+      }
+      pos++;
+    }
+  }
+
+  /* ============ ABC → MIDI(SMF) ============ */
+  function writeVarLen(v) {
+    var buf = [v & 0x7f]; v >>= 7;
+    while (v > 0) { buf.unshift((v & 0x7f) | 0x80); v >>= 7; }
+    return buf;
+  }
+  function str2bytes(s) { var a = []; for (var i = 0; i < s.length; i++) a.push(s.charCodeAt(i) & 0xff); return a; }
+  function u32(v) { return [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff]; }
+  function u16(v) { return [(v >>> 8) & 0xff, v & 0xff]; }
+
+  function chunk(id, data) { return str2bytes(id).concat(u32(data.length)).concat(data); }
+
+  function abcToMidi(text, opts) {
+    opts = opts || {};
+    var song = parseABC(text);
+    var Lq = (song.unit || 1 / 8) * 4;                 // L-단위 하나의 4분음표 길이
+    var bpm = opts.tempoBpm || song.tempoBpm || 120;
+    var voices = song.voiceOrder.length ? song.voiceOrder : ['1'];
+
+    // 트랙0: 템포/박자
+    var meta = [];
+    var mtr = (/(\d+)\s*\/\s*(\d+)/.exec(song.meter) || [0, 4, 4]);
+    var uspq = Math.round(60000000 / bpm);
+    meta = meta.concat(writeVarLen(0), [0xff, 0x51, 0x03, (uspq >> 16) & 0xff, (uspq >> 8) & 0xff, uspq & 0xff]);
+    var dd = Math.round(Math.log(parseInt(mtr[2], 10)) / Math.log(2));
+    meta = meta.concat(writeVarLen(0), [0xff, 0x58, 0x04, parseInt(mtr[1], 10), dd, 24, 8]);
+    if (song.title) meta = meta.concat(writeVarLen(0), [0xff, 0x03, song.title.length], str2bytes(song.title));
+    meta = meta.concat(writeVarLen(0), [0xff, 0x2f, 0x00]);
+
+    var tracks = [chunk('MTrk', meta)];
+    voices.forEach(function (vid) {
+      var evs = (song.voices[vid] || { events: [] }).events;
+      var abs = [], t = 0;
+      evs.forEach(function (e) {
+        if (e.type === 'bar') return;
+        var durTicks = Math.round(e.dur * Lq * PPQ);
+        if (e.type === 'note') {
+          e.midis.forEach(function (mm) {
+            if (mm >= 0 && mm <= 127) { abs.push({ t: t, on: true, midi: mm }); abs.push({ t: t + durTicks, on: false, midi: mm }); }
+          });
+        }
+        t += durTicks;
+      });
+      abs.sort(function (a, b) { return a.t - b.t || (a.on === b.on ? 0 : a.on ? 1 : -1); }); // off 먼저
+      var trk = [], last = 0;
+      abs.forEach(function (ev) {
+        trk = trk.concat(writeVarLen(ev.t - last));
+        trk.push(ev.on ? 0x90 : 0x80, ev.midi, ev.on ? 80 : 0);
+        last = ev.t;
+      });
+      trk = trk.concat(writeVarLen(0), [0xff, 0x2f, 0x00]);
+      tracks.push(chunk('MTrk', trk));
+    });
+
+    var header = chunk('MThd', u16(1).concat(u16(tracks.length)).concat(u16(PPQ)));
+    var all = header;
+    tracks.forEach(function (tk) { all = all.concat(tk); });
+    return Uint8Array.from(all);
+  }
+
+  /* ============ MIDI(SMF) 파싱 ============ */
+  function parseMidi(bytes) {
+    bytes = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes);
+    var p = 0;
+    function u32r() { var v = (bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3]; p += 4; return v >>> 0; }
+    function u16r() { var v = (bytes[p] << 8) | bytes[p + 1]; p += 2; return v; }
+    if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'MThd') throw new Error('MThd 헤더가 아닙니다 (올바른 MIDI 파일이 아닙니다).');
+    p = 4; u32r(); var format = u16r(); var ntrk = u16r(); var division = u16r();
+    if (division & 0x8000) throw new Error('SMPTE 타임코드 MIDI는 지원하지 않습니다.');
+    var ppq = division || 480;
+    var out = { ppq: ppq, format: format, tempoBpm: 120, timeSig: [4, 4], tracks: [] };
+    for (var ti = 0; ti < ntrk && p < bytes.length; ti++) {
+      if (String.fromCharCode(bytes[p], bytes[p + 1], bytes[p + 2], bytes[p + 3]) !== 'MTrk') break;
+      p += 4; var len = u32r(); var end = p + len, tick = 0, status = 0;
+      var open = {}, notes = [];
+      function varr() { var v = 0, c; do { c = bytes[p++]; v = (v << 7) | (c & 0x7f); } while (c & 0x80); return v; }
+      while (p < end) {
+        tick += varr();
+        var b = bytes[p];
+        if (b === 0xff) { p++; var type = bytes[p++]; var l = varr(); var data = bytes.slice(p, p + l); p += l;
+          if (type === 0x51 && l === 3) out.tempoBpm = Math.round(60000000 / ((data[0] << 16) | (data[1] << 8) | data[2]));
+          else if (type === 0x58 && l >= 2) out.timeSig = [data[0], Math.pow(2, data[1])];
+          continue;
+        }
+        if (b === 0xf0 || b === 0xf7) { p++; var sl = varr(); p += sl; continue; }
+        if (b & 0x80) { status = b; p++; } // 아니면 러닝 스테이터스
+        var hi = status & 0xf0, ch = status & 0x0f;
+        if (hi === 0x90 || hi === 0x80) {
+          var key = bytes[p++], vel = bytes[p++];
+          var id = ch + ':' + key;
+          if (hi === 0x90 && vel > 0) { (open[id] = open[id] || []).push(tick); }
+          else { var st = open[id] && open[id].shift(); if (st !== undefined) notes.push({ midi: key, startTick: st, durTick: tick - st }); }
+        } else if (hi === 0xc0 || hi === 0xd0) { p += 1; }
+        else { p += 2; }
+      }
+      p = end;
+      out.tracks.push({ notes: notes });
+    }
+    return out;
+  }
+
+  /* ============ MIDI → ABC ============ */
+  var SHARP_ABC = ['C', '^C', 'D', '^D', 'E', 'F', '^F', 'G', '^G', 'A', '^A', 'B'];
+  function midiToAbcNote(m) {
+    var pc = ((m % 12) + 12) % 12, name = SHARP_ABC[pc];
+    var letter = name.slice(-1), acc = name.length > 1 ? name[0] : '';
+    // 옥타브: 60~71 대문자, 72~ 소문자+', 48~59 대문자+',' ...
+    var out;
+    if (m >= 60 && m < 72) out = letter;
+    else if (m >= 72) { out = letter.toLowerCase(); var up = Math.floor((m - 72) / 12); for (var i = 0; i < up; i++) out += "'"; }
+    else { out = letter; var dn = Math.floor((59 - m) / 12) + 1; for (var j = 0; j < dn; j++) out += ','; }
+    return acc + out;
+  }
+  function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { var t = b; b = a % b; a = t; } return a || 1; }
+  function durToAbc(units) {
+    // units = L 단위 개수 (예: 2, 0.5, 1.5)
+    var num = Math.round(units * 4), den = 4, g = gcd(num, den); num /= g; den /= g;
+    if (num === 1 && den === 1) return '';
+    if (den === 1) return String(num);
+    if (num === 1) return '/' + (den === 2 ? '' : den);
+    return num + '/' + den;
+  }
+
+  function midiToAbc(bytes, opts) {
+    opts = opts || {};
+    var mid = parseMidi(bytes);
+    var ppq = mid.ppq;
+    var notes = [];
+    mid.tracks.forEach(function (tk) { tk.notes.forEach(function (n) { notes.push(n); }); });
+    if (!notes.length) return { abc: '', error: 'MIDI에 음표가 없습니다.' };
+    notes.sort(function (a, b) { return a.startTick - b.startTick || a.midi - b.midi; });
+
+    var grid = ppq / 4;                                       // 16분음표 그리드
+    var q = function (t) { return Math.max(0, Math.round(t / grid)) * grid; };
+    notes.forEach(function (n) { n.s = q(n.startTick); n.d = Math.max(grid, q(n.durTick)); });
+
+    // L 결정: 모든 s·d가 8분(=ppq/2)의 배수면 L=1/8, 아니면 1/16
+    var eighth = ppq / 2;
+    var needSix = notes.some(function (n) { return (n.s % eighth) !== 0 || (n.d % eighth) !== 0; });
+    var L = needSix ? 1 / 16 : 1 / 8;
+    var Lticks = ppq * (L * 4);                               // L-단위 하나의 틱
+
+    var ts = mid.timeSig, measureTicks = ts[0] * (4 / ts[1]) * ppq;
+
+    // 시작 틱별로 그룹(동시 시작 = 화음)
+    var groups = [], byStart = {};
+    notes.forEach(function (n) { (byStart[n.s] = byStart[n.s] || []).push(n); });
+    Object.keys(byStart).map(Number).sort(function (a, b) { return a - b; }).forEach(function (s) {
+      var g = byStart[s];
+      var dur = Math.max.apply(null, g.map(function (n) { return n.d; }));
+      groups.push({ start: s, dur: dur, midis: g.map(function (n) { return n.midi; }).sort(function (a, b) { return a - b; }) });
+    });
+
+    // 마디 경계에서 분할(붙임줄) + 쉼표 채우기
+    var body = '', cursor = 0, barCount = 0;
+    function emitToken(midis, ticks, tie) {
+      var lenStr = durToAbc(ticks / Lticks);
+      var tok = midis.length === 1 ? midiToAbcNote(midis[0]) + lenStr
+                                   : '[' + midis.map(midiToAbcNote).join('') + ']' + lenStr;
+      return tok + (tie ? '-' : '');
+    }
+    function barAt(t) { return Math.abs(t % measureTicks) < 1e-6; }
+    // 구간(midis=null 이면 쉼표)을 마디 경계마다 쪼개 붙임줄로 이어 출력
+    function emitSpan(midis, start, dur) {
+      var remain = dur, st = start;
+      while (remain > 1e-6) {
+        var nextBar = (Math.floor(st / measureTicks + 1e-9) + 1) * measureTicks;
+        var seg = Math.min(remain, nextBar - st);
+        var crosses = seg < remain - 1e-6;
+        if (midis) body += emitToken(midis, seg, crosses) + ' ';
+        else body += 'z' + durToAbc(seg / Lticks) + ' ';
+        st += seg; remain -= seg; cursor = st;
+        if (barAt(cursor)) { barCount++; body += (barCount % 4 === 0 ? '|\n' : '| '); } // 4마디마다 줄바꿈
+      }
+    }
+
+    groups.forEach(function (g) {
+      if (g.start > cursor + 1e-6) emitSpan(null, cursor, g.start - cursor);   // 쉼표
+      emitSpan(g.midis, g.start, g.dur);                                       // 음/화음
+    });
+
+    var header = 'X:1\nT:' + (opts.title || 'MIDI에서 변환') + '\nM:' + ts[0] + '/' + ts[1] +
+                 '\nL:' + (L === 1 / 16 ? '1/16' : '1/8') + '\nQ:1/4=' + mid.tempoBpm + '\nK:C\n';
+    var bodyClean = body.replace(/\|\s*$/, '').trim();       // 끝의 바 중복 제거
+    return { abc: header + bodyClean + ' |]', tempoBpm: mid.tempoBpm, timeSig: ts, ppq: ppq, L: L, noteCount: notes.length };
+  }
+
+  return { PPQ: PPQ, parseABC: parseABC, abcToMidi: abcToMidi, parseMidi: parseMidi, midiToAbc: midiToAbc };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = AbcMidi;
+if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
+</script>
 <style>
   :root {
     --ink: #1c2b3a; --ink-soft: #46586b;
@@ -125,8 +511,8 @@
           <option value="rhythm">Morning Mist (Rhythm)</option>
           <option value="nocturne">Morning Mist (Nocturne)</option>
         </select>
-        <button id="openBtn" class="btn-ghost btn-icon" type="button">&#128194; 파일 열기</button>
-        <input type="file" id="fileInput" accept=".abc,.txt" hidden>
+        <button id="openBtn" class="btn-ghost btn-icon" type="button">&#128194; 파일 열기 (.abc/.mid)</button>
+        <input type="file" id="fileInput" accept=".abc,.txt,.mid,.midi" hidden>
       </div>
       <textarea id="abcInput" spellcheck="false" aria-label="ABC notation 입력창"></textarea>
       <div class="pal" id="palette" aria-label="빠른 입력 팔레트">
@@ -1921,13 +2307,23 @@
   fileInput.addEventListener("change", function (e) {
     var f = e.target.files && e.target.files[0];
     if (!f) return;
-    f.text().then(function (t) {
+    function loaded(t, extra) {
       stopPlay(); cur = null;
       input.value = t;
       preset.value = "";
       render();
-      setStatus("'" + f.name + "' 파일을 불러왔습니다. '자동 반주 / 재분석'을 누르면 레이어 버튼(멜로디/베이스/코드)이 활성화됩니다.");
-    }).catch(function () { setStatus("파일을 읽을 수 없습니다.", true); });
+      setStatus("'" + f.name + "' 파일을 불러왔습니다." + (extra || "") + " '자동 반주 / 재분석'을 누르면 레이어 버튼(멜로디/베이스/코드)이 활성화됩니다.");
+    }
+    if (/\.midi?$/i.test(f.name || "")) {
+      /* MIDI → ABC 자동 변환 */
+      f.arrayBuffer().then(function (ab) {
+        var res = AbcMidi.midiToAbc(new Uint8Array(ab), { title: f.name.replace(/\.midi?$/i, "") });
+        if (res.error) { setStatus("MIDI를 읽었지만 " + res.error, true); return; }
+        loaded(res.abc, " (MIDI → ABC 변환됨)");
+      }).catch(function (err) { setStatus("MIDI 파일을 읽을 수 없습니다: " + err.message, true); });
+    } else {
+      f.text().then(function (t) { loaded(t); }).catch(function () { setStatus("파일을 읽을 수 없습니다.", true); });
+    }
     fileInput.value = "";
   });
   chordSel.addEventListener("change", function () {
