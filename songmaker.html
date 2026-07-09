@@ -1125,11 +1125,16 @@ var Stage3 = (function () {
   }
   /* ── 4단계: 보컬 브릿지 ── */
   var SEC_EN = { '인트로': 'Intro', '벌스': 'Verse', '프리코러스': 'Pre-Chorus', '코러스': 'Chorus', '브릿지': 'Bridge', '솔로': 'Solo', '간주': 'Interlude', '아웃트로': 'Outro' };
-  // 가사 + 스타일 태그 → 송 생성 엔진(ACE-Step·ElevenLabs·Suno)에 넘길 재료
+  /* 스타일 태그는 영어가 인식이 잘 됨(ACE-Step/Suno 등). 장르·분위기를 영어로 매핑 */
+  var GENRE_EN = { pop: 'pop', ballad: 'ballad', dance: 'dance, EDM', rock: 'rock', trot: 'trot, korean retro pop' };
+  var MOOD_EN = { bright: 'bright, uplifting', sad: 'sad, melancholic', excited: 'energetic, upbeat', calm: 'calm, gentle' };
+  // 가사(한글 그대로) + 영어 스타일 태그 → 송 생성 엔진(ACE-Step·ElevenLabs·Suno)에 넘길 재료
   function buildVocalBrief(plan, blocks) {
+    var g = GENRE_EN[plan.genreKey] || 'pop';
+    var m = MOOD_EN[plan.moodKey] || 'bright';
+    var key = plan.minor ? 'A minor' : 'C major';
     var voice = plan.moodKey === 'sad' ? 'emotional' : (plan.energy >= 0.8 ? 'energetic' : 'warm');
-    var style = ['[Style] genre: ' + plan.genre, 'mood: ' + plan.mood, 'tempo: ' + plan.tempo + ' BPM',
-      'key: ' + plan.key, 'vocal: ' + voice + ' Korean vocal', 'instrumentation: piano, bass, drums'].join(', ');
+    var style = '[Style] ' + [g, m, plan.tempo + ' BPM', key, voice + ' korean vocal', 'piano, bass, drums'].join(', ');
     var lyr = ['[Lyrics]'];
     (blocks || []).forEach(function (b) { lyr.push('[' + (SEC_EN[b.name] || b.name) + ']'); lyr.push(b.text); });
     return style + '\n\n' + lyr.join('\n');
