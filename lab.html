@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ABC 악보 연구소 ver.11</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js"></script>
+<!-- html-midi-player (구글 Magenta 팀 · 무료 · GM 사운드폰트로 자연스러운 재생) -->
+<script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.77,npm/@magenta/music@1.23.0/es6/core.js,npm/focus-visible@5,npm/html-midi-player@1.5.0"></script>
 <!-- MIDI 불러오기 지원: ABC↔MIDI 엔진 -->
 <script id="abcmidi-core">
 /* AbcMidi — ABC ↔ MIDI(SMF) 변환 코어 (자체 구현, 오프라인/테스트 가능) */
@@ -679,12 +681,17 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     <div class="controls">
       <button id="playBtn" class="btn-brass">&#9654; 재생</button>
       <button id="stopBtn" class="btn-ink" disabled>&#9632; 정지</button>
+      <button id="sfPlayBtn" class="btn-ghost" title="무료 GM 사운드폰트로 자연스럽게 재생(인터넷 필요)">&#128266; 좋은 소리로</button>
       <button id="quickEditBtn" class="btn-ghost" disabled title="재생을 정지한 음을 수정">&#9999;&#65039; 이 음 수정</button>
       <button id="arrangeBtn2" class="btn-ink" type="button" title="레이어 버튼 활성화">&#127929; 재분석</button>
       <button id="expandBtn" class="btn-ghost" type="button" title="이 곡을 32마디로 확장 (확장실로 이동)">&#11088; 32마디로 확장 &rarr;</button>
       <button id="saveBtn" class="btn-ghost">.abc 저장</button>
       <button id="transDownBtn" class="btn-ghost" title="반음 내림">&#9837; &minus;1</button>
       <button id="transUpBtn" class="btn-ghost" title="반음 올림">&#9839; +1</button>
+    </div>
+    <div id="sfWrap" style="display:none; margin:8px 0;">
+      <midi-player id="sfPlayer" sound-font style="width:100%; display:block;"></midi-player>
+      <p id="sfNote" style="font-size:.78rem; color:var(--ink-soft, #46586b); margin-top:4px;"></p>
     </div>
     <p id="status" role="status"></p>
     <div id="score"></div>
@@ -2350,6 +2357,27 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   $("transDownBtn").addEventListener("click", function () { transposeBy(-1); });
   playBtn.addEventListener("click", startPlay);
   stopBtn.addEventListener("click", stopPlay);
+  /* 좋은 소리로 재생 — 현재 ABC를 MIDI로 바꿔 GM 사운드폰트 플레이어로 */
+  var sfUrl = null;
+  function sfPlayerReady() { return !!(window.customElements && customElements.get("midi-player")); }
+  $("sfPlayBtn").addEventListener("click", function () {
+    var abc = input.value.trim();
+    if (!abc) { setStatus("먼저 악보를 입력하세요.", true); return; }
+    try { stopPlay(); } catch (e) {}
+    var bytes;
+    try { bytes = AbcMidi.abcToMidi(abc); }
+    catch (e) { setStatus("MIDI 변환 실패: " + e.message, true); return; }
+    var blob = new Blob([bytes], { type: "audio/midi" });
+    if (sfUrl) URL.revokeObjectURL(sfUrl);
+    sfUrl = URL.createObjectURL(blob);
+    $("sfWrap").style.display = "";
+    var el = $("sfPlayer");
+    el.setAttribute("src", sfUrl);
+    try { el.src = sfUrl; } catch (e) {}
+    $("sfNote").innerHTML = sfPlayerReady()
+      ? "▶ 플레이어의 재생 버튼을 누르세요. (드럼·화음 포함 GM 사운드폰트)"
+      : "<span style='color:#a33c2e'>재생기(html-midi-player)를 불러오지 못했습니다 — 인터넷 연결 시 재생됩니다. '재생'(기본음)은 항상 동작합니다.</span>";
+  });
   saveBtn.addEventListener("click", saveAbc);
   genBtn.addEventListener("click", fullGenerate);
   regenMelodyBtn.addEventListener("click", regenMelody);
