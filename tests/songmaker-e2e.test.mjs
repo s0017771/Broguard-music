@@ -95,6 +95,17 @@ await check('.mid 저장 버튼이 표준 MIDI 파일을 내려준다', async ()
   assert.ok(bytes.length > 500, '실제 곡 크기: ' + bytes.length);
 });
 
+await check('멜로디만 .abc 저장 → 베이스·V:LH 없는 단선율 악보', async () => {
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 5000 }),
+    page.click('#btnMelodyAbc'),
+  ]);
+  const abc = readFileSync(await download.path(), 'utf8');
+  assert.ok(abc.includes('(멜로디)'), '멜로디 제목');
+  assert.ok(!/%%score/.test(abc) && !/\[V:LH\]/.test(abc), '멀티보이스 아님(편집 쉬움)');
+  assert.ok(/"\^/.test(abc), '섹션 주석 포함');
+});
+
 await check('뮤직비디오 만들기 → 커버 그려지고 가사 첫 줄이 표시된다', async () => {
   // 가사 붙여넣어 두면 그 가사로
   await page.fill('#lyricPaste', '[벌스]\n거울 속 흰머리 하나 늘어도\n[코러스]\n어깨 펴고 화이팅');
