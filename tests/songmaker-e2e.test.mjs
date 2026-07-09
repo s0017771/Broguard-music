@@ -75,6 +75,26 @@ await check('오프라인 초안 넣기도 동작한다', async () => {
   assert.ok(blocks.length >= 6, '섹션마다 초안');
 });
 
+await check('반주 만들기 → 멜로디+베이스+드럼 MIDI가 생성된다', async () => {
+  await page.click('#btnArrange');
+  await page.waitForFunction(() => /반주 완성/.test(document.getElementById('arrStatus').textContent), undefined, { timeout: 10000 });
+  const st = await page.textContent('#arrStatus');
+  assert.ok(/멜로디\+베이스/.test(st) && /드럼/.test(st), '반주 요약: ' + st);
+  assert.equal(await page.isEnabled('#btnSaveMidi'), true, '.mid 저장 활성화');
+  const abc = await page.inputValue('#arrAbc');
+  assert.ok(abc.includes('[V:RH]') && abc.includes('[V:LH]'), '편곡 ABC(멀티보이스)');
+});
+
+await check('.mid 저장 버튼이 표준 MIDI 파일을 내려준다', async () => {
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 5000 }),
+    page.click('#btnSaveMidi'),
+  ]);
+  const bytes = readFileSync(await download.path());
+  assert.equal(bytes.slice(0, 4).toString(), 'MThd', 'MIDI 헤더');
+  assert.ok(bytes.length > 500, '실제 곡 크기: ' + bytes.length);
+});
+
 await check('심각한 JS 오류가 없다', async () => {
   assert.deepEqual(errors, []);
 });
