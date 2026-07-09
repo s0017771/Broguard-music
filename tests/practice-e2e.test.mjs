@@ -63,6 +63,35 @@ await check('다른 랩 → 연습 핸드오프: broguard_practice_abc를 읽어
   assert.equal(leftover, null, '핸드오프 키 소비됨');
 });
 
+await check('classifyDur: 음 길이(beats)별로 올바른 음표 모양을 고른다', async () => {
+  const r = await page.evaluate(() => {
+    const c = window.__practice.classifyDur;
+    return {
+      whole: c(4), half: c(2), dotHalf: c(3), quarter: c(1),
+      dotQuarter: c(1.5), eighth: c(0.5), sixteenth: c(0.25)
+    };
+  });
+  assert.ok(r.whole.hollow && !r.whole.stem, '온음표=빈 머리·기둥 없음');
+  assert.ok(r.half.hollow && r.half.stem && r.half.flags === 0, '2분음표=빈 머리·기둥');
+  assert.ok(r.dotHalf.dot && r.dotHalf.hollow, '점2분음표=부점');
+  assert.ok(!r.quarter.hollow && r.quarter.stem && r.quarter.flags === 0, '4분음표=채운 머리·기둥');
+  assert.ok(r.dotQuarter.dot && r.dotQuarter.flags === 0, '점4분음표=부점');
+  assert.equal(r.eighth.flags, 1, '8분음표=꼬리 1개');
+  assert.equal(r.sixteenth.flags, 2, '16분음표=꼬리 2개');
+});
+
+await check('레인에 실제 음 길이별 음표 모양이 그려진다', async () => {
+  // 온음표·2분·4분·8분·16분·점4분이 섞인 한 마디들
+  const abc = 'X:1\nT:dur\nM:4/4\nL:1/16\nK:C\n[V:RH] C16 | D8 D8 | E4 E4 E4 E4 | F2 F2 F2 F2 F2 F2 F2 F2 | G6 G2 A4 A4 |';
+  const r = await page.evaluate((a) => window.__practice.renderLaneFor(a), abc);
+  assert.ok(r.notes >= 10, '여러 음표: ' + r.notes);
+  assert.ok(r.open >= 1, '빈 머리(2분·온음표) 최소 1개: ' + r.open);
+  assert.ok(r.flags >= 1, '꼬리(8분·16분) 최소 1개: ' + r.flags);
+  assert.ok(r.dots >= 1, '부점 최소 1개(점4분음표): ' + r.dots);
+  // 온음표는 기둥이 없으므로 stems < notes
+  assert.ok(r.stems < r.notes, '온음표는 기둥 없음(stems ' + r.stems + ' < notes ' + r.notes + ')');
+});
+
 await check('심각한 JS 오류가 없다 (abcjs 미로딩 환경 포함)', async () => {
   assert.deepEqual(errors, []);
 });
