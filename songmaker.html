@@ -175,12 +175,39 @@
     <midi-player id="mvPlayer" sound-font style="display:none"></midi-player>
   </div>
 
+  <div class="card" id="vocalCard" style="display:none">
+    <h2>&#9317; 보컬 (4단계 · 완성 노래 얹기)</h2>
+    <p class="sub">보컬은 외부 <b>송 생성 AI</b>로 만듭니다. 우리 <b>가사+스타일</b>을 넘겨 완성 노래를 받고, 여기로 <b>가져오면</b> 커버·가라오케와 함께 재생됩니다.</p>
+    <div class="row" style="margin-top:0">
+      <button id="btnCopyBrief">&#128203; 가사+스타일 복사</button>
+      <span id="briefStatus" class="note" style="margin:0"></span>
+    </div>
+    <details style="margin-top:8px">
+      <summary>🎙️ 어디에 붙여넣나요? (ACE-Step 로컬 · ElevenLabs)</summary>
+      <p class="note">
+        <b>ACE-Step (로컬·GPU·무료):</b> github.com/ace-step/ACE-Step 설치 → Gradio 실행 → 위 <b>[Style]</b>을 style/prompt에, <b>[Lyrics]</b>를 lyrics에 붙여넣고 생성. GPU가 있으면 이게 최선(무제한·무료).<br>
+        <b>ElevenLabs (클라우드):</b> Eleven Music에 같은 재료를 붙여 생성. 무료는 <b>월 약 11분</b> 분량(비상업용).<br>
+        <b>Suno/Udio:</b> 동일하게 붙여넣기.<br>
+        ※ 이 엔진들은 <b>자기 멜로디로 새로 부릅니다</b>(우리 MIDI 멜로디와 다를 수 있어요). 완성 노래를 아래로 가져오면 커버·가사 자막을 그 길이에 맞춰 씌웁니다.
+      </p>
+    </details>
+    <div class="row" style="margin-top:10px">
+      <button id="btnVocalFile" class="alt">&#128193; 완성 노래(MP3·WAV) 가져오기</button>
+      <input type="file" id="vocalFile" accept="audio/*,.mp3,.wav,.m4a,.ogg" style="display:none">
+      <button id="btnVocalPlay" class="alt" disabled>&#9654; 커버+가사와 재생</button>
+      <button id="btnVocalStop" class="alt" disabled>&#9632; 정지</button>
+      <span id="vocalStatus" class="note" style="margin:0"></span>
+    </div>
+    <audio id="vocalAudio" style="display:none"></audio>
+    <p class="note">가져온 노래는 위 <b>④ 뮤직비디오</b> 화면(커버+가라오케)에서 함께 재생됩니다.</p>
+  </div>
+
   <div class="flow">
-    <b>다음 단계 예고(4단계):</b> 여기에 <b>보컬(노래 목소리)</b>을 얹으면 완성입니다 — 로컬 오픈소스 모델 또는 ElevenLabs 같은 서비스로.
+    <b>완성!</b> 곡 설계 → 가사 → 반주 → 커버+가라오케 → 보컬까지. 브로가드표 미니 Suno가 되었습니다 🎉
   </div>
 
 </main>
-<footer>Broguard Music Lab &middot; 송메이커 &middot; 곡 설계 + 가사 + 반주(멜로디·베이스·드럼)</footer>
+<footer>Broguard Music Lab &middot; 송메이커 &middot; 설계·가사·반주·뮤비·보컬</footer>
 
 <script id="songcore">
 /* SongCore — 곡 설계도 엔진 (자체 규칙, 오프라인/테스트 가능) */
@@ -1086,7 +1113,26 @@ var Stage3 = (function () {
              title: plan.title || '무제', sub: (plan.genre || '') + ' · ' + (plan.mood || ''),
              dark: plan.moodKey === 'sad' };
   }
-  return { buildKaraoke: buildKaraoke, lineAt: lineAt, coverSpec: coverSpec, MOOD_COLORS: MOOD_COLORS };
+  /* ── 4단계: 보컬 브릿지 ── */
+  var SEC_EN = { '인트로': 'Intro', '벌스': 'Verse', '프리코러스': 'Pre-Chorus', '코러스': 'Chorus', '브릿지': 'Bridge', '솔로': 'Solo', '간주': 'Interlude', '아웃트로': 'Outro' };
+  // 가사 + 스타일 태그 → 송 생성 엔진(ACE-Step·ElevenLabs·Suno)에 넘길 재료
+  function buildVocalBrief(plan, blocks) {
+    var voice = plan.moodKey === 'sad' ? 'emotional' : (plan.energy >= 0.8 ? 'energetic' : 'warm');
+    var style = ['[Style] genre: ' + plan.genre, 'mood: ' + plan.mood, 'tempo: ' + plan.tempo + ' BPM',
+      'key: ' + plan.key, 'vocal: ' + voice + ' Korean vocal', 'instrumentation: piano, bass, drums'].join(', ');
+    var lyr = ['[Lyrics]'];
+    (blocks || []).forEach(function (b) { lyr.push('[' + (SEC_EN[b.name] || b.name) + ']'); lyr.push(b.text); });
+    return style + '\n\n' + lyr.join('\n');
+  }
+  // 가라오케 타임라인을 실제 오디오 길이에 맞춰 선형 스케일
+  function scaleKaraoke(k, newTotal) {
+    var f = (k.totalSec > 0) ? (newTotal / k.totalSec) : 1;
+    return { totalSec: newTotal, tempo: k.tempo, lines: k.lines.map(function (l) {
+      return { section: l.section, text: l.text, startSec: round2(l.startSec * f), endSec: round2(l.endSec * f) }; }) };
+  }
+
+  return { buildKaraoke: buildKaraoke, lineAt: lineAt, coverSpec: coverSpec, MOOD_COLORS: MOOD_COLORS,
+           buildVocalBrief: buildVocalBrief, scaleKaraoke: scaleKaraoke };
 })();
 if (typeof module !== 'undefined') module.exports = Stage3;
 
@@ -1115,7 +1161,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   function energyColor(e) { return e >= 0.8 ? 'var(--e2)' : e >= 0.55 ? 'var(--e1)' : 'var(--e0)'; }
 
   function renderPlan(p) {
-    $('planCard').style.display = ''; $('lyricCard').style.display = ''; $('arrCard').style.display = ''; $('mvCard').style.display = '';
+    $('planCard').style.display = ''; $('lyricCard').style.display = ''; $('arrCard').style.display = ''; $('mvCard').style.display = ''; $('vocalCard').style.display = '';
     var sum = $('summary'); sum.innerHTML = '';
     [['제목', p.title], ['분위기', p.mood], ['장르', p.genre], ['조성', p.key], ['템포', p.tempo + ' BPM'],
      ['박자', p.meter], ['드럼', p.drumStyle], ['구성', p.sections.length + '섹션 · ' + p.totalBars + '마디'],
@@ -1308,22 +1354,20 @@ if (typeof module !== 'undefined') module.exports = Stage3;
       : '<span class="ok">✓ 커버·가사 준비됨</span> <span class="err">(재생기는 인터넷 연결 시 · 커버 저장은 항상 가능)</span>';
   }
 
+  var activeKaraoke = null, getTime = null;
   function highlight(sec) {
-    var i = Stage3.lineAt(karaoke, sec);
+    var kk = activeKaraoke || karaoke; if (!kk) return;
+    var i = Stage3.lineAt(kk, sec);
     if (i < 0) return;
-    $('kLine').textContent = karaoke.lines[i].text;
-    $('kNext').textContent = karaoke.lines[i + 1] ? karaoke.lines[i + 1].text : '';
+    $('kLine').textContent = kk.lines[i].text;
+    $('kNext').textContent = kk.lines[i + 1] ? kk.lines[i + 1].text : '';
   }
-  function loop() {
-    var p = $('mvPlayer');
-    var t = (p && typeof p.currentTime === 'number') ? p.currentTime : 0;
-    highlight(t);
-    rafId = requestAnimationFrame(loop);
-  }
-  function stopMv() {
+  function loop() { highlight(getTime ? getTime() : 0); rafId = requestAnimationFrame(loop); }
+  function stopAllPlay() {
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-    var p = $('mvPlayer'); try { if (p && p.stop) p.stop(); } catch (e) {}
-    $('btnMvStop').disabled = true;
+    try { var p = $('mvPlayer'); if (p && p.stop) p.stop(); } catch (e) {}
+    try { var a = $('vocalAudio'); if (a) a.pause(); } catch (e) {}
+    $('btnMvStop').disabled = true; $('btnVocalStop').disabled = true;
   }
 
   $('btnMv').addEventListener('click', buildMv);
@@ -1333,12 +1377,15 @@ if (typeof module !== 'undefined') module.exports = Stage3;
     if (!(window.customElements && customElements.get('midi-player')) || !p || !p.start) {
       $('mvStatus').innerHTML = '<span class="err">재생기를 불러오지 못했습니다(오프라인). 커버·가사는 보이고, .mid는 반주 카드에서 저장할 수 있어요.</span>'; return;
     }
+    stopAllPlay();
+    activeKaraoke = karaoke;
+    getTime = function () { return (p && typeof p.currentTime === 'number') ? p.currentTime : 0; };
     try { p.currentTime = 0; } catch (e) {}
     try { p.start(); } catch (e) {}
     $('btnMvStop').disabled = false;
-    if (rafId) cancelAnimationFrame(rafId); loop();
+    loop();
   });
-  $('btnMvStop').addEventListener('click', stopMv);
+  $('btnMvStop').addEventListener('click', stopAllPlay);
   $('btnSaveCover').addEventListener('click', function () {
     var cv = $('cover');
     // 커버에 제목을 구워서 저장
@@ -1353,6 +1400,45 @@ if (typeof module !== 'undefined') module.exports = Stage3;
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
     });
   });
+
+  /* ---------- 4단계: 보컬 브릿지 ---------- */
+  $('btnCopyBrief').addEventListener('click', function () {
+    if (!plan) { $('briefStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
+    var blocks = (curLyrics && curLyrics.length) ? curLyrics : SongCore.draftLyrics(plan);
+    var brief = Stage3.buildVocalBrief(plan, blocks);
+    var self = this;
+    function done() { self.innerHTML = '✓ 복사됨 — 송 생성 AI에 붙여넣으세요'; setTimeout(function () { self.innerHTML = '&#128203; 가사+스타일 복사'; }, 1800); }
+    if (navigator.clipboard) navigator.clipboard.writeText(brief).then(done, fb); else fb();
+    function fb() { var t = document.createElement('textarea'); t.value = brief; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); done(); } catch (e) {} t.remove(); }
+  });
+  $('btnVocalFile').addEventListener('click', function () { $('vocalFile').click(); });
+  $('vocalFile').addEventListener('change', function () {
+    var f = this.files && this.files[0]; this.value = '';
+    if (!f) return;
+    var a = $('vocalAudio');
+    if (a.src && a.src.indexOf('blob:') === 0) URL.revokeObjectURL(a.src);
+    a.src = URL.createObjectURL(f); a.load();
+    if (!karaoke) { try { buildMv(); } catch (e) {} }
+    $('btnVocalPlay').disabled = false;
+    $('vocalStatus').innerHTML = "<span class='ok'>✓ '" + (f.name || '노래') + "' 불러옴 — 커버+가사와 재생을 누르세요.</span>";
+  });
+  $('btnVocalPlay').addEventListener('click', function () {
+    var a = $('vocalAudio'); if (!a.src) return;
+    if (!karaoke) { try { buildMv(); } catch (e) {} }
+    stopAllPlay();
+    $('stage').style.display = '';
+    function start() {
+      var dur = (a.duration && isFinite(a.duration)) ? a.duration : (karaoke ? karaoke.totalSec : 0);
+      activeKaraoke = (karaoke && dur) ? Stage3.scaleKaraoke(karaoke, dur) : karaoke;
+      getTime = function () { return a.currentTime || 0; };
+      try { a.currentTime = 0; } catch (e) {}
+      a.play().then(function () { $('btnVocalStop').disabled = false; loop(); })
+        .catch(function (e) { $('vocalStatus').innerHTML = '<span class="err">재생 실패: ' + e.message + '</span>'; });
+    }
+    if (a.readyState >= 1 && a.duration && isFinite(a.duration)) start();
+    else { a.addEventListener('loadedmetadata', start, { once: true }); a.load(); }
+  });
+  $('btnVocalStop').addEventListener('click', stopAllPlay);
 })();
 </script>
 </body>

@@ -123,6 +123,30 @@ await check('커버 PNG 저장 버튼이 이미지를 내려준다', async () =>
   assert.equal(bytes.slice(1, 4).toString(), 'PNG', 'PNG 시그니처');
 });
 
+await check('가사+스타일 복사 → 송 생성 AI용 브리프가 클립보드에 담긴다', async () => {
+  await page.click('#btnCopyBrief');
+  const clip = await page.evaluate(() => navigator.clipboard.readText());
+  assert.ok(clip.includes('[Style]') && clip.includes('[Lyrics]'), '스타일·가사 섹션');
+  assert.ok(/BPM/.test(clip) && /Korean vocal/.test(clip), '스타일 태그');
+  assert.ok(clip.includes('[Verse]') || clip.includes('[Chorus]'), '영어 섹션 태그');
+});
+
+await check('완성 노래(오디오) 가져오기 → 재생 버튼 활성화', async () => {
+  // 짧은 WAV 생성(사인 1초)
+  const sr = 22050, n = sr, buf = Buffer.alloc(44 + n * 2);
+  buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8);
+  buf.write('fmt ', 12); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(sr, 24); buf.writeUInt32LE(sr * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
+  buf.write('data', 36); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) buf.writeInt16LE(Math.round(Math.sin(2 * Math.PI * 330 * i / sr) * 12000), 44 + i * 2);
+  await page.setInputFiles('#vocalFile', { name: 'song.wav', mimeType: 'audio/wav', buffer: buf });
+  await page.waitForFunction(() => !document.getElementById('btnVocalPlay').disabled, undefined, { timeout: 5000 });
+  const st = await page.textContent('#vocalStatus');
+  assert.ok(/불러옴/.test(st), '노래 불러옴 안내: ' + st);
+  const hasSrc = await page.evaluate(() => (document.getElementById('vocalAudio').src || '').indexOf('blob:') === 0);
+  assert.ok(hasSrc, '오디오 blob src 설정');
+});
+
 await check('심각한 JS 오류가 없다', async () => {
   assert.deepEqual(errors, []);
 });
