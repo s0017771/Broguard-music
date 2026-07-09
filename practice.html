@@ -551,8 +551,11 @@
     if (lb) {
       var color = cls === "pr-done" ? "var(--good)" : cls === "pr-late" ? "var(--hint)" : cls === "pr-miss" ? "var(--miss)" : "var(--ink)";
       lb.setAttribute("data-state", cls || "");
-      Array.prototype.forEach.call(lb.querySelectorAll(".nh"), function (e) { e.setAttribute("fill", color); e.setAttribute("stroke", color); });
-      Array.prototype.forEach.call(lb.querySelectorAll(".nstem,.nledger"), function (e) { e.setAttribute("stroke", color); });
+      Array.prototype.forEach.call(lb.querySelectorAll(".nh"), function (e) {
+        if (e.classList.contains("nh-open")) { e.setAttribute("stroke", color); e.setAttribute("fill", "#fff"); }
+        else { e.setAttribute("fill", color); e.setAttribute("stroke", color); }
+      });
+      Array.prototype.forEach.call(lb.querySelectorAll(".nstem,.nledger,.nflag"), function (e) { e.setAttribute("stroke", color); });
       Array.prototype.forEach.call(lb.querySelectorAll(".nlabel"), function (e) { e.setAttribute("fill", color); });
     }
   }
@@ -590,6 +593,28 @@
     for (var k in attrs) e.setAttribute(k, attrs[k]);
     return e;
   }
+  /* 음 길이(4분음표=1박 기준 beats) → 실제 음표 모양 */
+  var DUR_TABLE = [
+    { b: 4,     hollow: true,  stem: false, flags: 0, dot: false },  /* 온음표 */
+    { b: 3,     hollow: true,  stem: true,  flags: 0, dot: true },   /* 점2분음표 */
+    { b: 2,     hollow: true,  stem: true,  flags: 0, dot: false },  /* 2분음표 */
+    { b: 1.5,   hollow: false, stem: true,  flags: 0, dot: true },   /* 점4분음표 */
+    { b: 1,     hollow: false, stem: true,  flags: 0, dot: false },  /* 4분음표 */
+    { b: 0.75,  hollow: false, stem: true,  flags: 1, dot: true },   /* 점8분음표 */
+    { b: 0.5,   hollow: false, stem: true,  flags: 1, dot: false },  /* 8분음표 */
+    { b: 0.375, hollow: false, stem: true,  flags: 2, dot: true },   /* 점16분음표 */
+    { b: 0.25,  hollow: false, stem: true,  flags: 2, dot: false }   /* 16분음표 */
+  ];
+  function classifyDur(beats) {
+    if (!(beats > 0)) beats = 1;
+    var best = DUR_TABLE[DUR_TABLE.length - 1], bestD = Infinity;
+    for (var i = 0; i < DUR_TABLE.length; i++) {
+      var d = Math.abs(Math.log(beats / DUR_TABLE[i].b));  /* 음악적 비율 거리 */
+      if (d < bestD) { bestD = d; best = DUR_TABLE[i]; }
+    }
+    return best;
+  }
+
   function buildLane() {
     var svg = $("laneSvg");
     while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -650,12 +675,30 @@
         sh.textContent = accSym;
         ng.appendChild(sh);
       }
-      /* 음표 머리 */
-      ng.appendChild(svgEl("ellipse", { cx: cx, cy: cy, rx: 11.5, ry: 8.5, fill: "var(--ink)", stroke: "var(--ink)", "stroke-width": 1, class: "nh", transform: "rotate(-18 " + cx + " " + cy + ")" }));
-      /* 기둥 */
+      /* 음표 모양: 실제 음 길이(beats)에 따라 머리(채움/빈)·부점·기둥·꼬리 결정 */
+      var beats = n.len / (song.beatCells || 1);
+      var d = classifyDur(beats);
       var stemUp = cy > STAFF_TOP + 2 * STAFF_GAP;
-      var sy2 = stemUp ? cy - 56 : cy + 56;
-      ng.appendChild(svgEl("line", { x1: cx + (stemUp ? 10 : -10), y1: cy, x2: cx + (stemUp ? 10 : -10), y2: sy2, stroke: "var(--ink)", "stroke-width": 2, class: "nstem" }));
+      /* 머리 (2분·온음표는 빈 머리) */
+      ng.appendChild(svgEl("ellipse", { cx: cx, cy: cy, rx: 11.5, ry: 8.5,
+        fill: d.hollow ? "#fff" : "var(--ink)", stroke: "var(--ink)", "stroke-width": d.hollow ? 2.4 : 1,
+        class: d.hollow ? "nh nh-open" : "nh", transform: "rotate(-18 " + cx + " " + cy + ")" }));
+      /* 부점(점음표) */
+      if (d.dot) ng.appendChild(svgEl("circle", { cx: cx + 18, cy: cy - 5, r: 2.7, fill: "var(--ink)", class: "nh" }));
+      /* 기둥 */
+      if (d.stem) {
+        var sx = cx + (stemUp ? 10 : -10);
+        var sy2 = stemUp ? cy - 56 : cy + 56;
+        ng.appendChild(svgEl("line", { x1: sx, y1: cy, x2: sx, y2: sy2, stroke: "var(--ink)", "stroke-width": 2, class: "nstem" }));
+        /* 꼬리(꼬리 1개=8분, 2개=16분) */
+        for (var fl = 0; fl < d.flags; fl++) {
+          var fy = stemUp ? sy2 + fl * 13 : sy2 - fl * 13;
+          var fd = stemUp
+            ? "M " + sx + " " + fy + " Q " + (sx + 20) + " " + (fy + 4) + " " + (sx + 13) + " " + (fy + 28)
+            : "M " + sx + " " + fy + " Q " + (sx + 20) + " " + (fy - 4) + " " + (sx + 13) + " " + (fy - 28);
+          ng.appendChild(svgEl("path", { d: fd, stroke: "var(--ink)", "stroke-width": 4, fill: "none", "stroke-linecap": "round", class: "nflag" }));
+        }
+      }
       /* 계이름 라벨 */
       var lbl = svgEl("text", { x: cx, y: LABEL_Y, "font-size": 16, fill: "var(--ink-soft)", "text-anchor": "middle", class: "nlabel" });
       lbl.textContent = n.name;
@@ -1361,9 +1404,17 @@
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__practice = {
     parseSong: parseSong, attempt: attempt, generateChords: generateChords, chordAtCell: chordAtCell, staffY: staffY, injectChordsIntoAbc: injectChordsIntoAbc, wakeAudio: wakeAudio,
-    midiToAbcToken: midiToAbcToken, buildRecAbc: buildRecAbc,
+    midiToAbcToken: midiToAbcToken, buildRecAbc: buildRecAbc, classifyDur: classifyDur,
     startRecording: startRecording, stopRecording: stopRecording, recordNote: recordNote,
     setRecStart: function (ms) { recStartMs = ms; }, getRecEvents: function () { return recEvents; },
+    renderLaneFor: function (abc) {
+      song = parseSong(abc); cellMs = 200;
+      buildLane();
+      var svg = $("laneSvg");
+      return { notes: svg.querySelectorAll(".lnoteG").length, open: svg.querySelectorAll(".nh-open").length,
+        stems: svg.querySelectorAll(".nstem").length, flags: svg.querySelectorAll(".nflag").length,
+        dots: svg.querySelectorAll("circle").length };
+    },
     getState: function () { return { idx: idx, mode: mode, playing: playing, paused: paused, correctFirst: correctFirst, totalNotes: totalNotes, mistakes: mistakes, hits: hits, missCount: missCount, lateCount: lateCount, timedIdx: timedIdx, song: song, cellMs: cellMs, countInMs: countInMs, laneCount: laneEls.length }; }
   };
 })();
