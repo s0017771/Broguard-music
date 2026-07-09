@@ -289,6 +289,12 @@ var SongCore = (function () {
     };
   }
 
+  /* 받침 유무로 조사 선택 (노래 가사에 '을(를)' 같은 표기가 들어가지 않도록) */
+  function josa(word, withFinal, noFinal) {
+    var c = word.charCodeAt(word.length - 1);
+    if (c < 0xAC00 || c > 0xD7A3) return noFinal;               // 한글 아니면 무난한 쪽
+    return ((c - 0xAC00) % 28) ? withFinal : noFinal;
+  }
   /* 오프라인 가사 초안 — 로컬 LLM이 없을 때의 자리표시(간단) */
   function draftLyrics(plan) {
     var theme = (plan.theme || plan.title || '우리 이야기').trim();
@@ -299,7 +305,7 @@ var SongCore = (function () {
     plan.sections.forEach(function (s) {
       var lines;
       if (s.name === '코러스') lines = [word + ', ' + moodLine, '이 순간을 노래해요'];
-      else if (s.name === '벌스') lines = [word + '을(를) 떠올리면', '마음이 이렇게 물들어요'];
+      else if (s.name === '벌스') lines = [word + josa(word, '을', '를') + ' 떠올리면', '마음이 이렇게 물들어요'];
       else if (s.name === '브릿지') lines = ['잠시 멈춰 서서', '우리를 바라봐요'];
       else lines = ['(' + s.name + ')'];
       out.push({ name: s.name, text: lines.join('\n') });
@@ -1136,7 +1142,13 @@ var Stage3 = (function () {
     var voice = plan.moodKey === 'sad' ? 'emotional' : (plan.energy >= 0.8 ? 'energetic' : 'warm');
     var style = '[Style] ' + [g, m, plan.tempo + ' BPM', key, voice + ' korean vocal', 'piano, bass, drums'].join(', ');
     var lyr = ['[Lyrics]'];
-    (blocks || []).forEach(function (b) { lyr.push('[' + (SEC_EN[b.name] || b.name) + ']'); lyr.push(b.text); });
+    (blocks || []).forEach(function (b) {
+      /* "(인트로)" 같은 괄호 자리표시 줄은 가수가 그대로 읽어버리므로 제거 — 태그만 남김 */
+      var lines = String(b.text || '').split('\n').map(function (ln) { return ln.trim(); })
+        .filter(function (ln) { return ln && !/^[\(（].*[\)）]$/.test(ln); });
+      lyr.push('[' + (SEC_EN[b.name] || b.name) + ']');
+      if (lines.length) lyr.push(lines.join('\n'));
+    });
     return style + '\n\n' + lyr.join('\n');
   }
   // 가라오케 타임라인을 실제 오디오 길이에 맞춰 선형 스케일

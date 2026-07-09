@@ -70,6 +70,16 @@ test('draftLyrics: 섹션마다 초안 가사를 만든다(오프라인 폴백)'
   assert.ok(ly.some(b => b.text.includes('첫사랑')), '주제어가 가사에 반영');
 });
 
+test('draftLyrics: 조사가 받침에 맞게 붙는다("을(를)" 표기 금지 — 노래로 불림)', () => {
+  const withFinal = SongCore.draftLyrics(SongCore.planSong({ theme: '바닷물', mood: 'bright', genre: 'pop', seed: 1 })); // 받침 O → 을
+  const noFinal = SongCore.draftLyrics(SongCore.planSong({ theme: '바다', mood: 'bright', genre: 'pop', seed: 1 }));     // 받침 X → 를
+  const verse1 = withFinal.find(b => b.name === '벌스').text;
+  const verse2 = noFinal.find(b => b.name === '벌스').text;
+  assert.ok(verse1.includes('바닷물을 '), '받침 있으면 "을": ' + verse1);
+  assert.ok(verse2.includes('바다를 '), '받침 없으면 "를": ' + verse2);
+  assert.ok(!verse1.includes('을(를)') && !verse2.includes('을(를)'), '"을(를)" 표기 없음');
+});
+
 test('buildLyricPrompt: 제목·분위기·구성이 프롬프트에 담긴다', () => {
   const p = SongCore.planSong({ title: '별빛', theme: '밤하늘', mood: 'calm', genre: 'pop', seed: 9 });
   const prompt = SongCore.buildLyricPrompt(p);
