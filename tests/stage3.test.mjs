@@ -77,6 +77,19 @@ test('buildVocalBrief: 영어 스타일 태그 + 섹션 태그 가사(가사는 
   assert.ok(brief.includes('거울 속 흰머리'), '한글 가사 본문 유지');
 });
 
+test('buildVocalBrief: "(인트로)" 같은 자리표시는 가사에서 제거된다(가수가 읽지 않게)', () => {
+  const blocksWithPlaceholders = [
+    { name: '인트로', text: '(인트로)' },
+    { name: '벌스', text: '진짜 가사 한 줄' },
+    { name: '프리코러스', text: '(프리코러스)' },
+    { name: '코러스', text: '후렴 가사' }
+  ];
+  const brief = Stage3.buildVocalBrief(PLAN, blocksWithPlaceholders);
+  assert.ok(!brief.includes('(인트로)') && !brief.includes('(프리코러스)'), '괄호 자리표시 제거: ' + brief);
+  assert.ok(brief.includes('[Intro]') && brief.includes('[Pre-Chorus]'), '섹션 태그는 유지');
+  assert.ok(brief.includes('진짜 가사 한 줄') && brief.includes('후렴 가사'), '실제 가사는 유지');
+});
+
 test('scaleKaraoke: 타임라인을 실제 오디오 길이에 맞춰 선형 스케일', () => {
   const k = Stage3.buildKaraoke(PLAN, BLOCKS);
   const scaled = Stage3.scaleKaraoke(k, 60);
