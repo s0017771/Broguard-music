@@ -300,20 +300,39 @@ var SongCore = (function () {
     excited: { label: '신남', minor: false, energy: 0.9,  tempoAdj: 12 },
     calm:    { label: '잔잔', minor: false, energy: 0.3,  tempoAdj: -8 }
   };
+  /* 코드 진행 — 섹션마다 여러 변형(시드로 선택). 코러스 첫 코드는 으뜸화음(C/Am) 유지. */
   var PROG_MAJOR = {
-    '인트로': ['C', 'G', 'Am', 'F'], '벌스': ['C', 'G', 'Am', 'F'], '프리코러스': ['F', 'G', 'Em', 'Am'],
-    '코러스': ['C', 'G', 'Am', 'F'], '브릿지': ['Am', 'F', 'C', 'G'], '솔로': ['C', 'G', 'Am', 'F'],
-    '간주': ['C', 'G', 'Am', 'F'], '아웃트로': ['F', 'C', 'G', 'C']
+    '인트로':   [['C', 'G', 'Am', 'F'], ['C', 'Am', 'F', 'G'], ['C', 'F', 'C', 'G']],
+    '벌스':     [['C', 'G', 'Am', 'F'], ['Am', 'F', 'C', 'G'], ['C', 'Em', 'F', 'G'], ['C', 'G', 'F', 'G']],
+    '프리코러스': [['F', 'G', 'Em', 'Am'], ['Dm', 'G', 'C', 'C'], ['F', 'G', 'Am', 'G'], ['Am', 'G', 'F', 'G']],
+    '코러스':   [['C', 'G', 'Am', 'F'], ['C', 'F', 'G', 'F'], ['C', 'Am', 'F', 'G'], ['C', 'G', 'F', 'C']],
+    '브릿지':   [['Am', 'F', 'C', 'G'], ['F', 'G', 'Em', 'Am'], ['Dm', 'G', 'C', 'G']],
+    '솔로':     [['C', 'G', 'Am', 'F'], ['C', 'F', 'G', 'F'], ['Am', 'F', 'C', 'G']],
+    '간주':     [['C', 'G', 'Am', 'F'], ['C', 'Am', 'F', 'G'], ['F', 'G', 'C', 'C']],
+    '아웃트로': [['F', 'C', 'G', 'C'], ['C', 'G', 'F', 'C'], ['Am', 'F', 'G', 'C']]
   };
   var PROG_MINOR = {
-    '인트로': ['Am', 'F', 'C', 'G'], '벌스': ['Am', 'F', 'C', 'G'], '프리코러스': ['Dm', 'G', 'C', 'Am'],
-    '코러스': ['Am', 'F', 'C', 'G'], '브릿지': ['F', 'G', 'Am', 'Am'], '솔로': ['Am', 'F', 'C', 'G'],
-    '간주': ['Am', 'F', 'C', 'G'], '아웃트로': ['Dm', 'Am', 'E', 'Am']
+    '인트로':   [['Am', 'F', 'C', 'G'], ['Am', 'G', 'F', 'E'], ['Am', 'Dm', 'E', 'Am']],
+    '벌스':     [['Am', 'F', 'C', 'G'], ['Am', 'G', 'F', 'E'], ['Am', 'Dm', 'G', 'C'], ['Am', 'F', 'G', 'Am']],
+    '프리코러스': [['Dm', 'G', 'C', 'Am'], ['F', 'G', 'Am', 'Am'], ['Dm', 'E', 'Am', 'Am'], ['F', 'E', 'Am', 'Am']],
+    '코러스':   [['Am', 'F', 'C', 'G'], ['Am', 'G', 'F', 'G'], ['Am', 'F', 'Dm', 'E'], ['Am', 'C', 'F', 'G']],
+    '브릿지':   [['F', 'G', 'Am', 'Am'], ['Dm', 'Am', 'E', 'Am'], ['F', 'E', 'Am', 'Am']],
+    '솔로':     [['Am', 'F', 'C', 'G'], ['Am', 'G', 'F', 'E'], ['Dm', 'E', 'Am', 'Am']],
+    '간주':     [['Am', 'F', 'C', 'G'], ['Am', 'Dm', 'E', 'Am'], ['F', 'G', 'Am', 'Am']],
+    '아웃트로': [['Dm', 'Am', 'E', 'Am'], ['Am', 'F', 'G', 'Am'], ['F', 'G', 'Am', 'Am']]
   };
   var SECTION_BARS = { '인트로': 4, '벌스': 8, '프리코러스': 4, '코러스': 8, '브릿지': 8, '솔로': 8, '간주': 4, '아웃트로': 4 };
   var SECTION_ENERGY = { '인트로': 0.4, '벌스': 0.5, '프리코러스': 0.7, '코러스': 1.0, '브릿지': 0.6, '솔로': 0.85, '간주': 0.6, '아웃트로': 0.3 };
 
-  function rng(seed) { var s = (seed >>> 0) || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  /* 시드 혼합(스플릿믹스류) + xorshift — 작은/인접 시드도 첫 출력부터 충분히 흩어지게 */
+  function rng(seed) {
+    var s = (seed >>> 0) || 1;
+    s = (s ^ 0x9e3779b9) >>> 0;
+    s = Math.imul(s ^ (s >>> 16), 0x85ebca6b) >>> 0;
+    s = Math.imul(s ^ (s >>> 13), 0xc2b2ae35) >>> 0;
+    s = (s ^ (s >>> 16)) >>> 0; if (!s) s = 1;
+    return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+  }
 
   function shortenForm(form) {
     var seenVerse = 0, seenChorus = 0, out = [];
@@ -339,11 +358,18 @@ var SongCore = (function () {
     var prog = m.minor ? PROG_MINOR : PROG_MAJOR;
     var form = g.form.slice();
     if (opts.length === 'short') form = shortenForm(form);
+    // 섹션 이름마다 변형 하나를 시드로 선택(반복 섹션은 같은 진행 공유 → 곡이 일관됨)
+    var pickIdx = {};
+    function chordsFor(name) {
+      var variants = prog[name] || prog['벌스'];
+      if (pickIdx[name] == null) pickIdx[name] = Math.floor(rnd() * variants.length) % variants.length;
+      return variants[pickIdx[name]].slice();
+    }
     var sections = form.map(function (name) {
       return {
         name: name,
         bars: SECTION_BARS[name] || 8,
-        chords: (prog[name] || prog['벌스']).slice(),
+        chords: chordsFor(name),
         energy: SECTION_ENERGY[name] != null ? SECTION_ENERGY[name] : 0.5
       };
     });
@@ -421,7 +447,14 @@ var Arranger = (function () {
   'use strict';
   var NOTE_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   var SCALE = [0, 2, 4, 5, 7, 9, 11]; // C 장조
-  function rng(seed) { var s = (seed >>> 0) || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  function rng(seed) {
+    var s = (seed >>> 0) || 1;
+    s = (s ^ 0x9e3779b9) >>> 0;
+    s = Math.imul(s ^ (s >>> 16), 0x85ebca6b) >>> 0;
+    s = Math.imul(s ^ (s >>> 13), 0xc2b2ae35) >>> 0;
+    s = (s ^ (s >>> 16)) >>> 0; if (!s) s = 1;
+    return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+  }
   function parseChord(sym) {
     var m = /^([A-G])([#b]?)(m)?/.exec(sym || 'C');
     var pc = NOTE_PC[m[1]]; if (m[2] === '#') pc = (pc + 1) % 12; if (m[2] === 'b') pc = (pc + 11) % 12;
@@ -485,16 +518,17 @@ var Arranger = (function () {
     var rnd = rng(opts.seed != null ? opts.seed : (plan.seed || 1));
     var lo = 67, hi = 83; // 멜로디 음역 G4~B5
     var rhBars = [], lhBars = [], melBars = [], prev = 74;
-    plan.sections.forEach(function (sec) {
+    plan.sections.forEach(function (sec, si) {
       var dense = sec.energy >= 0.7;
+      // 섹션 시작에 번호+이름 텍스트 주석("^1. 인트로") — 악보에서 섹션 구분이 보이게
+      var mark = '"^' + (si + 1) + '. ' + sec.name + '"';
       for (var b = 0; b < sec.bars; b++) {
         var chord = parseChord(sec.chords[b % sec.chords.length]);
         var mel = melodyBar(chord, prev, dense, rnd, lo, hi);
         prev = mel[mel.length - 1].midi;
-        rhBars.push(barToAbc(mel, chord.sym));
+        rhBars.push((b === 0 ? mark : '') + barToAbc(mel, chord.sym));
         lhBars.push(barToAbc(bassBar(chord), ''));
-        // 멜로디 전용: 섹션 시작에 "^섹션" 텍스트 주석 + 코드 + 음
-        melBars.push((b === 0 ? '"^' + sec.name + '"' : '') + barToAbc(mel, chord.sym));
+        melBars.push((b === 0 ? mark : '') + barToAbc(mel, chord.sym));
       }
     });
     function join(bars) {
@@ -1160,7 +1194,14 @@ var Producer = (function () {
   var INTENSITY = { low: { vel: 58, label: '여림' }, mid: { vel: 80, label: '보통' }, high: { vel: 106, label: '셈' } };
   var ORDER = ['low', 'mid', 'high'];
 
-  function rng(seed) { var s = (seed >>> 0) || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  function rng(seed) {
+    var s = (seed >>> 0) || 1;
+    s = (s ^ 0x9e3779b9) >>> 0;
+    s = Math.imul(s ^ (s >>> 16), 0x85ebca6b) >>> 0;
+    s = Math.imul(s ^ (s >>> 13), 0xc2b2ae35) >>> 0;
+    s = (s ^ (s >>> 16)) >>> 0; if (!s) s = 1;
+    return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+  }
   function clampVel(v) { return Math.max(1, Math.min(127, Math.round(v))); }
   function ARR() { return (typeof Arranger !== 'undefined') ? Arranger : (typeof globalThis !== 'undefined' ? globalThis.Arranger : null); }
 
@@ -1428,9 +1469,9 @@ if (typeof module !== 'undefined') module.exports = Stage3;
       var el = document.createElement('span'); el.className = 'pill'; el.textContent = kv[0] + ': ' + kv[1]; sum.appendChild(el);
     });
     var box = $('sections'); box.innerHTML = '';
-    p.sections.forEach(function (s) {
+    p.sections.forEach(function (s, i) {
       var d = document.createElement('div'); d.className = 'sec';
-      d.innerHTML = '<span class="nm">' + s.name + '</span>' +
+      d.innerHTML = '<span class="nm">' + (i + 1) + '. ' + s.name + '</span>' +
         '<span class="ch">' + s.chords.join(' · ') + '</span>' +
         '<span class="bars">' + s.bars + '마디</span>' +
         '<span class="ebar"><i style="width:' + Math.round(s.energy * 100) + '%;background:' + energyColor(s.energy) + '"></i></span>';
@@ -1560,6 +1601,18 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   $('btnSaveMidi').addEventListener('click', function () {
     downloadMidi((plan.title || 'song').replace(/[\\/:*?"<>|]/g, '_') + '.mid');
   });
+  /* 현재 가사(붙여넣은 것 or 초안)를 [섹션]\n가사 형태 텍스트로 — 연구소에 함께 넘긴다 */
+  function currentLyricsText() {
+    var blocks = (curLyrics && curLyrics.length) ? curLyrics : (plan ? SongCore.draftLyrics(plan) : null);
+    if (!blocks || !blocks.length) return '';
+    return blocks.map(function (b) { return '[' + b.name + ']\n' + (b.text || '').trim(); }).join('\n\n');
+  }
+  function sendLyricsToLab() {
+    try {
+      var ly = currentLyricsText();
+      if (ly) localStorage.setItem('broguard_lab_lyrics', ly); else localStorage.removeItem('broguard_lab_lyrics');
+    } catch (e) {}
+  }
   /* 드럼 얹기·악보 연구소로는 편곡 ABC(멜로디+베이스)를 넘긴다 */
   $('btnToDrum').addEventListener('click', function () {
     try { localStorage.setItem('broguard_drum_abc', $('arrAbc').value); } catch (e) {}
@@ -1567,12 +1620,14 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   });
   $('btnToLab').addEventListener('click', function () {
     try { localStorage.setItem('broguard_lab_abc', $('arrAbc').value); } catch (e) {}
+    sendLyricsToLab();
     window.open('lab.html', '_blank');
   });
   /* 멜로디만(단선율) — 악보 연구소로 / .abc 저장 */
   $('btnMelodyLab').addEventListener('click', function () {
     if (!lastMelodyAbc) return;
     try { localStorage.setItem('broguard_lab_abc', lastMelodyAbc); } catch (e) {}
+    sendLyricsToLab();
     window.open('lab.html', '_blank');
   });
   $('btnMelodyAbc').addEventListener('click', function () {
@@ -1665,6 +1720,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   $('btnStudioToLab').addEventListener('click', function () {
     if (!lastStudioMelodyAbc) return;
     try { localStorage.setItem('broguard_lab_abc', lastStudioMelodyAbc); } catch (e) {}
+    sendLyricsToLab();
     window.open('lab.html', '_blank');
   });
 
