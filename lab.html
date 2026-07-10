@@ -680,7 +680,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     <h2>악보</h2>
     <div class="controls">
       <button id="playBtn" class="btn-brass">&#9654; 재생</button>
-      <button id="play4Btn" class="btn-brass" title="커서(입력창)가 놓인 마디부터 4마디만 미리듣기">&#9654; 4마디만</button>
+      <button id="play4Btn" class="btn-brass" title="입력창 커서가 놓인 마디부터 4마디만 미리듣기">&#9654; 커서 4마디</button>
       <button id="stopBtn" class="btn-ink" disabled>&#9632; 정지</button>
       <button id="sfPlayBtn" class="btn-ghost" title="무료 GM 사운드폰트로 자연스럽게 재생(인터넷 필요)">&#128266; 좋은 소리로</button>
       <button id="quickEditBtn" class="btn-ghost" disabled title="재생을 정지한 음을 수정">&#9999;&#65039; 이 음 수정</button>
@@ -695,6 +695,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       <p id="sfNote" style="font-size:.78rem; color:var(--ink-soft, #46586b); margin-top:4px;"></p>
     </div>
     <p id="status" role="status"></p>
+    <div id="linePlays" class="row" style="display:none; gap:6px; flex-wrap:wrap; margin:6px 0; align-items:center;"></div>
     <div id="score"></div>
     <div id="snippetHolder" style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true"></div>
     <div id="lyricsPanel" style="display:none; margin-top:12px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:#fffdf7;">
@@ -890,6 +891,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     if (!abc) {
       $("score").innerHTML = "";
       visualObj = null;
+      var lp = $("linePlays"); if (lp) lp.style.display = "none";
       setStatus("ABC를 입력하거나, 파일을 열거나, 전체 생성을 눌러보세요.");
       return;
     }
@@ -905,6 +907,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       visualObj = null;
       setStatus("악보를 그릴 수 없습니다: " + (e.message || "ABC 문법을 확인하세요"), true);
     }
+    try { buildLineButtons(); } catch (e) {}
   }
   function scheduleRender() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 350); }
 
@@ -1060,6 +1063,52 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       fallbackMode = true; startTiming(true); isPlaying = true; stopBtn.disabled = false; armStop();
       setStatus("4마디만 듣기 (간이 신디사이저)");
     }
+  }
+
+  /* 악보의 소스 '줄'(보통 4마디)마다 재생 버튼을 만든다 — 어느 줄인지 명확 */
+  function musicLines(abc) {
+    return abc.split("\n").filter(function (l) { return l.trim() && !/^\s*(?:[A-Za-z]:|%%|%)/.test(l); });
+  }
+  function buildLineButtons() {
+    var host = $("linePlays"); if (!host) return;
+    host.innerHTML = "";
+    var abc = input.value;
+    var lines = musicLines(abc);
+    if (isMultiVoice(abc) || lines.length <= 1) { host.style.display = "none"; return; }
+    var head = abcParts(abc).header.filter(function (l) { return l.trim(); }).join("\n");
+    var lbl = document.createElement("span");
+    lbl.style.cssText = "font-size:.78rem; color:var(--ink-soft,#46586b); font-weight:600;";
+    lbl.textContent = "줄별 듣기:";
+    host.appendChild(lbl);
+    lines.forEach(function (line, i) {
+      var nbars = line.split("|").filter(function (s) { return s.replace(/[\[\]:\s"^.\d가-힣A-Za-z]/g, "").length || /[A-Ga-gz]/.test(s); }).length;
+      var btn = document.createElement("button");
+      btn.className = "btn-ghost"; btn.type = "button";
+      btn.textContent = "▶ " + (i + 1) + "줄";
+      btn.title = (i + 1) + "번째 줄(" + nbars + "마디) 듣기";
+      btn.addEventListener("click", function () { playLineSnippet(head, line, i + 1); });
+      host.appendChild(btn);
+    });
+    host.style.display = "";
+  }
+  async function playLineSnippet(head, line, lineNo) {
+    if (typeof ABCJS === "undefined") { setStatus("악보 엔진(abcjs)을 불러오지 못했습니다 — 인터넷 연결 시 동작합니다.", true); return; }
+    try { await ensureAudio(); } catch (e) { setStatus("이 브라우저에서 오디오를 시작할 수 없습니다.", true); return; }
+    stopPlay();
+    var body = line.replace(/\]\s*$/, "").replace(/\|\s*$/, "").trim();
+    var snippet = head + "\n" + body + " |]\n";
+    var vo = null;
+    try { var t = ABCJS.renderAbc("snippetHolder", snippet, { add_classes: false }); vo = t && t[0]; } catch (e) {}
+    if (vo && ABCJS.synth.supportsAudio()) {
+      try {
+        snippetSynth = new ABCJS.synth.CreateSynth();
+        await snippetSynth.init({ audioContext: audioCtx, visualObj: vo, options: { onEnded: function () { setStatus(""); } } });
+        await snippetSynth.prime(); snippetSynth.start();
+        setStatus(lineNo + "줄 재생 중 (피아노 음원)");
+        return;
+      } catch (e) { snippetSynth = null; }
+    }
+    playLimited(4);
   }
 
   async function playFourBars() {
