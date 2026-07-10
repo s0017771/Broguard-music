@@ -72,9 +72,12 @@
   details { margin-top: 8px; } summary { cursor: pointer; font-size: .8rem; color: var(--brass-deep); font-weight: 700; }
   footer { text-align: center; padding: 14px; font-size: .72rem; color: #b6ae9c; }
   midi-player { width: 100%; display: block; margin-bottom: 8px; }
-  #playerWrap, #studioPlayerWrap { overflow-x: auto; overflow-y: visible; }
-  midi-visualizer { display: block; width: 100%; }
-  midi-visualizer svg { height: auto; }
+  /* 피아노롤: 가로만 스크롤, 세로는 전체가 보이게(높이=내용). overflow-y는 hidden이어야 visible이 auto로 강제되지 않음 */
+  .viz-scroll { overflow-x: auto; overflow-y: hidden; border: 1px solid var(--line); border-radius: 8px; }
+  .viz-scroll midi-visualizer { display: block; }
+  .viz-scroll svg { display: block; }
+  .viz-lyrics { margin-top: 8px; padding: 8px 11px; background: #fffdf7; border: 1px solid var(--line); border-radius: 8px; font-size: .8rem; line-height: 1.75; white-space: pre-wrap; color: var(--ink); }
+  .viz-lyrics b { color: var(--brass-deep); }
   midi-visualizer { border: 1px solid var(--line); border-radius: 8px; background: #fff; max-height: 180px; overflow: auto; }
 </style>
 <!-- html-midi-player (구글 Magenta 팀 · 무료 · GM 사운드폰트로 드럼 포함 재생) -->
@@ -160,7 +163,8 @@
     </div>
     <div id="playerWrap" style="margin-top:12px; display:none">
       <midi-player id="player" sound-font visualizer="#viz"></midi-player>
-      <midi-visualizer id="viz" type="piano-roll" style="width:100%"></midi-visualizer>
+      <div class="viz-scroll"><midi-visualizer id="viz" type="piano-roll"></midi-visualizer></div>
+      <div class="viz-lyrics" id="arrLyrics" style="display:none"></div>
     </div>
     <div class="row">
       <button id="btnSaveMidi" class="alt" disabled>&#8681; .mid 저장</button>
@@ -190,7 +194,8 @@
     </div>
     <div id="studioPlayerWrap" style="margin-top:12px; display:none">
       <midi-player id="studioPlayer" sound-font visualizer="#studioViz"></midi-player>
-      <midi-visualizer id="studioViz" type="piano-roll" style="width:100%"></midi-visualizer>
+      <div class="viz-scroll"><midi-visualizer id="studioViz" type="piano-roll"></midi-visualizer></div>
+      <div class="viz-lyrics" id="studioLyrics" style="display:none"></div>
     </div>
     <div class="row">
       <button id="btnSaveStudioMidi" class="alt" disabled>&#8681; .mid 저장(멀티트랙)</button>
@@ -1616,6 +1621,15 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   function playerReady() { return !!(window.customElements && customElements.get('midi-player')); }
   /* 피아노롤 세로(음 높이)를 키워 전 음역이 크게 보이게 — 가로는 스크롤 */
   function bigViz(id) { try { var v = document.getElementById(id); if (v) v.config = { noteHeight: 6 }; } catch (e) {} }
+  /* 피아노롤 아래에 현재 가사를 텍스트로 함께 보여준다(섹션 머리표는 굵게) */
+  function showVizLyrics(id) {
+    var el = document.getElementById(id); if (!el) return;
+    var ly = currentLyricsText();
+    if (!ly) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.innerHTML = ly.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; })
+      .replace(/^\[(.+)\]$/gm, '<b>[$1]</b>');
+    el.style.display = '';
+  }
 
   function buildArrangement() {
     var arr = Arranger.arrange(plan, { seed: plan.seed });
@@ -1640,6 +1654,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
         $('playerWrap').style.display = '';
         bigViz('viz');
         try { $('player').src = curUrl; } catch (e) {}
+        showVizLyrics('arrLyrics');
         ['btnSaveMidi', 'btnToDrum', 'btnToLab', 'btnMelodyLab', 'btnMelodyAbc'].forEach(function (id) { $(id).disabled = false; });
         var msg = '✓ 반주 완성 · ' + out.info.melBars + '마디 · 멜로디+베이스 ' + out.info.melNotes + '음 · 드럼 ' + out.info.drmNotes + '음 · ' + plan.tempo + ' BPM · 드럼 ' + plan.drumStyle;
         $('arrStatus').innerHTML = playerReady()
@@ -1758,6 +1773,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
         $('studioPlayerWrap').style.display = '';
         bigViz('studioViz');
         try { $('studioPlayer').src = studioUrl; } catch (e) {}
+        showVizLyrics('studioLyrics');
         $('btnSaveStudioMidi').disabled = false; $('btnStudioToLab').disabled = false;
         var names = out.tracks.map(function (t) { return t.name + '(' + t.count + ')'; }).join(' · ');
         var msg = '✓ 편곡 완성 · ' + out.bars + '마디 · ' + names + ' · ' + out.tempo + ' BPM';
