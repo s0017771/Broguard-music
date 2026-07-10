@@ -680,6 +680,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     <h2>악보</h2>
     <div class="controls">
       <button id="playBtn" class="btn-brass">&#9654; 재생</button>
+      <button id="play4Btn" class="btn-brass" title="커서(입력창)가 놓인 마디부터 4마디만 미리듣기">&#9654; 4마디만</button>
       <button id="stopBtn" class="btn-ink" disabled>&#9632; 정지</button>
       <button id="sfPlayBtn" class="btn-ghost" title="무료 GM 사운드폰트로 자연스럽게 재생(인터넷 필요)">&#128266; 좋은 소리로</button>
       <button id="quickEditBtn" class="btn-ghost" disabled title="재생을 정지한 음을 수정">&#9999;&#65039; 이 음 수정</button>
@@ -695,6 +696,14 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     </div>
     <p id="status" role="status"></p>
     <div id="score"></div>
+    <div id="snippetHolder" style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true"></div>
+    <div id="lyricsPanel" style="display:none; margin-top:12px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:#fffdf7;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <strong style="color:var(--brass-deep, #8f6e1f); font-size:.9rem;">&#127925; 가사</strong>
+        <span style="font-size:.74rem; color:var(--ink-soft, #46586b);">— 송메이커에서 함께 넘어온 가사입니다. 악보와 나란히 흐름을 짚어보세요.</span>
+      </div>
+      <div id="lyricsBody" style="white-space:pre-wrap; font-size:.86rem; line-height:1.7; color:var(--ink, #1c2b3a);"></div>
+    </div>
   </section>
 </main>
 
@@ -781,7 +790,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   function $(id) { return document.getElementById(id); }
   var input = $("abcInput"), preset = $("preset"), statusEl = $("status");
   var openBtn = $("openBtn"), fileInput = $("fileInput"), arrangeBtn = $("arrangeBtn");
-  var playBtn = $("playBtn"), stopBtn = $("stopBtn"), saveBtn = $("saveBtn");
+  var playBtn = $("playBtn"), stopBtn = $("stopBtn"), saveBtn = $("saveBtn"), play4Btn = $("play4Btn");
   var genBtn = $("genBtn");
   var regenMelodyBtn = $("regenMelodyBtn"), regenBassBtn = $("regenBassBtn"), regenChordBtn = $("regenChordBtn");
   var chordSel = $("chordSel"), chordInput = $("chordInput"), chordInputRow = $("chordInputRow");
@@ -793,6 +802,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   var visualObj = null, synth = null, audioCtx = null;
   var timing = null, fallbackMode = false, isPlaying = false;
   var renderTimer = null, litNotes = [];
+  var snippetSynth = null, limitTimer = null;   // 4마디 미리듣기용
   var lastEventPos = null; /* 재생 중 마지막 음의 ABC 텍스트 위치 (퀵 편집용) */
   var cur = null; /* 현재 곡의 레이어 상태 */
 
@@ -913,6 +923,8 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   }
   function stopPlay() {
     if (synth) { try { synth.stop(); } catch (e) {} }
+    if (snippetSynth) { try { snippetSynth.stop(); } catch (e) {} snippetSynth = null; }
+    if (limitTimer) { clearTimeout(limitTimer); limitTimer = null; }
     if (timing) { try { timing.stop(); } catch (e) {} timing = null; }
     unlight(); resetPlayUI();
     /* 정지한 위치에 음이 있으면 퀵 편집 버튼 활성화 */
@@ -995,6 +1007,89 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     startTiming(true);
     isPlaying = true; stopBtn.disabled = false;
     setStatus("간이 신디사이저로 재생 중 (피아노 음원 차단 환경) — 파일을 PC에 받아 브라우저로 열면 피아노 소리가 납니다.");
+  }
+
+  /* ════════ 4마디만 미리듣기 ════════ */
+  /* ABC를 헤더(X/T/M/L/Q/K/V/%% …)와 본문(음표 줄)로 나눈다 */
+  function abcParts(abc) {
+    var header = [], body = [];
+    abc.split("\n").forEach(function (l) {
+      if (/^\s*(?:[A-Za-z]:|%%|%)/.test(l)) header.push(l);
+      else body.push(l);
+    });
+    return { header: header, body: body.join(" ") };
+  }
+  /* 단선율 ABC에서 startBar부터 count마디를 잘라 미니 ABC로 (멀티보이스는 지원 안 함) */
+  function sliceBars(abc, startBar, count) {
+    var pr = abcParts(abc);
+    var bars = pr.body.split("|").map(function (s) {
+      return s.replace(/[\[\]:]+/g, " ").replace(/\s+/g, " ").trim();
+    }).filter(function (s) { return s.length; });
+    if (!bars.length) return null;
+    var s = Math.max(0, Math.min(startBar, bars.length - 1));
+    var slice = bars.slice(s, s + count);
+    if (!slice.length) return null;
+    var head = pr.header.filter(function (l) { return l.trim() !== ""; }).join("\n");
+    return { abc: head + "\n" + slice.join(" | ") + " |]\n", from: s, to: s + slice.length };
+  }
+  function isMultiVoice(abc) { return /%%score|\[V:/.test(abc); }
+  /* 커서(입력창)가 놓인 마디 인덱스 = 커서 앞의 '|' 개수 */
+  function caretBar() {
+    var before = input.value.slice(0, caret.st || 0);
+    return (before.match(/\|/g) || []).length;
+  }
+
+  async function ensureAudio() {
+    if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; audioCtx = new AC(); }
+    await audioCtx.resume();
+  }
+  /* 전체를 처음부터 재생하되 bars마디 뒤 자동 정지 (멀티보이스 폴백) */
+  function playLimited(bars) {
+    fallbackMode = false;
+    var ms = 2000;
+    try { ms = visualObj.millisecondsPerMeasure() || 2000; } catch (e) {}
+    var stopAfter = ms * bars + 150;
+    function armStop() { limitTimer = setTimeout(stopPlay, stopAfter); }
+    if (ABCJS.synth.supportsAudio()) {
+      var sy = new ABCJS.synth.CreateSynth();
+      sy.init({ audioContext: audioCtx, visualObj: visualObj, options: { onEnded: function () { unlight(); resetPlayUI(); setStatus(""); } } })
+        .then(function () { return sy.prime(); })
+        .then(function () { synth = sy; sy.start(); startTiming(false); isPlaying = true; stopBtn.disabled = false; armStop(); setStatus("4마디만 듣기 (처음부터 · 피아노 음원)"); })
+        .catch(function () { fallbackMode = true; startTiming(true); isPlaying = true; stopBtn.disabled = false; armStop(); setStatus("4마디만 듣기 (간이 신디사이저)"); });
+    } else {
+      fallbackMode = true; startTiming(true); isPlaying = true; stopBtn.disabled = false; armStop();
+      setStatus("4마디만 듣기 (간이 신디사이저)");
+    }
+  }
+
+  async function playFourBars() {
+    if (typeof ABCJS === "undefined") { setStatus("악보 엔진(abcjs)을 불러오지 못했습니다 — 인터넷 연결 시 동작합니다.", true); return; }
+    var abc = input.value.trim();
+    if (!abc) { setStatus("먼저 ABC를 입력해 악보를 만들어주세요.", true); return; }
+    if (!visualObj) render();
+    try { await ensureAudio(); } catch (e) { setStatus("이 브라우저에서 오디오를 시작할 수 없습니다.", true); return; }
+    stopPlay();
+    play4Btn.disabled = true;
+    // 멀티보이스(반주 등)는 잘라내기 대신 '처음부터 4마디 뒤 정지'
+    if (isMultiVoice(abc)) { playLimited(4); play4Btn.disabled = false; return; }
+    var sliced = sliceBars(abc, caretBar(), 4);
+    if (!sliced) { playLimited(4); play4Btn.disabled = false; return; }
+    var vo = null;
+    try { var tunes = ABCJS.renderAbc("snippetHolder", sliced.abc, { add_classes: false }); vo = tunes && tunes[0]; } catch (e) {}
+    if (vo && ABCJS.synth.supportsAudio()) {
+      try {
+        snippetSynth = new ABCJS.synth.CreateSynth();
+        await snippetSynth.init({ audioContext: audioCtx, visualObj: vo, options: { onEnded: function () { setStatus(""); play4Btn.disabled = false; } } });
+        await snippetSynth.prime();
+        snippetSynth.start();
+        setStatus("4마디만 듣기 — " + (sliced.from + 1) + "~" + sliced.to + "마디 (피아노 음원)");
+        play4Btn.disabled = false;
+        return;
+      } catch (e) { snippetSynth = null; }
+    }
+    // 음원이 안 되면 전체를 처음부터 4마디 뒤 정지
+    playLimited(4);
+    play4Btn.disabled = false;
   }
 
   /* ════════ 파일 저장/열기 ════════ */
@@ -2356,6 +2451,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   $("transUpBtn").addEventListener("click", function () { transposeBy(1); });
   $("transDownBtn").addEventListener("click", function () { transposeBy(-1); });
   playBtn.addEventListener("click", startPlay);
+  play4Btn.addEventListener("click", playFourBars);
   stopBtn.addEventListener("click", stopPlay);
   /* 좋은 소리로 재생 — 현재 ABC를 MIDI로 바꿔 GM 사운드폰트 플레이어로 */
   var sfUrl = null;
@@ -2426,6 +2522,14 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   } else {
     preset.value = "nocturne";
     input.value = PRESETS.nocturne;
+  }
+  /* 송메이커에서 함께 넘어온 가사가 있으면 악보 아래에 표시 */
+  var lyricsHandoff = null;
+  try { lyricsHandoff = window.localStorage.getItem("broguard_lab_lyrics"); } catch (e) {}
+  if (lyricsHandoff && lyricsHandoff.trim()) {
+    $("lyricsBody").textContent = lyricsHandoff.trim();
+    $("lyricsPanel").style.display = "";
+    try { window.localStorage.removeItem("broguard_lab_lyrics"); } catch (e) {}
   }
   caret.st = caret.en = input.value.length;
   render();
