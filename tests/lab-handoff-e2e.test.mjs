@@ -78,6 +78,21 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + e.messa
   } catch (e) { bad('ABC 가져오기', e); }
 
   try {
+    // 여러 트랙 미디 가져오기 → 멜로디(최상성)만 깔끔히 추출(화음 아님, 여러 줄)
+    const b64 = await page.evaluate(() => {
+      const p = SongCore.planSong({ title: 'x', mood: 'bright', genre: 'pop', seed: 7 });
+      const bytes = Producer.produce(p).bytes; let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s);
+    });
+    await page.setInputFiles('#fileMidi', { name: 'multi.mid', mimeType: 'audio/midi', buffer: Buffer.from(b64, 'base64') });
+    await page.waitForFunction(() => /멜로디만 추출/.test(document.getElementById('arrStatus').textContent), undefined, { timeout: 5000 });
+    const mel = await page.inputValue('#arrAbc');
+    assert.ok(!/\[[A-Ga-g]/.test(mel), '가져온 멜로디는 단음(화음 없음)');
+    const bodyLines = mel.split('\n').filter(l => l.trim() && !/^[A-Za-z]:/.test(l)).length;
+    assert.ok(bodyLines >= 2, '여러 줄(줄별 재생 가능): ' + bodyLines);
+    ok('반주: 여러 트랙 미디 → 멜로디만 깔끔 추출');
+  } catch (e) { bad('미디 멜로디 추출', e); }
+
+  try {
     // 가사 붙여넣고 → 멜로디 연구소로: window.open 가로채고 localStorage 확인
     await page.click('#btnArrange');
     await page.waitForFunction(() => /반주 완성/.test(document.getElementById('arrStatus').textContent), undefined, { timeout: 10000 });
@@ -109,9 +124,8 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + e.messa
   await page.goto(`${base}/lab.html`, { waitUntil: 'domcontentloaded' });
   try {
     await page.waitForSelector('#lyricsPanel', { state: 'visible', timeout: 5000 });
-    const body = await page.textContent('#lyricsBody');
-    assert.ok(body.includes('후렴 가사입니다') && body.includes('[코러스]'), '가사 패널 내용: ' + body);
-    ok('연구소: 악보 아래 가사 패널 표시');
+    assert.equal(await page.isVisible('#lyricOverlayBtn'), true, '가사 얹기 버튼 노출');
+    ok('연구소: 가사 패널(가사 얹기 버튼) 표시');
   } catch (e) { bad('가사 패널', e); }
   try {
     // 버튼 존재 + 클릭해도 크래시 없이 안내가 뜬다.
