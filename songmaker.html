@@ -26,6 +26,14 @@
   .card h2 { font-size: .95rem; font-weight: 800; color: var(--brass-deep); margin-bottom: 8px; letter-spacing: .02em; }
   .flow { padding: 12px 14px; background: var(--card); border: 1px dashed var(--line); border-radius: 12px; font-size: .78rem; color: var(--ink-soft); line-height: 1.7; }
   .flow b { color: var(--brass-deep); }
+  .cheat-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.cheat { border-collapse: collapse; width: 100%; font-size: .74rem; min-width: 460px; }
+  table.cheat th, table.cheat td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: middle; }
+  table.cheat thead th { background: #f0ecd8; color: var(--brass-deep); font-weight: 800; }
+  table.cheat th.grp { background: #faf6e8; color: var(--ink-soft); font-weight: 700; font-size: .72rem; }
+  table.cheat td:first-child { white-space: nowrap; font-weight: 700; color: var(--ink); }
+  table.cheat td:last-child { white-space: nowrap; color: var(--ink-soft); text-align: center; }
+  table.cheat code { font-family: 'D2Coding', Consolas, monospace; font-size: .72rem; color: var(--ink); }
   label.fld { font-size: .76rem; color: var(--ink-soft); display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
   input[type=text], select, textarea { font: inherit; font-size: .86rem; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fffdf7; color: var(--ink); width: 100%; }
   textarea { min-height: 90px; resize: vertical; font-family: 'D2Coding', Consolas, monospace; line-height: 1.6; }
@@ -194,6 +202,38 @@
         <b>ElevenLabs (클라우드):</b> Eleven Music에 같은 재료를 붙여 생성. 무료는 <b>월 약 11분</b> 분량(비상업용).<br>
         <b>Suno/Udio:</b> 동일하게 붙여넣기.<br>
         ※ 이 엔진들은 <b>자기 멜로디로 새로 부릅니다</b>(우리 MIDI 멜로디와 다를 수 있어요). 완성 노래를 아래로 가져오면 커버·가사 자막을 그 길이에 맞춰 씌웁니다.
+      </p>
+    </details>
+    <details style="margin-top:8px" id="tagCheatsheet">
+      <summary>🎛️ 장르별 추천 Tags 치트시트 (영어로 붙여넣기)</summary>
+      <p class="note" style="margin-bottom:6px">Tags(스타일) 칸에 그대로 복붙하세요. 「가사+스타일 복사」를 쓰면 아래 <b>기본 5종</b>이 곡에 맞춰 자동으로 들어갑니다.</p>
+      <div class="cheat-wrap">
+        <table class="cheat">
+          <thead><tr><th>장르</th><th>추천 Tags</th><th>BPM</th></tr></thead>
+          <tbody>
+            <tr><th colspan="3" class="grp">기본 5종 (자동 반영)</th></tr>
+            <tr><td>팝</td><td><code>pop, catchy, polished, synth, electric guitar, bass, drums</code></td><td>100~120</td></tr>
+            <tr><td>발라드</td><td><code>ballad, emotional, piano, strings, soft drums</code></td><td>60~80</td></tr>
+            <tr><td>댄스</td><td><code>dance pop, EDM, four-on-the-floor, bright synth, punchy bass</code></td><td>120~132</td></tr>
+            <tr><td>록</td><td><code>rock, driving, distorted electric guitar, bass, powerful drums</code></td><td>110~140</td></tr>
+            <tr><td>트로트</td><td><code>trot, korean retro pop, cheerful, brass, synth, bouncy rhythm</code></td><td>100~130</td></tr>
+            <tr><th colspan="3" class="grp">보너스 (직접 넣어보기)</th></tr>
+            <tr><td>힙합</td><td><code>hip hop, boom bap, 808 bass, trap hi-hats, punchy drums</code></td><td>80~95</td></tr>
+            <tr><td>R&amp;B</td><td><code>R&amp;B, smooth, soulful, electric piano, mellow bass, groovy</code></td><td>65~90</td></tr>
+            <tr><td>시티팝</td><td><code>city pop, 80s, retro, funky guitar, warm synth, groovy bass</code></td><td>100~118</td></tr>
+            <tr><td>재즈</td><td><code>jazz, swing, upright bass, brushed drums, saxophone, warm</code></td><td>90~140</td></tr>
+            <tr><td>로파이</td><td><code>lo-fi, chill, dusty piano, vinyl crackle, mellow beat, relaxing</code></td><td>70~85</td></tr>
+            <tr><td>포크</td><td><code>folk, acoustic guitar, warm, gentle, intimate, fingerpicking</code></td><td>80~110</td></tr>
+            <tr><td>신스웨이브</td><td><code>synthwave, retrowave, 80s synth, arpeggio, neon, driving bass</code></td><td>100~118</td></tr>
+            <tr><td>어쿠스틱팝</td><td><code>acoustic pop, cozy, acoustic guitar, soft vocals, claps</code></td><td>90~115</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note" style="margin-top:8px">
+        <b>꿀팁</b> · 분위기 형용사(bright·warm·melancholic·energetic·dreamy·dark)를 앞에 얹기 ·
+        한국어면 <code>korean vocal</code>, 성별은 <code>female/male vocal</code> ·
+        보컬 태그를 빼고 악기만 넣으면 반주만 나옴(<code>piano</code>만 → 피아노 솔로) ·
+        <code>126 BPM</code>처럼 숫자로도 명시 · 5~8개가 적당(10개↑ 흐려짐).
       </p>
     </details>
     <div class="row" style="margin-top:10px">
