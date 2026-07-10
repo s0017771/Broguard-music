@@ -74,10 +74,8 @@
   midi-player { width: 100%; display: block; margin-bottom: 8px; }
   /* 피아노롤: 가로만 스크롤, 세로는 전체가 보이게(높이=내용). overflow-y는 hidden이어야 visible이 auto로 강제되지 않음 */
   .viz-scroll { overflow-x: auto; overflow-y: hidden; border: 1px solid var(--line); border-radius: 8px; }
-  .viz-scroll midi-visualizer { display: block; }
-  .viz-scroll svg { display: block; }
-  .viz-lyrics { margin-top: 8px; padding: 8px 11px; background: #fffdf7; border: 1px solid var(--line); border-radius: 8px; font-size: .8rem; line-height: 1.75; white-space: pre-wrap; color: var(--ink); }
-  .viz-lyrics b { color: var(--brass-deep); }
+  .viz-scroll midi-visualizer { display: block; overflow: visible !important; height: auto !important; max-height: none !important; }
+  .viz-scroll svg { display: block; max-height: none !important; }
   midi-visualizer { border: 1px solid var(--line); border-radius: 8px; background: #fff; max-height: 180px; overflow: auto; }
 </style>
 <!-- html-midi-player (구글 Magenta 팀 · 무료 · GM 사운드폰트로 드럼 포함 재생) -->
@@ -159,12 +157,15 @@
     <p class="sub">설계도의 코드로 <b>멜로디·베이스·드럼</b>을 만들어 하나의 곡으로 재생합니다. 소리는 무료 GM 사운드폰트(인터넷 필요).</p>
     <div class="row" style="margin-top:0">
       <button id="btnArrange">&#127929; 반주 만들기</button>
+      <button id="btnImportMidi" class="alt">&#128229; 미디 가져오기</button>
+      <button id="btnImportAbc" class="alt">&#128229; ABC 가져오기</button>
+      <input type="file" id="fileMidi" accept=".mid,.midi,audio/midi" style="display:none">
+      <input type="file" id="fileAbc" accept=".abc,.txt,text/plain" style="display:none">
       <span id="arrStatus" class="note" style="margin:0"></span>
     </div>
     <div id="playerWrap" style="margin-top:12px; display:none">
       <midi-player id="player" sound-font visualizer="#viz"></midi-player>
       <div class="viz-scroll"><midi-visualizer id="viz" type="piano-roll"></midi-visualizer></div>
-      <div class="viz-lyrics" id="arrLyrics" style="display:none"></div>
     </div>
     <div class="row">
       <button id="btnSaveMidi" class="alt" disabled>&#8681; .mid 저장</button>
@@ -195,7 +196,6 @@
     <div id="studioPlayerWrap" style="margin-top:12px; display:none">
       <midi-player id="studioPlayer" sound-font visualizer="#studioViz"></midi-player>
       <div class="viz-scroll"><midi-visualizer id="studioViz" type="piano-roll"></midi-visualizer></div>
-      <div class="viz-lyrics" id="studioLyrics" style="display:none"></div>
     </div>
     <div class="row">
       <button id="btnSaveStudioMidi" class="alt" disabled>&#8681; .mid 저장(멀티트랙)</button>
@@ -1621,15 +1621,6 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   function playerReady() { return !!(window.customElements && customElements.get('midi-player')); }
   /* 피아노롤 세로(음 높이)를 키워 전 음역이 크게 보이게 — 가로는 스크롤 */
   function bigViz(id) { try { var v = document.getElementById(id); if (v) v.config = { noteHeight: 6 }; } catch (e) {} }
-  /* 피아노롤 아래에 현재 가사를 텍스트로 함께 보여준다(섹션 머리표는 굵게) */
-  function showVizLyrics(id) {
-    var el = document.getElementById(id); if (!el) return;
-    var ly = currentLyricsText();
-    if (!ly) { el.style.display = 'none'; el.innerHTML = ''; return; }
-    el.innerHTML = ly.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; })
-      .replace(/^\[(.+)\]$/gm, '<b>[$1]</b>');
-    el.style.display = '';
-  }
 
   function buildArrangement() {
     var arr = Arranger.arrange(plan, { seed: plan.seed });
@@ -1654,7 +1645,6 @@ if (typeof module !== 'undefined') module.exports = Stage3;
         $('playerWrap').style.display = '';
         bigViz('viz');
         try { $('player').src = curUrl; } catch (e) {}
-        showVizLyrics('arrLyrics');
         ['btnSaveMidi', 'btnToDrum', 'btnToLab', 'btnMelodyLab', 'btnMelodyAbc'].forEach(function (id) { $(id).disabled = false; });
         var msg = '✓ 반주 완성 · ' + out.info.melBars + '마디 · 멜로디+베이스 ' + out.info.melNotes + '음 · 드럼 ' + out.info.drmNotes + '음 · ' + plan.tempo + ' BPM · 드럼 ' + plan.drumStyle;
         $('arrStatus').innerHTML = playerReady()
@@ -1665,6 +1655,50 @@ if (typeof module !== 'undefined') module.exports = Stage3;
       }
       $('btnArrange').disabled = false;
     }, 30);
+  });
+
+  /* 외부 미디/ABC 파일을 반주로 가져오기 — 재생·저장·연구소로 파이프라인에 연결 */
+  function showImported(bytes, abcText, label) {
+    lastMidi = bytes;
+    $('arrAbc').value = abcText || '';
+    lastMelodyAbc = abcText || '';
+    var blob = new Blob([bytes], { type: 'audio/midi' });
+    if (curUrl) URL.revokeObjectURL(curUrl);
+    curUrl = URL.createObjectURL(blob);
+    $('playerWrap').style.display = ''; bigViz('viz');
+    try { $('player').src = curUrl; } catch (e) {}
+    ['btnSaveMidi', 'btnToDrum', 'btnToLab', 'btnMelodyLab', 'btnMelodyAbc'].forEach(function (id) { $(id).disabled = false; });
+    $('arrStatus').innerHTML = '<span class="ok">✓ ' + label + '</span>';
+  }
+  $('btnImportMidi').addEventListener('click', function () { $('fileMidi').click(); });
+  $('fileMidi').addEventListener('change', function () {
+    var f = this.files && this.files[0]; this.value = '';
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var bytes = new Uint8Array(r.result);
+        if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'MThd') throw new Error('MIDI 파일이 아닙니다.');
+        var conv = AbcMidi.midiToAbc(bytes);
+        showImported(bytes, conv.abc || '', '미디 가져옴 · ' + f.name + (conv.error ? ' (' + conv.error + ')' : ' · ABC로도 변환'));
+      } catch (e) { $('arrStatus').innerHTML = '<span class="err">미디 읽기 실패: ' + e.message + '</span>'; }
+    };
+    r.readAsArrayBuffer(f);
+  });
+  $('btnImportAbc').addEventListener('click', function () { $('fileAbc').click(); });
+  $('fileAbc').addEventListener('change', function () {
+    var f = this.files && this.files[0]; this.value = '';
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var text = String(r.result || '').trim();
+        if (!/X:|K:/.test(text)) throw new Error('ABC 악보 형식이 아닙니다.');
+        var bytes = AbcMidi.abcToMidi(text);
+        showImported(bytes, text, 'ABC 가져옴 · ' + f.name);
+      } catch (e) { $('arrStatus').innerHTML = '<span class="err">ABC 변환 실패: ' + e.message + '</span>'; }
+    };
+    r.readAsText(f);
   });
 
   function downloadMidi(name) {
@@ -1773,7 +1807,6 @@ if (typeof module !== 'undefined') module.exports = Stage3;
         $('studioPlayerWrap').style.display = '';
         bigViz('studioViz');
         try { $('studioPlayer').src = studioUrl; } catch (e) {}
-        showVizLyrics('studioLyrics');
         $('btnSaveStudioMidi').disabled = false; $('btnStudioToLab').disabled = false;
         var names = out.tracks.map(function (t) { return t.name + '(' + t.count + ')'; }).join(' · ');
         var msg = '✓ 편곡 완성 · ' + out.bars + '마디 · ' + names + ' · ' + out.tempo + ' BPM';
