@@ -1657,6 +1657,47 @@ if (typeof module !== 'undefined') module.exports = Stage3;
     }, 30);
   });
 
+  /* 최상성(멜로디) 노트만 뽑아 단선율 MIDI로 만든다 — 여러 트랙 미디를 편집 가능한 멜로디로 */
+  function notesToMonoMidi(notes, ppq, tempoBpm, timeSig) {
+    function vlq(v) { var a = [v & 0x7f]; v >>= 7; while (v > 0) { a.unshift((v & 0x7f) | 0x80); v >>= 7; } return a; }
+    function u32(v) { return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255]; }
+    function u16(v) { return [(v >>> 8) & 255, v & 255]; }
+    function chunk(id, d) { var a = []; for (var i = 0; i < id.length; i++) a.push(id.charCodeAt(i)); return a.concat(u32(d.length), d); }
+    var ev = [];
+    notes.forEach(function (n) { ev.push({ t: n.startTick, on: 1, m: n.midi }); ev.push({ t: n.startTick + Math.max(1, n.durTick), on: 0, m: n.midi }); });
+    ev.sort(function (a, b) { return a.t - b.t || (a.on - b.on); });
+    var uspq = Math.round(60000000 / (tempoBpm || 120)), ts = timeSig || [4, 4];
+    var trk = [].concat(vlq(0), [0xff, 0x51, 3, (uspq >> 16) & 255, (uspq >> 8) & 255, uspq & 255]);
+    trk = trk.concat(vlq(0), [0xff, 0x58, 4, ts[0], Math.round(Math.log(ts[1]) / Math.log(2)), 24, 8]);
+    var last = 0;
+    ev.forEach(function (e) { trk = trk.concat(vlq(e.t - last)); trk.push(e.on ? 0x90 : 0x80, e.m & 0x7f, e.on ? 90 : 0); last = e.t; });
+    trk = trk.concat(vlq(0), [0xff, 0x2f, 0]);
+    var hdr = chunk('MThd', u16(0).concat(u16(1)).concat(u16(ppq)));
+    return Uint8Array.from(hdr.concat(chunk('MTrk', trk)));
+  }
+  function extractMelodyAbc(bytes) {
+    try {
+      var mid = AbcMidi.parseMidi(bytes);
+      function avg(ns) { return ns.reduce(function (s, n) { return s + n.midi; }, 0) / ns.length; }
+      // 드럼 아닌 트랙 중 '평균 음고가 가장 높은' 트랙을 멜로디로 추정
+      var cand = mid.tracks.filter(function (t) { return !t.isDrum && t.notes && t.notes.length; });
+      if (!cand.length) return '';
+      cand.sort(function (a, b) { return avg(b.notes) - avg(a.notes); });
+      var src = cand[0].notes.filter(function (n) { return n.channel !== 9; });
+      if (!src.length) return '';
+      var grid = Math.max(1, Math.round(mid.ppq / 4)), by = {};
+      src.forEach(function (n) {                                      // 그 트랙이 화음이면 시작시각별 최상성
+        var s = Math.round(n.startTick / grid) * grid;
+        if (!by[s] || n.midi > by[s].midi) by[s] = { midi: n.midi, startTick: s, durTick: Math.max(grid, n.durTick) };
+      });
+      var mono = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return a.startTick - b.startTick; });
+      for (var i = 0; i < mono.length - 1; i++) {                     // 겹침 방지
+        var gap = mono[i + 1].startTick - mono[i].startTick;
+        if (gap > 0 && mono[i].durTick > gap) mono[i].durTick = gap;
+      }
+      return (AbcMidi.midiToAbc(notesToMonoMidi(mono, mid.ppq, mid.tempoBpm, mid.timeSig)).abc) || '';
+    } catch (e) { return ''; }
+  }
   /* 외부 미디/ABC 파일을 반주로 가져오기 — 재생·저장·연구소로 파이프라인에 연결 */
   function showImported(bytes, abcText, label) {
     lastMidi = bytes;
@@ -1679,8 +1720,9 @@ if (typeof module !== 'undefined') module.exports = Stage3;
       try {
         var bytes = new Uint8Array(r.result);
         if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'MThd') throw new Error('MIDI 파일이 아닙니다.');
-        var conv = AbcMidi.midiToAbc(bytes);
-        showImported(bytes, conv.abc || '', '미디 가져옴 · ' + f.name + (conv.error ? ' (' + conv.error + ')' : ' · ABC로도 변환'));
+        var melAbc = extractMelodyAbc(bytes);                          // 편집·연구소용 단선율 멜로디 추출
+        if (!melAbc) { var c = AbcMidi.midiToAbc(bytes); melAbc = c.abc || ''; }
+        showImported(bytes, melAbc, '미디 가져옴 · ' + f.name + ' · 멜로디만 추출(편집·연구소용) · 재생은 원곡 전체');
       } catch (e) { $('arrStatus').innerHTML = '<span class="err">미디 읽기 실패: ' + e.message + '</span>'; }
     };
     r.readAsArrayBuffer(f);

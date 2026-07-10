@@ -699,11 +699,10 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     <div id="score"></div>
     <div id="snippetHolder" style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true"></div>
     <div id="lyricsPanel" style="display:none; margin-top:12px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:#fffdf7;">
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
         <strong style="color:var(--brass-deep, #8f6e1f); font-size:.9rem;">&#127925; 가사</strong>
-        <span style="font-size:.74rem; color:var(--ink-soft, #46586b);">— 송메이커에서 함께 넘어온 가사입니다. 악보와 나란히 흐름을 짚어보세요.</span>
+        <span style="font-size:.74rem; color:var(--ink-soft, #46586b);">— 송메이커에서 함께 넘어온 가사입니다.</span>
       </div>
-      <div id="lyricsBody" style="white-space:pre-wrap; font-size:.86rem; line-height:1.7; color:var(--ink, #1c2b3a);"></div>
       <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
         <button type="button" id="lyricOverlayBtn" class="btn-brass">&#127925; 악보에 가사 얹어 보기</button>
         <button type="button" id="lyricOverlayHide" class="btn-ghost" style="display:none;">닫기</button>
@@ -2635,7 +2634,6 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   try { lyricsHandoff = window.localStorage.getItem("broguard_lab_lyrics"); } catch (e) {}
   if (lyricsHandoff && lyricsHandoff.trim()) {
     labLyricsText = lyricsHandoff.trim();
-    $("lyricsBody").textContent = labLyricsText;
     $("lyricsPanel").style.display = "";
     try { window.localStorage.removeItem("broguard_lab_lyrics"); } catch (e) {}
   }
