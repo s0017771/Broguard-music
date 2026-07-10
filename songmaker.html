@@ -72,6 +72,9 @@
   details { margin-top: 8px; } summary { cursor: pointer; font-size: .8rem; color: var(--brass-deep); font-weight: 700; }
   footer { text-align: center; padding: 14px; font-size: .72rem; color: #b6ae9c; }
   midi-player { width: 100%; display: block; margin-bottom: 8px; }
+  #playerWrap, #studioPlayerWrap { overflow-x: auto; overflow-y: visible; }
+  midi-visualizer { display: block; width: 100%; }
+  midi-visualizer svg { height: auto; }
   midi-visualizer { border: 1px solid var(--line); border-radius: 8px; background: #fff; max-height: 180px; overflow: auto; }
 </style>
 <!-- html-midi-player (구글 Magenta 팀 · 무료 · GM 사운드폰트로 드럼 포함 재생) -->
@@ -235,18 +238,18 @@
     </details>
     <details style="margin-top:8px" id="tagCheatsheet">
       <summary>🎛️ 장르별 추천 Tags 치트시트 (영어로 붙여넣기)</summary>
-      <p class="note" style="margin-bottom:6px">Tags(스타일) 칸에 그대로 복붙하세요. 「가사+스타일 복사」를 쓰면 아래 <b>기본 5종</b>이 곡에 맞춰 자동으로 들어갑니다.</p>
+      <p class="note" style="margin-bottom:6px">Tags(스타일) 칸에 그대로 복붙하세요. 이제 <b>13개 장르 모두 위 「장르」 드롭다운에서 선택</b>할 수 있고, 「가사+스타일 복사」를 쓰면 고른 장르의 태그가 곡에 맞춰 자동으로 들어갑니다.</p>
       <div class="cheat-wrap">
         <table class="cheat">
           <thead><tr><th>장르</th><th>추천 Tags</th><th>BPM</th></tr></thead>
           <tbody>
-            <tr><th colspan="3" class="grp">기본 5종 (자동 반영)</th></tr>
+            <tr><th colspan="3" class="grp">기본 5종</th></tr>
             <tr><td>팝</td><td><code>pop, catchy, polished, synth, electric guitar, bass, drums</code></td><td>100~120</td></tr>
             <tr><td>발라드</td><td><code>ballad, emotional, piano, strings, soft drums</code></td><td>60~80</td></tr>
             <tr><td>댄스</td><td><code>dance pop, EDM, four-on-the-floor, bright synth, punchy bass</code></td><td>120~132</td></tr>
             <tr><td>록</td><td><code>rock, driving, distorted electric guitar, bass, powerful drums</code></td><td>110~140</td></tr>
             <tr><td>트로트</td><td><code>trot, korean retro pop, cheerful, brass, synth, bouncy rhythm</code></td><td>100~130</td></tr>
-            <tr><th colspan="3" class="grp">보너스 (직접 넣어보기)</th></tr>
+            <tr><th colspan="3" class="grp">보너스 8종 (이제 드롭다운에서 선택 가능)</th></tr>
             <tr><td>힙합</td><td><code>hip hop, boom bap, 808 bass, trap hi-hats, punchy drums</code></td><td>80~95</td></tr>
             <tr><td>R&amp;B</td><td><code>R&amp;B, smooth, soulful, electric piano, mellow bass, groovy</code></td><td>65~90</td></tr>
             <tr><td>시티팝</td><td><code>city pop, 80s, retro, funky guitar, warm synth, groovy bass</code></td><td>100~118</td></tr>
@@ -288,11 +291,19 @@
 var SongCore = (function () {
   'use strict';
   var GENRES = {
-    pop:    { label: '팝',     tempo: [96, 118],  drum: '팝',              form: ['인트로', '벌스', '프리코러스', '코러스', '벌스', '프리코러스', '코러스', '브릿지', '코러스', '아웃트로'] },
-    ballad: { label: '발라드', tempo: [64, 80],   drum: '발라드',          form: ['인트로', '벌스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
-    dance:  { label: '댄스',   tempo: [120, 130], drum: '포 온 더 플로어', form: ['인트로', '벌스', '프리코러스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
-    rock:   { label: '록',     tempo: [112, 138], drum: '기본 록',         form: ['인트로', '벌스', '코러스', '벌스', '코러스', '솔로', '코러스', '아웃트로'] },
-    trot:   { label: '트로트', tempo: [100, 126], drum: '팝',              form: ['인트로', '벌스', '코러스', '벌스', '코러스', '간주', '코러스', '아웃트로'] }
+    pop:       { label: '팝',         tempo: [96, 118],  drum: '팝',              form: ['인트로', '벌스', '프리코러스', '코러스', '벌스', '프리코러스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    ballad:    { label: '발라드',     tempo: [64, 80],   drum: '발라드',          form: ['인트로', '벌스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    dance:     { label: '댄스',       tempo: [120, 130], drum: '포 온 더 플로어', form: ['인트로', '벌스', '프리코러스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    rock:      { label: '록',         tempo: [112, 138], drum: '기본 록',         form: ['인트로', '벌스', '코러스', '벌스', '코러스', '솔로', '코러스', '아웃트로'] },
+    trot:      { label: '트로트',     tempo: [100, 126], drum: '팝',              form: ['인트로', '벌스', '코러스', '벌스', '코러스', '간주', '코러스', '아웃트로'] },
+    hiphop:    { label: '힙합',       tempo: [82, 96],   drum: '하프타임',        form: ['인트로', '벌스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    rnb:       { label: 'R&B',        tempo: [68, 92],   drum: '하프타임',        form: ['인트로', '벌스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    citypop:   { label: '시티팝',     tempo: [100, 116], drum: '팝',              form: ['인트로', '벌스', '프리코러스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    jazz:      { label: '재즈',       tempo: [92, 132],  drum: '8비트 드라이브',  form: ['인트로', '벌스', '코러스', '벌스', '코러스', '간주', '코러스', '아웃트로'] },
+    lofi:      { label: '로파이',     tempo: [70, 86],   drum: '하프타임',        form: ['인트로', '벌스', '코러스', '벌스', '코러스', '아웃트로'] },
+    folk:      { label: '포크',       tempo: [84, 112],  drum: '발라드',          form: ['인트로', '벌스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    synthwave: { label: '신스웨이브', tempo: [100, 118], drum: '포 온 더 플로어', form: ['인트로', '벌스', '프리코러스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] },
+    acoustic:  { label: '어쿠스틱팝', tempo: [90, 116],  drum: '팝',              form: ['인트로', '벌스', '프리코러스', '코러스', '벌스', '코러스', '브릿지', '코러스', '아웃트로'] }
   };
   var MOODS = {
     bright:  { label: '밝음', minor: false, energy: 0.7,  tempoAdj: 6 },
@@ -468,27 +479,43 @@ var Arranger = (function () {
     for (var m = lo; m <= hi; m++) { if (tones.indexOf(((m % 12) + 12) % 12) >= 0) { var d = Math.abs(m - ref); if (d < bd) { bd = d; best = m; } } }
     return best < 0 ? Math.max(lo, Math.min(hi, ref)) : best;
   }
-  // 한 마디 멜로디 — 8분음표 그리드. 강박(1·3박)=코드톤, 사이는 순차. dense면 8분, 아니면 4분.
-  function melodyBar(chord, prevMidi, dense, rnd, lo, hi) {
-    var t1 = chordToneNear(chord.tones, prevMidi, lo, hi);
-    var t3 = chordToneNear(chord.tones, t1 + Math.round(rnd() * 6 - 3), lo, hi);
-    var slots = [];
-    if (dense) {
-      // 8개(각 8분). 0,4=코드톤. 1..3 t1→t3 순차, 5..7 t3에서 순차 이동
-      var seq = [t1];
-      var cur = t1;
-      for (var i = 1; i < 4; i++) { cur = stepToward(cur, t3); seq.push(cur); }
-      seq.push(t3); cur = t3;
-      for (var j = 5; j < 8; j++) { cur = scaleStep(cur, rnd() < 0.5 ? 1 : -1); cur = Math.max(lo, Math.min(hi, cur)); seq.push(cur); }
-      slots = seq.map(function (m) { return { midi: m, len: 1 }; });
-    } else {
-      // 4개(각 4분=2). 0,4=코드톤(=beat1,3), 2,6=사이 스케일음
-      var a = t1, c = t3;
-      var b = clampScale(Math.round((a + c) / 2), lo, hi);
-      var d = clampScale(scaleStep(c, rnd() < 0.5 ? -1 : 1), lo, hi);
-      slots = [{ midi: a, len: 2 }, { midi: b, len: 2 }, { midi: c, len: 2 }, { midi: d, len: 2 }];
+  // 리듬 템플릿(8분음표 단위, 한 마디=8). 밀도(sparse/normal/dense)별로 느낌이 다름.
+  var RHY = {
+    sparse: [[8], [4, 4], [6, 2], [4, 2, 2], [2, 6], [4, 4]],
+    normal: [[2, 2, 2, 2], [4, 2, 2], [2, 2, 4], [4, 4], [2, 4, 2], [2, 2, 2, 1, 1], [4, 3, 1], [3, 1, 2, 2]],
+    dense:  [[2, 1, 1, 2, 2], [1, 1, 2, 2, 2], [2, 2, 1, 1, 2], [1, 1, 2, 1, 1, 2], [2, 1, 1, 2, 1, 1], [1, 1, 1, 1, 2, 2]]
+  };
+  function chordToneLeap(chord, ref, lo, hi, rnd) {
+    // 코드톤으로 3~6도 도약(멜로디에 굴곡을 줌)
+    var dir = rnd() < 0.5 ? -1 : 1;
+    return chordToneNear(chord.tones, ref + dir * (4 + Math.floor(rnd() * 4)), lo, hi);
+  }
+  // 한 마디 멜로디 — 리듬 패턴을 받아 음을 얹는다. 강박(pos 0·4)=코드톤, 약박=순차/도약/쉼표.
+  function melodyBarR(chord, prevMidi, rnd, lo, hi, rhythm, opt) {
+    opt = opt || {};
+    var slots = [], pos = 0, cur = chordToneNear(chord.tones, prevMidi, lo, hi), prevPitch = -1;
+    for (var i = 0; i < rhythm.length; i++) {
+      var len = rhythm[i], strong = (pos === 0 || pos === 4), pitch;
+      if (i === 0) {
+        pitch = cur;                                            // 마디 첫 음 = 코드톤(강박)
+      } else if (opt.rest && i < rhythm.length - 1 && rnd() < opt.rest) {
+        slots.push({ midi: null, len: len }); pos += len; continue;   // 약박 쉼표(마지막 음은 유지)
+      } else if (strong || (opt.leap && rnd() < opt.leap)) {
+        pitch = (opt.leap && rnd() < opt.leap) ? chordToneLeap(chord, cur, lo, hi, rnd) : chordToneNear(chord.tones, cur, lo, hi);
+      } else {
+        pitch = clampScale(scaleStep(cur, rnd() < 0.5 ? 1 : -1), lo, hi);
+      }
+      if (pitch === prevPitch && !strong) pitch = clampScale(scaleStep(pitch, rnd() < 0.5 ? 1 : -1), lo, hi); // 한 음 갇힘 방지
+      pitch = Math.max(lo, Math.min(hi, pitch));
+      slots.push({ midi: pitch, len: len }); prevPitch = cur = pitch; pos += len;
     }
     return slots;
+  }
+  // 공개 래퍼(테스트/호환용) — 밀도만 받아 리듬을 하나 골라 melodyBarR 호출
+  function melodyBar(chord, prevMidi, dense, rnd, lo, hi) {
+    var set = dense ? RHY.dense : RHY.normal;
+    var rhythm = set[Math.floor(rnd() * set.length) % set.length];
+    return melodyBarR(chord, prevMidi, rnd, lo, hi, rhythm, { rest: dense ? 0.06 : 0.12, leap: dense ? 0.35 : 0.25 });
   }
   function stepToward(cur, target) { if (cur === target) return cur; return scaleStep(cur, cur < target ? 1 : -1); }
   function clampScale(midi, lo, hi) { var m = Math.max(lo, Math.min(hi, midi)); if (!isScale(m)) m = scaleStep(m, 1); return Math.max(lo, Math.min(hi, m)); }
@@ -510,22 +537,42 @@ var Arranger = (function () {
   }
   function barToAbc(notes, chordSym) {
     var s = chordSym ? '"' + chordSym + '"' : '';
-    notes.forEach(function (n, i) { s += (i > 0 ? '' : '') + midiToAbc(n.midi) + (n.len > 1 ? n.len : '') + ((i % 2 === 1) ? ' ' : ''); });
+    notes.forEach(function (n, i) {
+      var tok = (n.midi == null) ? 'z' : midiToAbc(n.midi);       // 쉼표 지원
+      s += tok + (n.len > 1 ? n.len : '') + ((i % 2 === 1) ? ' ' : '');
+    });
     return s.trim();
   }
+  // 장르별 멜로디 성향(밀도) — 같은 시드라도 장르가 다르면 멜로디가 달라지게 하는 핵심
+  function styleFor(sec, plan) {
+    var e = sec.energy, g = plan.genreKey || 'pop';
+    var denseG = (g === 'dance' || g === 'rock' || g === 'hiphop' || g === 'synthwave' || g === 'trot');
+    var sparseG = (g === 'ballad' || g === 'lofi' || g === 'rnb' || g === 'folk');
+    if (sec.name === '코러스' || e >= 0.85) return 'dense';
+    if (sparseG && e < 0.65) return 'sparse';
+    if (denseG && e >= 0.5) return 'dense';
+    return e >= 0.7 ? 'dense' : 'normal';
+  }
+  function strHash(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
   function arrange(plan, opts) {
     opts = opts || {};
-    var rnd = rng(opts.seed != null ? opts.seed : (plan.seed || 1));
+    // 시드에 장르·분위기를 섞는다 → 같은 시드라도 장르/분위기가 다르면 멜로디가 달라짐
+    var baseSeed = (opts.seed != null ? opts.seed : (plan.seed || 1)) >>> 0;
+    var mixed = (baseSeed ^ strHash((plan.genreKey || 'pop') + ':' + (plan.moodKey || 'bright'))) >>> 0;
+    var rnd = rng(mixed);
     var lo = 67, hi = 83; // 멜로디 음역 G4~B5
     var rhBars = [], lhBars = [], melBars = [], prev = 74;
     plan.sections.forEach(function (sec, si) {
-      var dense = sec.energy >= 0.7;
-      // 섹션 시작에 번호+이름 텍스트 주석("^1. 인트로") — 악보에서 섹션 구분이 보이게
-      var mark = '"^' + (si + 1) + '. ' + sec.name + '"';
+      var style = styleFor(sec, plan), set = RHY[style];
+      // 섹션마다 2마디 리듬 모티프를 잡아 반복 → 멜로디에 '기억되는' 형태가 생김
+      var rA = set[Math.floor(rnd() * set.length) % set.length];
+      var rB = set[Math.floor(rnd() * set.length) % set.length];
+      var opt = { rest: style === 'sparse' ? 0.16 : (style === 'dense' ? 0.05 : 0.1), leap: style === 'dense' ? 0.35 : 0.22 };
+      var mark = '"^' + (si + 1) + '. ' + sec.name + '"';   // 악보에 섹션 번호+이름
       for (var b = 0; b < sec.bars; b++) {
         var chord = parseChord(sec.chords[b % sec.chords.length]);
-        var mel = melodyBar(chord, prev, dense, rnd, lo, hi);
-        prev = mel[mel.length - 1].midi;
+        var mel = melodyBarR(chord, prev, rnd, lo, hi, (b % 2 === 0 ? rA : rB), opt);
+        for (var k = mel.length - 1; k >= 0; k--) { if (mel[k].midi != null) { prev = mel[k].midi; break; } }
         rhBars.push((b === 0 ? mark : '') + barToAbc(mel, chord.sym));
         lhBars.push(barToAbc(bassBar(chord), ''));
         melBars.push((b === 0 ? mark : '') + barToAbc(mel, chord.sym));
@@ -1235,7 +1282,7 @@ var Producer = (function () {
   function addLinear(lane, slots, barStart, eighth, vel, gate) {
     var t = barStart;
     slots.forEach(function (n) {
-      lane.push({ midi: n.midi, start: t, dur: Math.max(1, Math.round(n.len * eighth * (gate || 0.95))), vel: clampVel(vel) });
+      if (n.midi != null) lane.push({ midi: n.midi, start: t, dur: Math.max(1, Math.round(n.len * eighth * (gate || 0.95))), vel: clampVel(vel) }); // 쉼표는 건너뛰고 시간만 진행
       t += n.len * eighth;
     });
   }
@@ -1268,7 +1315,10 @@ var Producer = (function () {
     var A = ARR();
     if (!A) throw new Error('Arranger 엔진이 필요합니다.');
     cfg = cfg || defaultConfig(plan);
-    var rnd = rng(plan.seed || 1);
+    // 시드에 장르·분위기를 섞어 멜로디가 장르/분위기별로 달라지게(편곡실도 동일)
+    var gm = (plan.genreKey || 'pop') + ':' + (plan.moodKey || 'bright');
+    var gh = 2166136261; for (var ci = 0; ci < gm.length; ci++) { gh ^= gm.charCodeAt(ci); gh = Math.imul(gh, 16777619); }
+    var rnd = rng(((plan.seed || 1) ^ (gh >>> 0)) >>> 0);
     var quarter = PPQ, eighth = PPQ / 2, beatsPerBar = 4, barTicks = quarter * beatsPerBar;
     var lo = 67, hi = 83, prev = 74;
     var lanes = { vocal: [], piano: [], guitar: [], bass: [], drums: [] };
@@ -1400,11 +1450,19 @@ var Stage3 = (function () {
   var SEC_EN = { '인트로': 'Intro', '벌스': 'Verse', '프리코러스': 'Pre-Chorus', '코러스': 'Chorus', '브릿지': 'Bridge', '솔로': 'Solo', '간주': 'Interlude', '아웃트로': 'Outro' };
   /* 스타일 태그는 영어가 인식이 잘 됨(ACE-Step/Suno 등). 장르별로 하위장르+악기까지 풍부하게 */
   var GENRE_TAGS = {
-    pop:    'pop, catchy, polished, synth, electric guitar, bass, drums',
-    ballad: 'ballad, emotional, piano, strings, soft drums',
-    dance:  'dance pop, EDM, four-on-the-floor, bright synth, punchy bass',
-    rock:   'rock, driving, distorted electric guitar, bass, powerful drums',
-    trot:   'trot, korean retro pop, cheerful, brass, synth, bouncy rhythm'
+    pop:       'pop, catchy, polished, synth, electric guitar, bass, drums',
+    ballad:    'ballad, emotional, piano, strings, soft drums',
+    dance:     'dance pop, EDM, four-on-the-floor, bright synth, punchy bass',
+    rock:      'rock, driving, distorted electric guitar, bass, powerful drums',
+    trot:      'trot, korean retro pop, cheerful, brass, synth, bouncy rhythm',
+    hiphop:    'hip hop, boom bap, 808 bass, trap hi-hats, punchy drums',
+    rnb:       'R&B, smooth, soulful, electric piano, mellow bass, groovy',
+    citypop:   'city pop, 80s, retro, funky guitar, warm synth, groovy bass',
+    jazz:      'jazz, swing, upright bass, brushed drums, saxophone, warm',
+    lofi:      'lo-fi, chill, dusty piano, vinyl crackle, mellow beat, relaxing',
+    folk:      'folk, acoustic guitar, warm, gentle, intimate, fingerpicking',
+    synthwave: 'synthwave, retrowave, 80s synth, arpeggio, neon, driving bass',
+    acoustic:  'acoustic pop, cozy, acoustic guitar, soft vocals, claps'
   };
   var MOOD_EN = { bright: 'bright, uplifting', sad: 'sad, melancholic', excited: 'energetic, upbeat', calm: 'calm, gentle' };
   // 가사(한글 그대로) + 영어 스타일 태그 → 송 생성 엔진(ACE-Step·ElevenLabs·Suno)에 넘길 재료
@@ -1556,6 +1614,8 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   var lastMidi = null, curUrl = null, lastMelodyAbc = '';
   var DRUM_MAP = { '기본 록': 0, '8비트 드라이브': 1, '하프타임': 2, '발라드': 3, '팝': 4, '포 온 더 플로어': 5 };
   function playerReady() { return !!(window.customElements && customElements.get('midi-player')); }
+  /* 피아노롤 세로(음 높이)를 키워 전 음역이 크게 보이게 — 가로는 스크롤 */
+  function bigViz(id) { try { var v = document.getElementById(id); if (v) v.config = { noteHeight: 6 }; } catch (e) {} }
 
   function buildArrangement() {
     var arr = Arranger.arrange(plan, { seed: plan.seed });
@@ -1578,6 +1638,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
         if (curUrl) URL.revokeObjectURL(curUrl);
         curUrl = URL.createObjectURL(blob);
         $('playerWrap').style.display = '';
+        bigViz('viz');
         try { $('player').src = curUrl; } catch (e) {}
         ['btnSaveMidi', 'btnToDrum', 'btnToLab', 'btnMelodyLab', 'btnMelodyAbc'].forEach(function (id) { $(id).disabled = false; });
         var msg = '✓ 반주 완성 · ' + out.info.melBars + '마디 · 멜로디+베이스 ' + out.info.melNotes + '음 · 드럼 ' + out.info.drmNotes + '음 · ' + plan.tempo + ' BPM · 드럼 ' + plan.drumStyle;
@@ -1695,6 +1756,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
         if (studioUrl) URL.revokeObjectURL(studioUrl);
         studioUrl = URL.createObjectURL(blob);
         $('studioPlayerWrap').style.display = '';
+        bigViz('studioViz');
         try { $('studioPlayer').src = studioUrl; } catch (e) {}
         $('btnSaveStudioMidi').disabled = false; $('btnStudioToLab').disabled = false;
         var names = out.tracks.map(function (t) { return t.name + '(' + t.count + ')'; }).join(' · ');
