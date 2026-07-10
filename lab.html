@@ -704,6 +704,12 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
         <span style="font-size:.74rem; color:var(--ink-soft, #46586b);">— 송메이커에서 함께 넘어온 가사입니다. 악보와 나란히 흐름을 짚어보세요.</span>
       </div>
       <div id="lyricsBody" style="white-space:pre-wrap; font-size:.86rem; line-height:1.7; color:var(--ink, #1c2b3a);"></div>
+      <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+        <button type="button" id="lyricOverlayBtn" class="btn-brass">&#127925; 악보에 가사 얹어 보기</button>
+        <button type="button" id="lyricOverlayHide" class="btn-ghost" style="display:none;">닫기</button>
+      </div>
+      <p class="hint" style="margin:6px 0 0;">멜로디 음표 아래에 가사를 얹어 미리봅니다(읽기 전용). 실제 노래는 ACE-Step이 부르며, 여기 음표는 흐름 참고용입니다.</p>
+      <div id="lyricScore" style="display:none; margin-top:8px; border:1px solid var(--line); border-radius:8px; padding:6px; background:#fff; overflow-x:auto;"></div>
     </div>
   </section>
 </main>
@@ -1068,6 +1074,56 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   /* 악보의 소스 '줄'(보통 4마디)마다 재생 버튼을 만든다 — 어느 줄인지 명확 */
   function musicLines(abc) {
     return abc.split("\n").filter(function (l) { return l.trim() && !/^\s*(?:[A-Za-z]:|%%|%)/.test(l); });
+  }
+
+  /* ── 악보에 가사 얹어 보기(읽기 전용 미리보기) ── */
+  var labLyricsText = "";
+  function parseLyricSecs(text) {
+    var out = [], cur = null;
+    (text || "").split(/\n/).forEach(function (line) {
+      var m = line.match(/^\s*\[(.+?)\]\s*$/);
+      if (m) { cur = { name: m[1].trim(), syls: [] }; out.push(cur); return; }
+      if (!cur) { cur = { name: "", syls: [] }; out.push(cur); }
+      var toks = line.trim().match(/[가-힣]|[A-Za-z]+/g);   // 한글 음절 / 영어 단어
+      if (toks) cur.syls = cur.syls.concat(toks);
+    });
+    return out;
+  }
+  function lineNoteSlots(line) {   // 음/쉼표 순서 배열
+    var body = line.replace(/"[^"]*"/g, "").replace(/[|\]\[]/g, " ");
+    var re = /[\^_=]*([A-Ga-gzZ])[',]*\d*(?:\/\d*)?/g, m, slots = [];
+    while ((m = re.exec(body))) slots.push((m[1] === "z" || m[1] === "Z") ? "rest" : "note");
+    return slots;
+  }
+  function buildLyricPreview() {
+    var host = $("lyricScore"); if (!host) return;
+    if (typeof ABCJS === "undefined") { setStatus("악보 엔진(abcjs)을 불러오지 못했습니다 — 인터넷 연결 시 동작합니다.", true); return; }
+    var abc = input.value;
+    if (isMultiVoice(abc)) {
+      host.innerHTML = "<p class='hint' style='padding:8px'>여러 악기(멀티보이스) 악보는 가사 얹기를 지원하지 않습니다. 「멜로디만」 악보에서 사용하세요.</p>";
+      host.style.display = ""; $("lyricOverlayHide").style.display = ""; return;
+    }
+    var nameToSyls = {};
+    parseLyricSecs(labLyricsText).forEach(function (s) { if (nameToSyls[s.name] == null) nameToSyls[s.name] = s.syls.slice(); });
+    var pr = abcParts(abc);
+    var head = pr.header.filter(function (l) { return l.trim(); }).join("\n");
+    var out = [head], pool = [], pi = 0;
+    musicLines(abc).forEach(function (line) {
+      var mk = line.match(/"\^\d+\.\s*([^"]+)"/);            // 섹션 마커 → 그 섹션 가사로 리셋
+      if (mk) { pool = (nameToSyls[mk[1].trim()] || []).slice(); pi = 0; }
+      out.push(line);
+      var w = lineNoteSlots(line).map(function (s) { return s === "rest" ? "*" : (pi < pool.length ? pool[pi++] : "*"); });
+      if (w.some(function (t) { return t !== "*"; })) out.push("w: " + w.join(" "));
+    });
+    try {
+      host.innerHTML = "";
+      ABCJS.renderAbc("lyricScore", out.join("\n") + "\n", { responsive: "resize", add_classes: false, paddingleft: 8, paddingright: 8 });
+      host.style.display = ""; $("lyricOverlayHide").style.display = "";
+      setStatus("악보에 가사를 얹어 미리보기했습니다(읽기 전용).");
+    } catch (e) {
+      host.innerHTML = "<p class='hint' style='padding:8px'>미리보기 실패: " + (e.message || "") + "</p>";
+      host.style.display = ""; $("lyricOverlayHide").style.display = "";
+    }
   }
   function buildLineButtons() {
     var host = $("linePlays"); if (!host) return;
@@ -2502,6 +2558,8 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   playBtn.addEventListener("click", startPlay);
   play4Btn.addEventListener("click", playFourBars);
   stopBtn.addEventListener("click", stopPlay);
+  $("lyricOverlayBtn").addEventListener("click", buildLyricPreview);
+  $("lyricOverlayHide").addEventListener("click", function () { $("lyricScore").style.display = "none"; $("lyricOverlayHide").style.display = "none"; });
   /* 좋은 소리로 재생 — 현재 ABC를 MIDI로 바꿔 GM 사운드폰트 플레이어로 */
   var sfUrl = null;
   function sfPlayerReady() { return !!(window.customElements && customElements.get("midi-player")); }
@@ -2576,7 +2634,8 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   var lyricsHandoff = null;
   try { lyricsHandoff = window.localStorage.getItem("broguard_lab_lyrics"); } catch (e) {}
   if (lyricsHandoff && lyricsHandoff.trim()) {
-    $("lyricsBody").textContent = lyricsHandoff.trim();
+    labLyricsText = lyricsHandoff.trim();
+    $("lyricsBody").textContent = labLyricsText;
     $("lyricsPanel").style.display = "";
     try { window.localStorage.removeItem("broguard_lab_lyrics"); } catch (e) {}
   }

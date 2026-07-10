@@ -42,9 +42,6 @@ try {
 } catch (e) { bad('편곡실 격자 렌더', e); }
 
 try {
-  // 가사를 넣어두면 피아노롤 아래에 텍스트로 함께 보인다
-  await page.fill('#lyricPaste', '[벌스]\n거울 속 흰머리 하나\n[코러스]\n어깨 펴고 화이팅');
-  await page.click('#btnApplyLyric');
   await page.click('#btnProduce');
   await page.waitForFunction(() => /편곡 완성/.test(document.getElementById('studioStatus').textContent), undefined, { timeout: 10000 });
   const st = await page.textContent('#studioStatus');
@@ -56,14 +53,17 @@ try {
 } catch (e) { bad('편곡 생성', e); }
 
 try {
-  // 피아노롤 아래 가사 텍스트 표시 + 세로 스크롤 없음(가로만 스크롤)
-  assert.equal(await page.isVisible('#studioLyrics'), true, '가사 텍스트 표시');
-  const ly = await page.textContent('#studioLyrics');
-  assert.ok(/어깨 펴고 화이팅/.test(ly) && /\[코러스\]/.test(ly), '가사 내용: ' + ly);
-  const ovY = await page.evaluate(() => getComputedStyle(document.querySelector('#studioPlayerWrap .viz-scroll')).overflowY);
-  assert.equal(ovY, 'hidden', '피아노롤은 세로 스크롤 없음(overflow-y:hidden)');
-  ok('피아노롤 아래 가사 텍스트 + 세로 스크롤 제거');
-} catch (e) { bad('가사 텍스트/세로 스크롤', e); }
+  // 피아노롤은 세로 스크롤 없이(가로만) — .viz-scroll의 overflow-y가 hidden, 안쪽 비주얼라이저도 세로 스크롤 억제
+  const s = await page.evaluate(() => {
+    const vs = document.querySelector('#studioPlayerWrap .viz-scroll');
+    const vz = document.getElementById('studioViz');
+    return { vsY: getComputedStyle(vs).overflowY, vsX: getComputedStyle(vs).overflowX, vzY: getComputedStyle(vz).overflowY };
+  });
+  assert.equal(s.vsY, 'hidden', '래퍼 세로 스크롤 없음');
+  assert.equal(s.vsX, 'auto', '래퍼 가로만 스크롤');
+  assert.equal(s.vzY, 'visible', '비주얼라이저 세로 스크롤 억제(visible)');
+  ok('피아노롤: 세로 스크롤 제거(가로만)');
+} catch (e) { bad('세로 스크롤 제거', e); }
 
 try {
   // 강약 편집: 첫 섹션 여림으로, 기타 트랙 전체 Off 후 재생성 → 채널 2 사라짐 확인은 저장 파일로

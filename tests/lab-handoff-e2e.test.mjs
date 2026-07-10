@@ -68,6 +68,16 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + e.messa
   } catch (e) { bad('장르별 멜로디 변화', e); }
 
   try {
+    // 반주: 외부 ABC 파일 가져오기 → 플레이어·저장 활성화
+    const abcFile = 'X:1\nT:가져온곡\nM:4/4\nL:1/8\nK:C\n"C"c2c2 c2c2 | "G"B2B2 B2B2 |]\n';
+    await page.setInputFiles('#fileAbc', { name: 'test.abc', mimeType: 'text/plain', buffer: Buffer.from(abcFile) });
+    await page.waitForFunction(() => /ABC 가져옴/.test(document.getElementById('arrStatus').textContent), undefined, { timeout: 5000 });
+    assert.equal(await page.isEnabled('#btnSaveMidi'), true, '가져온 뒤 .mid 저장 활성화');
+    assert.ok((await page.inputValue('#arrAbc')).includes('가져온곡'), 'arrAbc에 가져온 ABC 반영');
+    ok('반주: ABC 가져오기 동작');
+  } catch (e) { bad('ABC 가져오기', e); }
+
+  try {
     // 가사 붙여넣고 → 멜로디 연구소로: window.open 가로채고 localStorage 확인
     await page.click('#btnArrange');
     await page.waitForFunction(() => /반주 완성/.test(document.getElementById('arrStatus').textContent), undefined, { timeout: 10000 });
@@ -121,6 +131,16 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + e.messa
     await page.click('#linePlays button:nth-of-type(1)');
     ok('연구소: 줄별(4마디) 재생 버튼 생성·클릭 안전');
   } catch (e) { bad('줄별 재생 버튼', e); }
+  try {
+    // 가사 얹어 보기: abcjs 있으면 #lyricScore 표시, 없으면 상태 안내 — 크래시 없이
+    assert.equal(await page.isVisible('#lyricOverlayBtn'), true, '가사 얹기 버튼 존재');
+    await page.click('#lyricOverlayBtn');
+    await page.waitForFunction(() => {
+      const ls = document.getElementById('lyricScore');
+      return (ls && ls.style.display !== 'none') || /abcjs/.test(document.getElementById('status').textContent);
+    }, undefined, { timeout: 5000 });
+    ok('연구소: 악보에 가사 얹어 보기 안전 동작');
+  } catch (e) { bad('가사 얹어 보기', e); }
   try { assert.deepEqual(errors, []); ok('연구소 JS 오류 없음'); } catch (e) { bad('연구소 JS 오류', e); }
   await page.close();
 }
