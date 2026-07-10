@@ -34,6 +34,14 @@
   table.cheat td:first-child { white-space: nowrap; font-weight: 700; color: var(--ink); }
   table.cheat td:last-child { white-space: nowrap; color: var(--ink-soft); text-align: center; }
   table.cheat code { font-family: 'D2Coding', Consolas, monospace; font-size: .72rem; color: var(--ink); }
+  .grid-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; }
+  table.grid { border-collapse: collapse; font-size: .74rem; width: 100%; }
+  table.grid th, table.grid td { border: 1px solid var(--line); padding: 4px 7px; text-align: center; white-space: nowrap; }
+  table.grid thead th { background: #f0ecd8; color: var(--brass-deep); font-weight: 800; }
+  table.grid .trk { text-align: left; font-weight: 700; background: #faf6e8; position: sticky; left: 0; z-index: 1; }
+  table.grid .trk label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  table.grid select.int { font: inherit; font-size: .7rem; padding: 2px 3px; border: 1px solid var(--line); border-radius: 6px; background: #fffdf7; width: auto; }
+  table.grid input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--brass-deep); }
   label.fld { font-size: .76rem; color: var(--ink-soft); display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
   input[type=text], select, textarea { font: inherit; font-size: .86rem; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fffdf7; color: var(--ink); width: 100%; }
   textarea { min-height: 90px; resize: vertical; font-family: 'D2Coding', Consolas, monospace; line-height: 1.6; }
@@ -165,6 +173,27 @@
       <summary>🎼 편곡 ABC 보기</summary>
       <textarea id="arrAbc" readonly style="margin-top:6px"></textarea>
     </details>
+  </div>
+
+  <div class="card" id="studioCard" style="display:none">
+    <h2>&#127900;&#65039; 편곡실 (프로듀싱 · 5트랙 · 섹션별 강약)</h2>
+    <p class="sub"><b>보컬·피아노·메인기타·베이스·드럼</b>을 트랙별로 켜고/끄고, 섹션마다 <b>세기(강약)</b>를 정해 <b>“벌스는 비우고 코러스는 터뜨리는”</b> 프로 편곡을 만듭니다. 악기마다 다른 소리로 재생됩니다.</p>
+    <div class="grid-scroll"><table class="grid" id="studioGrid"></table></div>
+    <p class="note">칸 = 그 섹션에서 그 악기를 <b>켤지</b>. 맨 왼쪽 체크 = 트랙 전체 On/Off. 「세기」는 여림→보통→셈으로 갈수록 크고 촘촘해집니다.</p>
+    <div class="row" style="margin-top:6px">
+      <button id="btnProduce">&#127900;&#65039; 이 편곡으로 반주 만들기</button>
+      <button id="btnStudioReset" class="alt">&#8635; 기본 강약으로</button>
+      <span id="studioStatus" class="note" style="margin:0"></span>
+    </div>
+    <div id="studioPlayerWrap" style="margin-top:12px; display:none">
+      <midi-player id="studioPlayer" sound-font visualizer="#studioViz"></midi-player>
+      <midi-visualizer id="studioViz" type="piano-roll" style="width:100%"></midi-visualizer>
+    </div>
+    <div class="row">
+      <button id="btnSaveStudioMidi" class="alt" disabled>&#8681; .mid 저장(멀티트랙)</button>
+      <button id="btnStudioToLab" class="alt" disabled>&#127925; 연구소로(멜로디)</button>
+    </div>
+    <p class="note">완성 후 <b>보컬(4단계)</b>에서 이 반주를 ACE-Step에 넘겨 노래만 얹으면, AI가 대충 만든 반주 대신 <b>내 편곡</b>이 그대로 살아납니다.</p>
   </div>
 
   <div class="card" id="mvCard" style="display:none">
@@ -1113,6 +1142,163 @@ if (typeof module !== 'undefined' && module.exports) module.exports = MidiCore;
 if (typeof window !== 'undefined') window.MidiCore = MidiCore;
 </script>
 
+<script id="producer">
+/* Producer — 편곡실: 설계도(plan) + 트랙/강약 설정 → 5트랙 멀티 MIDI(악기별 GM · 벨로시티 강약)
+   트랙: 보컬(리드 멜로디) · 피아노(코드) · 메인기타(파워코드) · 베이스 · 드럼
+   섹션마다 세기(여림/보통/셈)와 트랙 On/Off를 지정해 "벌스는 비우고 코러스는 터뜨리는" 다이내믹을 만든다.
+   Arranger(전역)의 멜로디·베이스·코드 로직을 재사용한다. */
+var Producer = (function () {
+  'use strict';
+  var PPQ = 480;
+  var TRACKS = [
+    { key: 'vocal',  name: '보컬(리드)', prog: 54, ch: 0 },   // Voice Oohs — 멜로디 가이드
+    { key: 'piano',  name: '피아노',      prog: 0,  ch: 1 },   // Acoustic Grand Piano
+    { key: 'guitar', name: '메인기타',    prog: 29, ch: 2 },   // Overdriven Guitar
+    { key: 'bass',   name: '베이스',      prog: 33, ch: 3 },   // Electric Bass (finger)
+    { key: 'drums',  name: '드럼',        prog: 0,  ch: 9 }    // 채널 10 = 드럼
+  ];
+  var INTENSITY = { low: { vel: 58, label: '여림' }, mid: { vel: 80, label: '보통' }, high: { vel: 106, label: '셈' } };
+  var ORDER = ['low', 'mid', 'high'];
+
+  function rng(seed) { var s = (seed >>> 0) || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  function clampVel(v) { return Math.max(1, Math.min(127, Math.round(v))); }
+  function ARR() { return (typeof Arranger !== 'undefined') ? Arranger : (typeof globalThis !== 'undefined' ? globalThis.Arranger : null); }
+
+  // 섹션 energy → 기본 강약 + 트랙 프리셋(벌스 절제 / 코러스 터짐)
+  function defaultConfig(plan) {
+    var sections = (plan.sections || []).map(function (sec) {
+      var e = sec.energy != null ? sec.energy : 0.6;
+      var intensity = e >= 0.8 ? 'high' : (e >= 0.55 ? 'mid' : 'low');
+      return {
+        name: sec.name,
+        intensity: intensity,
+        tracks: {
+          vocal: true,
+          piano: true,
+          bass: true,
+          drums: e >= 0.4,               // 아주 여린 섹션(인트로 등)은 드럼 빼기
+          guitar: intensity === 'high'   // 메인기타는 코러스(고에너지)에서만 터뜨림
+        }
+      };
+    });
+    return { enabled: { vocal: true, piano: true, guitar: true, bass: true, drums: true }, sections: sections };
+  }
+
+  function active(cfg, scfg, key) { return cfg.enabled[key] !== false && !!scfg.tracks[key]; }
+
+  // ---- 파트 생성기(각 노트 = {midi,start,dur,vel}) ----
+  function pianoVoicing(chord) {
+    // 트라이어드를 C4 옥타브(60~71)에 — 보컬 멜로디(67~83)보다 낮게 깔린다
+    return chord.tones.map(function (pc) { return 60 + ((pc % 12) + 12) % 12; }).sort(function (a, b) { return a - b; });
+  }
+  function addLinear(lane, slots, barStart, eighth, vel, gate) {
+    var t = barStart;
+    slots.forEach(function (n) {
+      lane.push({ midi: n.midi, start: t, dur: Math.max(1, Math.round(n.len * eighth * (gate || 0.95))), vel: clampVel(vel) });
+      t += n.len * eighth;
+    });
+  }
+  function addPiano(lane, chord, barStart, quarter, intensity, vel) {
+    var voic = pianoVoicing(chord);
+    var beats = intensity === 'low' ? [0] : (intensity === 'high' ? [0, 1, 2, 3] : [0, 2]);
+    var dur = intensity === 'low' ? quarter * 4 : (intensity === 'high' ? quarter : quarter * 2);
+    beats.forEach(function (be) { voic.forEach(function (m) { lane.push({ midi: m, start: barStart + be * quarter, dur: Math.round(dur * 0.9), vel: clampVel(vel) }); }); });
+  }
+  function addGuitar(lane, chord, barStart, quarter, intensity, vel) {
+    var root = 48 + chord.root;                 // C3 기준 파워코드(근음+5도+옥타브)
+    var stack = [root, root + 7, root + 12];
+    var beats = intensity === 'high' ? [0, 1, 2, 3] : [0, 2];
+    beats.forEach(function (be) { stack.forEach(function (m) { lane.push({ midi: m, start: barStart + be * quarter, dur: Math.round(quarter * 0.8), vel: clampVel(vel) }); }); });
+  }
+  function addDrums(lane, barStart, quarter, eighth, beatsPerBar, intensity, sectionStart) {
+    var kv = intensity === 'low' ? 70 : (intensity === 'high' ? 118 : 96);   // 킥
+    var sv = intensity === 'low' ? 0 : (intensity === 'high' ? 112 : 92);    // 스네어(여림=없음)
+    var hv = intensity === 'low' ? 52 : (intensity === 'high' ? 80 : 66);    // 하이햇
+    function d(pitch, t, vel, dur) { if (vel <= 0) return; lane.push({ midi: pitch, start: t, dur: dur || Math.round(eighth * 0.5), vel: clampVel(vel) }); }
+    if (intensity === 'low') { for (var be = 0; be < beatsPerBar; be++) d(42, barStart + be * quarter, hv); }
+    else { for (var h = 0; h < beatsPerBar * 2; h++) d(42, barStart + h * eighth, hv); }
+    d(36, barStart, kv);                                    // 킥 1박
+    if (intensity !== 'low') d(36, barStart + 2 * quarter, kv);  // 킥 3박
+    if (sv > 0) { d(38, barStart + quarter, sv); d(38, barStart + 3 * quarter, sv); }  // 스네어 백비트
+    if (intensity === 'high' && sectionStart) d(49, barStart, 110, quarter);            // 크래시(코러스 시작)
+  }
+
+  function produce(plan, cfg) {
+    var A = ARR();
+    if (!A) throw new Error('Arranger 엔진이 필요합니다.');
+    cfg = cfg || defaultConfig(plan);
+    var rnd = rng(plan.seed || 1);
+    var quarter = PPQ, eighth = PPQ / 2, beatsPerBar = 4, barTicks = quarter * beatsPerBar;
+    var lo = 67, hi = 83, prev = 74;
+    var lanes = { vocal: [], piano: [], guitar: [], bass: [], drums: [] };
+    var barCursor = 0;
+    (plan.sections || []).forEach(function (sec, si) {
+      var scfg = cfg.sections[si] || { intensity: 'mid', tracks: { vocal: true, piano: true, bass: true, drums: true } };
+      var vel = INTENSITY[scfg.intensity] ? INTENSITY[scfg.intensity].vel : 80;
+      var dense = scfg.intensity === 'high';
+      for (var b = 0; b < sec.bars; b++) {
+        var barStart = (barCursor + b) * barTicks;
+        var chord = A.parseChord(sec.chords[b % sec.chords.length]);
+        var mel = A.melodyBar(chord, prev, dense, rnd, lo, hi);   // 뮤트여도 멜로디 흐름은 계속 계산(연속성)
+        prev = mel[mel.length - 1].midi;
+        if (active(cfg, scfg, 'vocal')) addLinear(lanes.vocal, mel, barStart, eighth, vel + 8, 0.95);
+        if (active(cfg, scfg, 'bass')) addLinear(lanes.bass, A.bassBar(chord), barStart, eighth, vel - 4, 0.9);
+        if (active(cfg, scfg, 'piano')) addPiano(lanes.piano, chord, barStart, quarter, scfg.intensity, vel - 12);
+        if (active(cfg, scfg, 'guitar')) addGuitar(lanes.guitar, chord, barStart, quarter, scfg.intensity, vel);
+        if (active(cfg, scfg, 'drums')) addDrums(lanes.drums, barStart, quarter, eighth, beatsPerBar, scfg.intensity, b === 0);
+      }
+      barCursor += sec.bars;
+    });
+    var bytes = writeSmf(lanes, plan.tempo || 100);
+    var counts = {}, trackList = [];
+    TRACKS.forEach(function (t) { var c = lanes[t.key].length; counts[t.key] = c; if (c) trackList.push({ key: t.key, name: t.name, count: c }); });
+    return { bytes: bytes, tempo: plan.tempo || 100, bars: barCursor, counts: counts, tracks: trackList };
+  }
+
+  // ---- SMF(type 1) 쓰기: 트랙별 GM 프로그램 + 노트별 벨로시티 ----
+  function writeVarLen(v) { var buf = [v & 0x7f]; v >>= 7; while (v > 0) { buf.unshift((v & 0x7f) | 0x80); v >>= 7; } return buf; }
+  function str2bytes(s) { var a = []; for (var i = 0; i < s.length; i++) a.push(s.charCodeAt(i) & 0xff); return a; }
+  function u32(v) { return [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff]; }
+  function u16(v) { return [(v >>> 8) & 0xff, v & 0xff]; }
+  function chunk(id, data) { return str2bytes(id).concat(u32(data.length)).concat(data); }
+
+  function noteTrack(notes, ch, prog, name) {
+    var abs = [];
+    notes.forEach(function (n) {
+      abs.push({ t: n.start, on: true, midi: n.midi, vel: n.vel });
+      abs.push({ t: n.start + Math.max(1, n.dur), on: false, midi: n.midi, vel: 0 });
+    });
+    abs.sort(function (a, b) { return a.t - b.t || (a.on === b.on ? 0 : a.on ? 1 : -1); }); // off 먼저
+    var trk = [], last = 0, nm = str2bytes(name || '');
+    if (name) trk = trk.concat(writeVarLen(0), [0xff, 0x03, nm.length], nm);
+    trk = trk.concat(writeVarLen(0), [0xc0 | (ch & 0x0f), prog & 0x7f]);      // 프로그램 체인지(악기)
+    abs.forEach(function (e) {
+      trk = trk.concat(writeVarLen(e.t - last));
+      trk.push((e.on ? 0x90 : 0x80) | (ch & 0x0f), e.midi & 0x7f, e.on ? clampVel(e.vel) : 0);
+      last = e.t;
+    });
+    return trk.concat(writeVarLen(0), [0xff, 0x2f, 0x00]);
+  }
+
+  function writeSmf(lanes, tempo) {
+    var uspq = Math.round(60000000 / (tempo || 100));
+    var meta = [];
+    meta = meta.concat(writeVarLen(0), [0xff, 0x51, 0x03, (uspq >> 16) & 0xff, (uspq >> 8) & 0xff, uspq & 0xff]);
+    meta = meta.concat(writeVarLen(0), [0xff, 0x58, 0x04, 4, 2, 24, 8]);
+    meta = meta.concat(writeVarLen(0), [0xff, 0x2f, 0x00]);
+    var chunks = [chunk('MTrk', meta)];
+    TRACKS.forEach(function (t) { if (lanes[t.key] && lanes[t.key].length) chunks.push(chunk('MTrk', noteTrack(lanes[t.key], t.ch, t.prog, t.name))); });
+    var header = chunk('MThd', u16(1).concat(u16(chunks.length)).concat(u16(PPQ)));
+    var all = header; chunks.forEach(function (c) { all = all.concat(c); });
+    return Uint8Array.from(all);
+  }
+
+  return { TRACKS: TRACKS, INTENSITY: INTENSITY, ORDER: ORDER, PPQ: PPQ, defaultConfig: defaultConfig, produce: produce };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = Producer;
+if (typeof window !== 'undefined') window.Producer = Producer;
+</script>
+
 <script id="stage3">
 /* Stage3 — 가라오케 가사 타임라인 + 커버 이미지 스펙 (자체·오프라인·테스트 가능) */
 var Stage3 = (function () {
@@ -1234,7 +1420,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
   function energyColor(e) { return e >= 0.8 ? 'var(--e2)' : e >= 0.55 ? 'var(--e1)' : 'var(--e0)'; }
 
   function renderPlan(p) {
-    $('planCard').style.display = ''; $('lyricCard').style.display = ''; $('arrCard').style.display = ''; $('mvCard').style.display = ''; $('vocalCard').style.display = '';
+    $('planCard').style.display = ''; $('lyricCard').style.display = ''; $('arrCard').style.display = ''; $('studioCard').style.display = ''; $('mvCard').style.display = ''; $('vocalCard').style.display = '';
     var sum = $('summary'); sum.innerHTML = '';
     [['제목', p.title], ['분위기', p.mood], ['장르', p.genre], ['조성', p.key], ['템포', p.tempo + ' BPM'],
      ['박자', p.meter], ['드럼', p.drumStyle], ['구성', p.sections.length + '섹션 · ' + p.totalBars + '마디'],
@@ -1251,6 +1437,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
       box.appendChild(d);
     });
     $('planNote').textContent = '시드 ' + p.seed + ' · 같은 값이면 같은 설계가 나옵니다. 마음에 들 때까지 다시 눌러보세요.';
+    studioCfg = null; buildStudioGrid();
   }
 
   $('btnPlan').addEventListener('click', function () {
@@ -1395,6 +1582,90 @@ if (typeof module !== 'undefined') module.exports = Stage3;
     a.download = (plan.title || 'melody').replace(/[\\/:*?"<>|]/g, '_') + '-melody.abc';
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
+  });
+
+  /* ---------- 편곡실(프로듀싱): 5트랙 × 섹션 강약 ---------- */
+  var studioCfg = null, lastStudioMidi = null, studioUrl = null, lastStudioMelodyAbc = '';
+
+  function buildStudioGrid() {
+    var g = $('studioGrid'); if (!g) return;
+    if (!plan) { g.innerHTML = ''; return; }
+    if (!studioCfg || studioCfg.sections.length !== plan.sections.length) studioCfg = Producer.defaultConfig(plan);
+    var secs = plan.sections;
+    var head = '<thead><tr><th class="trk">트랙 \\ 섹션</th>';
+    secs.forEach(function (s, i) { head += '<th>' + (i + 1) + '.<br>' + s.name + '</th>'; });
+    head += '</tr><tr><th class="trk">세기(강약)</th>';
+    secs.forEach(function (s, i) {
+      var cur = studioCfg.sections[i].intensity;
+      var opts = Producer.ORDER.map(function (k) { return '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + Producer.INTENSITY[k].label + '</option>'; }).join('');
+      head += '<td><select class="int" data-si="' + i + '">' + opts + '</select></td>';
+    });
+    head += '</tr></thead>';
+    var body = '<tbody>';
+    Producer.TRACKS.forEach(function (t) {
+      body += '<tr><td class="trk"><label><input type="checkbox" class="mtr" data-key="' + t.key + '"' + (studioCfg.enabled[t.key] !== false ? ' checked' : '') + '>' + t.name + '</label></td>';
+      secs.forEach(function (s, i) {
+        var on = !!studioCfg.sections[i].tracks[t.key];
+        body += '<td><input type="checkbox" class="cell" data-si="' + i + '" data-key="' + t.key + '"' + (on ? ' checked' : '') + '></td>';
+      });
+      body += '</tr>';
+    });
+    body += '</tbody>';
+    g.innerHTML = head + body;
+    g.querySelectorAll('select.int').forEach(function (sel) {
+      sel.addEventListener('change', function () { studioCfg.sections[+sel.getAttribute('data-si')].intensity = sel.value; });
+    });
+    g.querySelectorAll('input.cell').forEach(function (cb) {
+      cb.addEventListener('change', function () { studioCfg.sections[+cb.getAttribute('data-si')].tracks[cb.getAttribute('data-key')] = cb.checked; });
+    });
+    g.querySelectorAll('input.mtr').forEach(function (cb) {
+      cb.addEventListener('change', function () { studioCfg.enabled[cb.getAttribute('data-key')] = cb.checked; });
+    });
+  }
+
+  $('btnStudioReset').addEventListener('click', function () {
+    if (!plan) return; studioCfg = Producer.defaultConfig(plan); buildStudioGrid();
+    $('studioStatus').innerHTML = '<span class="note">기본 강약으로 되돌렸습니다.</span>';
+  });
+
+  $('btnProduce').addEventListener('click', function () {
+    if (!plan) { $('studioStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
+    $('btnProduce').disabled = true; $('studioStatus').textContent = '편곡 만드는 중…';
+    setTimeout(function () {
+      try {
+        var out = Producer.produce(plan, studioCfg);
+        lastStudioMidi = out.bytes;
+        lastStudioMelodyAbc = Arranger.arrange(plan, { seed: plan.seed }).melodyAbc;
+        var blob = new Blob([lastStudioMidi], { type: 'audio/midi' });
+        if (studioUrl) URL.revokeObjectURL(studioUrl);
+        studioUrl = URL.createObjectURL(blob);
+        $('studioPlayerWrap').style.display = '';
+        try { $('studioPlayer').src = studioUrl; } catch (e) {}
+        $('btnSaveStudioMidi').disabled = false; $('btnStudioToLab').disabled = false;
+        var names = out.tracks.map(function (t) { return t.name + '(' + t.count + ')'; }).join(' · ');
+        var msg = '✓ 편곡 완성 · ' + out.bars + '마디 · ' + names + ' · ' + out.tempo + ' BPM';
+        $('studioStatus').innerHTML = playerReady()
+          ? '<span class="ok">' + msg + '</span>'
+          : '<span class="ok">' + msg + '</span> <span class="err">(재생기는 인터넷 연결 시 · .mid 저장은 항상 가능)</span>';
+      } catch (e) {
+        $('studioStatus').innerHTML = '<span class="err">편곡 생성 실패: ' + e.message + '</span>';
+      }
+      $('btnProduce').disabled = false;
+    }, 30);
+  });
+
+  $('btnSaveStudioMidi').addEventListener('click', function () {
+    if (!lastStudioMidi) return;
+    var blob = new Blob([lastStudioMidi], { type: 'audio/midi' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = (plan.title || 'song').replace(/[\\/:*?"<>|]/g, '_') + '-편곡.mid';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
+  });
+  $('btnStudioToLab').addEventListener('click', function () {
+    if (!lastStudioMelodyAbc) return;
+    try { localStorage.setItem('broguard_lab_abc', lastStudioMelodyAbc); } catch (e) {}
+    window.open('lab.html', '_blank');
   });
 
   /* ---------- 3단계: 뮤직비디오(커버 + 가라오케) ---------- */
