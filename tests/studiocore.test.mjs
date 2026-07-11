@@ -122,3 +122,52 @@ test('genDrums/genBass: 시드·입력 같으면 재현된다', () => {
   const c = StudioCore.genBass(PLAN, { pattern: 2 }), d = StudioCore.genBass(PLAN, { pattern: 2 });
   assert.deepEqual(c, d, '베이스 재현');
 });
+
+test('parseBassPattern: 문법·마디합 검증(r2 z2 f2 z2 | r4 f4)', () => {
+  const ok = StudioCore.parseBassPattern('r2 z2 f2 z2 | r4 f4');
+  assert.ok(!ok.error, ok.error);
+  assert.equal(ok.bars.length, 2);
+  assert.deepEqual(ok.bars[0][0], { deg: 'r', up: false, len: 2 });
+  assert.equal(ok.bars[0][1].deg, null, 'z=쉼표');
+  // 대문자 = 옥타브 위
+  const up = StudioCore.parseBassPattern('R4 F4');
+  assert.equal(up.bars[0][0].up, true);
+  // 오류: 합 != 8, 모르는 토큰
+  assert.ok(StudioCore.parseBassPattern('r2 f2').error, '합 4는 오류');
+  assert.ok(StudioCore.parseBassPattern('x8').error, '모르는 토큰');
+});
+
+test('genBassPattern: 근음·3음·5음·높은5음이 코드에 맞고 패턴이 반복된다', () => {
+  const lane = StudioCore.genBassPattern(PLAN, 'r2 t2 f2 a2');
+  // 첫 마디(코드 = 첫 섹션 첫 코드)
+  const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const sym = PLAN.sections[0].chords[0];
+  let pc = PC[sym[0]]; if (sym[1] === '#') pc = (pc + 1) % 12;
+  const minor = /m$/.test(sym);
+  const first4 = lane.slice(0, 4).map(n => ((n.midi % 12) + 12) % 12);
+  assert.equal(first4[0], pc, '근음');
+  assert.equal(first4[1], (pc + (minor ? 3 : 4)) % 12, '3음');
+  assert.equal(first4[2], (pc + 7) % 12, '5음');
+  assert.equal(first4[3], (pc + 7) % 12, '높은5음(같은 pc, 옥타브 위)');
+  assert.ok(lane[3].midi > lane[2].midi, 'a는 f보다 높음');
+  assert.equal(lane.length, PLAN.totalBars * 4, '마디마다 4음');
+  // 대문자 옥타브
+  const hi = StudioCore.genBassPattern(PLAN, 'R8')[0].midi;
+  const lo = StudioCore.genBassPattern(PLAN, 'r8')[0].midi;
+  assert.equal(hi - lo, 12, '대문자=+12');
+});
+
+test('parseDrumPattern/genDrumsPattern: 동시타(kh) · 반복 · 벨로시티', () => {
+  const p = StudioCore.parseDrumPattern('kh1 h1 sh1 h1 kh1 h1 sh1 h1');
+  assert.ok(!p.error, p.error);
+  assert.deepEqual(p.bars[0][0].hits.sort(), [36, 42], 'kh = 킥+햇');
+  assert.ok(StudioCore.parseDrumPattern('kh1 h1').error, '합!=8 오류');
+  assert.ok(StudioCore.parseDrumPattern('x8').error, '모르는 글자');
+  const lane = StudioCore.genDrumsPattern(PLAN, 'kh1 h1 sh1 h1 kh1 h1 sh1 h1');
+  // 마디마다 첫 박에 킥
+  for (let bar = 0; bar < PLAN.totalBars; bar++) {
+    assert.ok(lane.some(n => n.midi === 36 && n.start === bar * BAR), '마디 ' + bar + ' 킥');
+  }
+  const kick = lane.find(n => n.midi === 36), hat = lane.find(n => n.midi === 42);
+  assert.ok(kick.vel > hat.vel, '킥이 햇보다 큼');
+});

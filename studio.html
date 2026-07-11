@@ -73,6 +73,11 @@
       <button id="btnSoloDrum" class="alt" disabled>🔊 이 트랙만 듣기</button>
       <span id="drumStatus" class="note" style="margin:0"></span>
     </div>
+    <div class="row" id="drumCustomRow" style="display:none; margin-top:8px">
+      <label class="fld grow">직접 패턴 (마디 합=8 · | 로 여러 마디)<input type="text" id="drumCustom" placeholder="예: kh1 h1 sh1 h1 kh1 h1 sh1 h1   (k킥 s스네어 h햇 o오픈햇 c크래시 r라이드 t탐 g플로어탐 z쉼표 · 글자 붙이면 동시타)"></label>
+      <button id="btnSaveDrumPat" class="alt" title="이 패턴을 목록에 저장">💾</button>
+      <button id="btnDelDrumPat" class="alt" title="선택한 저장 패턴 삭제" style="display:none">🗑</button>
+    </div>
     <div class="tctl">
       <span class="onoff"><input type="checkbox" id="drumOn" checked disabled> 합주에 포함</span>
       <label class="note" style="display:flex;align-items:center;gap:6px">볼륨 <input type="range" id="drumVol" min="0" max="120" value="100"></label>
@@ -88,6 +93,11 @@
       <button id="btnRegenBass" class="alt" disabled>🎲 다시 생성</button>
       <button id="btnSoloBass" class="alt" disabled>🔊 이 트랙만 듣기</button>
       <span id="bassStatus" class="note" style="margin:0"></span>
+    </div>
+    <div class="row" id="bassCustomRow" style="display:none; margin-top:8px">
+      <label class="fld grow">직접 패턴 (마디 합=8 · | 로 여러 마디)<input type="text" id="bassCustom" placeholder="예: r2 z2 f2 z2 | r4 f4   (r근음 t3음 f5음 a높은5음 z쉼표 · 대문자=옥타브↑)"></label>
+      <button id="btnSaveBassPat" class="alt" title="이 패턴을 목록에 저장">💾</button>
+      <button id="btnDelBassPat" class="alt" title="선택한 저장 패턴 삭제" style="display:none">🗑</button>
     </div>
     <div class="tctl">
       <span class="onoff"><input type="checkbox" id="bassOn" checked disabled> 합주에 포함</span>
@@ -361,6 +371,93 @@ var StudioCore = (function () {
     return lane;
   }
 
+  // ── 직접 입력(박자 패턴) 파서 ──
+  // 베이스: r근음 t3음 f5음 a높은5음(옥타브 위 5음) z쉼표 + 길이(8분음표 단위). 대문자=한 옥타브 위. 마디는 | 구분, 마디 합=8.
+  function parseBassPattern(str) {
+    var bars = [], err = null;
+    String(str || '').split('|').forEach(function (barStr) {
+      if (err) return;
+      var toks = barStr.trim().split(/\s+/).filter(Boolean);
+      if (!toks.length) return;
+      var bar = [], sum = 0;
+      toks.forEach(function (tk) {
+        if (err) return;
+        var m = /^([rtfaRTFAzZ])(\d+)$/.exec(tk);
+        if (!m) { err = '알 수 없는 토큰: "' + tk + '" (예: r2 f1 z1)'; return; }
+        var ch = m[1], len = +m[2];
+        var lower = ch.toLowerCase();
+        bar.push({ deg: lower === 'z' ? null : lower, up: (ch !== lower), len: len });
+        sum += len;
+      });
+      if (!err && sum !== 8) err = '마디 길이 합이 8이어야 합니다(현재 ' + sum + '): "' + barStr.trim() + '"';
+      if (!err) bars.push(bar);
+    });
+    if (!err && !bars.length) err = '패턴이 비었습니다.';
+    return err ? { error: err } : { bars: bars };
+  }
+  function genBassPattern(plan, patternStr) {
+    var p = parseBassPattern(patternStr);
+    if (p.error) throw new Error(p.error);
+    var e = PPQ / 2, barTicks = PPQ * 4, lane = [], bar = 0;
+    plan.sections.forEach(function (sec) {
+      for (var b = 0; b < sec.bars; b++) {
+        var chord = parseChord(sec.chords[b % sec.chords.length]);
+        var root = 36 + chord.root; while (root < 36) root += 12; while (root > 48) root -= 12;
+        var DEG = { r: root, t: root + (chord.minor ? 3 : 4), f: root + 7, a: root + 19 };
+        var barStart = bar * barTicks, rel = 0;
+        p.bars[bar % p.bars.length].forEach(function (n) {
+          if (n.deg) lane.push({ midi: DEG[n.deg] + (n.up ? 12 : 0), start: barStart + rel * e, dur: Math.round(n.len * e * 0.9), vel: 98 });
+          rel += n.len;
+        });
+        bar++;
+      }
+    });
+    return lane;
+  }
+  // 드럼: 글자 조합=동시 타격. k킥 s스네어 h클로즈햇 o오픈햇 c크래시 r라이드 t탐 g플로어탐 p페달햇 z쉼표 + 길이(8분음표). 마디 합=8.
+  var DRUM_LETTER = { k: 36, s: 38, h: 42, o: 46, c: 49, r: 51, t: 47, g: 43, p: 44 };
+  function parseDrumPattern(str) {
+    var bars = [], err = null;
+    String(str || '').split('|').forEach(function (barStr) {
+      if (err) return;
+      var toks = barStr.trim().split(/\s+/).filter(Boolean);
+      if (!toks.length) return;
+      var bar = [], sum = 0;
+      toks.forEach(function (tk) {
+        if (err) return;
+        var m = /^([ksohcrtgpz]+)(\d+)$/i.exec(tk);
+        if (!m) { err = '알 수 없는 토큰: "' + tk + '" (예: kh1 h1 sh1)'; return; }
+        var letters = m[1].toLowerCase(), len = +m[2], hits = [];
+        for (var i = 0; i < letters.length; i++) {
+          var L = letters[i];
+          if (L === 'z') continue;
+          if (!DRUM_LETTER[L]) { err = '모르는 드럼 글자: "' + L + '"'; return; }
+          hits.push(DRUM_LETTER[L]);
+        }
+        bar.push({ hits: hits, len: len }); sum += len;
+      });
+      if (!err && sum !== 8) err = '마디 길이 합이 8이어야 합니다(현재 ' + sum + '): "' + barStr.trim() + '"';
+      if (!err) bars.push(bar);
+    });
+    if (!err && !bars.length) err = '패턴이 비었습니다.';
+    return err ? { error: err } : { bars: bars };
+  }
+  function genDrumsPattern(plan, patternStr) {
+    var p = parseDrumPattern(patternStr);
+    if (p.error) throw new Error(p.error);
+    var e = PPQ / 2, barTicks = PPQ * 4, lane = [];
+    for (var bar = 0; bar < plan.totalBars; bar++) {
+      var barStart = bar * barTicks, rel = 0;
+      p.bars[bar % p.bars.length].forEach(function (tk) {
+        tk.hits.forEach(function (m) {
+          lane.push({ midi: m, start: barStart + rel * e, dur: Math.round(e * 0.5), vel: m === 36 ? 110 : (m === 38 ? 100 : 64) });
+        });
+        rel += tk.len;
+      });
+    }
+    return lane;
+  }
+
   // ── 멀티트랙 SMF 조합 ──
   function vlq(v) { var a = [v & 0x7f]; v >>= 7; while (v > 0) { a.unshift((v & 0x7f) | 0x80); v >>= 7; } return a; }
   function u32(v) { return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255]; }
@@ -398,8 +495,10 @@ var StudioCore = (function () {
     return { bytes: Uint8Array.from(all), tempo: tempo, tracks: used };
   }
 
-  return { PPQ: PPQ, DRUM_STYLES: DRUM_STYLES, BASS_PATTERNS: BASS_PATTERNS, TRACK_META: TRACK_META,
-           parseChord: parseChord, genDrums: genDrums, genBass: genBass, combine: combine };
+  return { PPQ: PPQ, DRUM_STYLES: DRUM_STYLES, BASS_PATTERNS: BASS_PATTERNS, TRACK_META: TRACK_META, DRUM_LETTER: DRUM_LETTER,
+           parseChord: parseChord, genDrums: genDrums, genBass: genBass, combine: combine,
+           parseBassPattern: parseBassPattern, genBassPattern: genBassPattern,
+           parseDrumPattern: parseDrumPattern, genDrumsPattern: genDrumsPattern };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = StudioCore;
 if (typeof window !== 'undefined') window.StudioCore = StudioCore;
@@ -417,8 +516,23 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
   Object.keys(SongCore.GENRES).forEach(function (k) {
     var o = document.createElement('option'); o.value = k; o.textContent = SongCore.GENRES[k].label; $('genre').appendChild(o);
   });
-  StudioCore.DRUM_STYLES.forEach(function (s, i) { var o = document.createElement('option'); o.value = i; o.textContent = s; $('drumStyle').appendChild(o); });
-  StudioCore.BASS_PATTERNS.forEach(function (s, i) { var o = document.createElement('option'); o.value = i; o.textContent = s; $('bassPattern').appendChild(o); });
+  // 저장된 직접 패턴 (localStorage)
+  var PATS = { drums: [], bass: [] };
+  try { var st = JSON.parse(localStorage.getItem('broguard_studio_pats_v1') || '{}'); PATS.drums = st.drums || []; PATS.bass = st.bass || []; } catch (e) {}
+  function savePats() { try { localStorage.setItem('broguard_studio_pats_v1', JSON.stringify(PATS)); } catch (e) {} }
+
+  function fillSelect(selId, styles, kind, label) {
+    var sel = $(selId); sel.innerHTML = '';
+    styles.forEach(function (s, i) { var o = document.createElement('option'); o.value = i; o.textContent = s; sel.appendChild(o); });
+    var c = document.createElement('option'); c.value = 'custom'; c.textContent = '직접 입력 (박자 패턴)…'; sel.appendChild(c);
+    PATS[kind].forEach(function (p, i) {
+      var o = document.createElement('option'); o.value = 'saved:' + i;
+      o.textContent = '💾 ' + label + ': ' + p + ' (4/4)'; sel.appendChild(o);
+    });
+  }
+  function refreshDrumSel(keep) { fillSelect('drumStyle', StudioCore.DRUM_STYLES, 'drums', '직접 드럼'); if (keep != null) $('drumStyle').value = keep; }
+  function refreshBassSel(keep) { fillSelect('bassPattern', StudioCore.BASS_PATTERNS, 'bass', '직접 베이스'); if (keep != null) $('bassPattern').value = keep; }
+  refreshDrumSel(); refreshBassSel();
 
   function playerReady() { return !!(window.customElements && customElements.get('midi-player')); }
   function bigViz(id) { try { var v = $(id); if (v) v.config = { noteHeight: 6 }; } catch (e) {} }
@@ -438,29 +552,81 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     ['drumCard', 'bassCard', 'mixCard'].forEach(function (id) { $(id).style.display = ''; });
   });
 
+  // 선택값 해석: 숫자 스타일 / 'custom'(입력칸) / 'saved:N'(저장 패턴)
+  function selMode(selId, inputId, kind) {
+    var v = $(selId).value;
+    if (v === 'custom') return { custom: $(inputId).value.trim() };
+    if (v.indexOf('saved:') === 0) return { custom: PATS[kind][+v.slice(6)] || '' };
+    return { style: +v };
+  }
+  function toggleCustomRows() {
+    $('drumCustomRow').style.display = $('drumStyle').value === 'custom' ? '' : 'none';
+    $('bassCustomRow').style.display = $('bassPattern').value === 'custom' ? '' : 'none';
+    $('btnDelDrumPat').style.display = $('drumStyle').value.indexOf('saved:') === 0 ? '' : 'none';
+    $('btnDelBassPat').style.display = $('bassPattern').value.indexOf('saved:') === 0 ? '' : 'none';
+  }
+
   // ── 드럼 ──
   function makeDrum(regen) {
     if (!plan) { $('drumStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
     if (regen) tracks.drums.seed = (Math.random() * 1e9) | 0;
-    tracks.drums.lane = StudioCore.genDrums(plan, { style: +$('drumStyle').value, seed: tracks.drums.seed });
-    ['btnRegenDrum', 'btnSoloDrum', 'drumOn'].forEach(function (id) { $(id).disabled = false; });
-    $('drumStatus').innerHTML = '<span class="ok">✓ 드럼 ' + tracks.drums.lane.length + '타 · ' + StudioCore.DRUM_STYLES[+$('drumStyle').value] + '</span>';
+    var mode = selMode('drumStyle', 'drumCustom', 'drums');
+    try {
+      if (mode.custom != null) {
+        tracks.drums.lane = StudioCore.genDrumsPattern(plan, mode.custom);
+        $('drumStatus').innerHTML = '<span class="ok">✓ 드럼 ' + tracks.drums.lane.length + '타 · 직접 패턴</span>';
+      } else {
+        tracks.drums.lane = StudioCore.genDrums(plan, { style: mode.style, seed: tracks.drums.seed });
+        $('drumStatus').innerHTML = '<span class="ok">✓ 드럼 ' + tracks.drums.lane.length + '타 · ' + StudioCore.DRUM_STYLES[mode.style] + '</span>';
+      }
+      ['btnRegenDrum', 'btnSoloDrum', 'drumOn'].forEach(function (id) { $(id).disabled = false; });
+    } catch (e) { $('drumStatus').innerHTML = '<span class="err">' + e.message + '</span>'; }
   }
   $('btnGenDrum').addEventListener('click', function () { makeDrum(false); });
   $('btnRegenDrum').addEventListener('click', function () { makeDrum(true); });
-  $('drumStyle').addEventListener('change', function () { if (tracks.drums.lane) makeDrum(false); });
+  $('drumStyle').addEventListener('change', function () { toggleCustomRows(); if (tracks.drums.lane && $('drumStyle').value !== 'custom') makeDrum(false); });
+  $('btnSaveDrumPat').addEventListener('click', function () {
+    var pat = $('drumCustom').value.trim();
+    var p = StudioCore.parseDrumPattern(pat);
+    if (p.error) { $('drumStatus').innerHTML = '<span class="err">' + p.error + '</span>'; return; }
+    PATS.drums.push(pat); savePats(); refreshDrumSel('saved:' + (PATS.drums.length - 1)); toggleCustomRows();
+    $('drumStatus').innerHTML = '<span class="ok">💾 저장했습니다 — 목록에서 언제든 선택</span>';
+  });
+  $('btnDelDrumPat').addEventListener('click', function () {
+    var v = $('drumStyle').value; if (v.indexOf('saved:') !== 0) return;
+    PATS.drums.splice(+v.slice(6), 1); savePats(); refreshDrumSel('0'); toggleCustomRows();
+  });
 
   // ── 베이스 ──
   function makeBass(regen) {
     if (!plan) { $('bassStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
     if (regen) tracks.bass.seed = (Math.random() * 1e9) | 0;
-    tracks.bass.lane = StudioCore.genBass(plan, { pattern: +$('bassPattern').value, seed: tracks.bass.seed });
-    ['btnRegenBass', 'btnSoloBass', 'bassOn'].forEach(function (id) { $(id).disabled = false; });
-    $('bassStatus').innerHTML = '<span class="ok">✓ 베이스 ' + tracks.bass.lane.length + '음 · ' + StudioCore.BASS_PATTERNS[+$('bassPattern').value] + '</span>';
+    var mode = selMode('bassPattern', 'bassCustom', 'bass');
+    try {
+      if (mode.custom != null) {
+        tracks.bass.lane = StudioCore.genBassPattern(plan, mode.custom);
+        $('bassStatus').innerHTML = '<span class="ok">✓ 베이스 ' + tracks.bass.lane.length + '음 · 직접 패턴</span>';
+      } else {
+        tracks.bass.lane = StudioCore.genBass(plan, { pattern: mode.style, seed: tracks.bass.seed });
+        $('bassStatus').innerHTML = '<span class="ok">✓ 베이스 ' + tracks.bass.lane.length + '음 · ' + StudioCore.BASS_PATTERNS[mode.style] + '</span>';
+      }
+      ['btnRegenBass', 'btnSoloBass', 'bassOn'].forEach(function (id) { $(id).disabled = false; });
+    } catch (e) { $('bassStatus').innerHTML = '<span class="err">' + e.message + '</span>'; }
   }
   $('btnGenBass').addEventListener('click', function () { makeBass(false); });
   $('btnRegenBass').addEventListener('click', function () { makeBass(true); });
-  $('bassPattern').addEventListener('change', function () { if (tracks.bass.lane) makeBass(false); });
+  $('bassPattern').addEventListener('change', function () { toggleCustomRows(); if (tracks.bass.lane && $('bassPattern').value !== 'custom') makeBass(false); });
+  $('btnSaveBassPat').addEventListener('click', function () {
+    var pat = $('bassCustom').value.trim();
+    var p = StudioCore.parseBassPattern(pat);
+    if (p.error) { $('bassStatus').innerHTML = '<span class="err">' + p.error + '</span>'; return; }
+    PATS.bass.push(pat); savePats(); refreshBassSel('saved:' + (PATS.bass.length - 1)); toggleCustomRows();
+    $('bassStatus').innerHTML = '<span class="ok">💾 저장했습니다 — 목록에서 언제든 선택</span>';
+  });
+  $('btnDelBassPat').addEventListener('click', function () {
+    var v = $('bassPattern').value; if (v.indexOf('saved:') !== 0) return;
+    PATS.bass.splice(+v.slice(6), 1); savePats(); refreshBassSel('0'); toggleCustomRows();
+  });
 
   // ── 이 트랙만 듣기(솔로) ──
   function playSolo(key) {

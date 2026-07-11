@@ -1,0 +1,418 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BKD 드럼 교실 · 브로가드 뮤직 랩</title>
+<style>
+  :root { --ink:#1c2b3a; --ink-soft:#46586b; --brass:#b08a2e; --brass-deep:#8f6e1f; --paper:#faf8f2; --card:#fff; --line:#ddd6c8; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:'Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif; line-height:1.5; }
+  header { padding:18px 16px 6px; text-align:center; }
+  header h1 { margin:0; font-size:1.25rem; color:var(--brass-deep); }
+  header p { margin:4px 0 0; font-size:.8rem; color:var(--ink-soft); }
+  main { max-width:900px; margin:0 auto; padding:12px 14px 60px; display:flex; flex-direction:column; gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .card h2 { font-size:.95rem; font-weight:800; color:var(--brass-deep); margin:0 0 8px; }
+  .sub { font-size:.78rem; color:var(--ink-soft); margin:0 0 8px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:8px; }
+  button { font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; background:var(--ink); color:#f3efe4; border:0; border-radius:9px; padding:9px 15px; }
+  button.alt { background:#efe8d6; color:var(--ink); }
+  button.brass { background:var(--brass-deep); color:#fff; }
+  button.rec { background:#a33c2e; color:#fff; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  select, input[type=number], input[type=text] { font:inherit; font-size:.85rem; border:1px solid var(--line); border-radius:8px; padding:6px 9px; background:#fffdf7; }
+  .note { font-size:.76rem; color:var(--ink-soft); }
+  .ok { color:#2f7d4f; font-weight:700; } .err { color:#a33c2e; font-weight:700; }
+  /* ── 드럼 킷 ── */
+  #kit { position:relative; width:100%; max-width:820px; margin:0 auto; aspect-ratio: 2 / 1; user-select:none; touch-action:none; }
+  .pad { position:absolute; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+         font-weight:800; cursor:pointer; border:3px solid rgba(0,0,0,.25); box-shadow:0 3px 10px rgba(0,0,0,.18);
+         transition:transform .05s, filter .05s; }
+  .pad .nm { font-size:.72rem; line-height:1.15; text-align:center; text-shadow:0 1px 2px rgba(255,255,255,.35); }
+  .pad .ky { margin-top:2px; font-size:.68rem; background:rgba(0,0,0,.5); color:#fff; border-radius:6px; padding:1px 7px; }
+  .pad.hit { transform:scale(.93); filter:brightness(1.35); }
+  .pad.guide { outline:5px solid #ffd75e; outline-offset:2px; }
+  .cymbal { background:radial-gradient(circle at 35% 30%, #f4e3b0, #cda842 65%, #93762a); }
+  .drumhead { background:radial-gradient(circle at 40% 32%, #fffdf5, #e8e0cc 70%, #b9ad8f); }
+  .kickpad { background:radial-gradient(circle at 40% 32%, #5a4632, #3c2f22); color:#f3efe4; border-radius:18px; }
+  .kickpad .nm { text-shadow:none; }
+  .hands { display:flex; justify-content:space-between; max-width:820px; margin:4px auto 0; font-size:.72rem; color:var(--ink-soft); }
+  .hands b { color:var(--brass-deep); }
+  .steps { display:grid; grid-template-columns:repeat(8,1fr); gap:4px; margin-top:8px; }
+  .step { height:10px; border-radius:4px; background:#eee6d2; }
+  .step.on { background:var(--brass); }
+  footer { text-align:center; font-size:.72rem; color:var(--ink-soft); padding:16px; }
+</style>
+
+<header>
+  <h1>🥁 BKD — 브로가드 키보드 드럼</h1>
+  <p>터치·마우스·키보드로 치는 드럼 교실 — 왼손 왼쪽 키, 오른손 오른쪽 키</p>
+</header>
+
+<main>
+  <div class="card">
+    <h2>드럼 킷 <span id="audioNote" class="note" style="font-weight:400"></span></h2>
+    <div id="kit"></div>
+    <div class="hands">
+      <span>👈 <b>왼손</b> Q크래시 · A햇(닫힘) · S햇(열림) · D스네어 · C페달햇</span>
+      <span><b>오른손</b> 👉 Space/J킥 · K탐1 · L탐2 · ;플로어탐 · I라이드 · O크래시</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🎵 메트로놈 · 녹음</h2>
+    <div class="row" style="margin-top:0">
+      <label class="note">BPM <input type="number" id="bpm" min="40" max="220" value="100" style="width:76px"></label>
+      <button id="btnMetro" class="alt">🕒 메트로놈 켜기</button>
+      <button id="btnRec" class="rec">⏺ 녹음</button>
+      <button id="btnPlayRec" class="alt" disabled>▶ 녹음 재생</button>
+      <button id="btnClearRec" class="alt" disabled>🗑 지우기</button>
+      <span id="recStatus" class="note"></span>
+    </div>
+    <div class="row">
+      <button id="btnCopyPattern" class="brass" disabled>📋 스튜디오 드럼 패턴 복사</button>
+      <button id="btnSaveMidi" class="alt" disabled>⬇ .mid 저장</button>
+      <span id="exportStatus" class="note"></span>
+    </div>
+    <p class="note">녹음을 8분음표로 정리(양자화)해 <b>프로듀싱 스튜디오의 「직접 입력」 패턴</b>으로 복사합니다 — 내가 친 리듬이 그대로 드럼 트랙이 됩니다.</p>
+  </div>
+
+  <div class="card">
+    <h2>🎓 레슨 (기본 비트 따라치기)</h2>
+    <p class="sub">비트를 고르고 「시범」을 누르면 <b>패드에 불이 들어오며</b> 반복 재생됩니다. 불을 따라 쳐보세요.</p>
+    <div class="row" style="margin-top:0">
+      <select id="lessonSel"></select>
+      <button id="btnLesson" class="alt">👀 시범 (반복)</button>
+      <button id="btnLessonStop" class="alt" disabled>■ 정지</button>
+      <span id="lessonStatus" class="note"></span>
+    </div>
+    <div class="steps" id="lessonSteps"></div>
+    <p class="note" id="lessonHint"></p>
+  </div>
+</main>
+<footer>Broguard Music Lab · BKD 드럼 교실 · 프로듀싱 스튜디오와 패턴 호환</footer>
+
+<script id="bkd-core">
+/* BkdCore — BKD 드럼 엔진(오디오 없이 테스트 가능)
+   패드 정의(키보드 손 배치) · 8분음표 양자화 · 스튜디오 패턴 문자열 · 드럼 MIDI 쓰기 */
+var BkdCore = (function () {
+  'use strict';
+  // 실제 드러머의 사지 배치를 키보드 좌/우로: 왼손(햇·스네어·크래시1) / 오른손(킥·탐·라이드·크래시2)
+  var PADS = [
+    { id: 'crash',  name: '크래시',      key: 'q', keyLabel: 'Q',     gm: 49, letter: 'c', hand: 'L', cymbal: true,  x: 8,  y: 6,  size: 21 },
+    { id: 'hhc',    name: '하이햇',      key: 'a', keyLabel: 'A',     gm: 42, letter: 'h', hand: 'L', cymbal: true,  x: 3,  y: 38, size: 19 },
+    { id: 'hho',    name: '오픈햇',      key: 's', keyLabel: 'S',     gm: 46, letter: 'o', hand: 'L', cymbal: true,  x: 20, y: 30, size: 17 },
+    { id: 'snare',  name: '스네어',      key: 'd', keyLabel: 'D',     gm: 38, letter: 's', hand: 'L', cymbal: false, x: 24, y: 58, size: 21 },
+    { id: 'pedal',  name: '페달햇',      key: 'c', keyLabel: 'C',     gm: 44, letter: 'p', hand: 'L', cymbal: true,  x: 6,  y: 72, size: 14 },
+    { id: 'kick',   name: '킥(베이스)',  key: ' ', keyLabel: 'Space·J', gm: 36, letter: 'k', hand: 'R', cymbal: false, x: 42, y: 62, size: 26, kick: true },
+    { id: 'tom1',   name: '탐1',        key: 'k', keyLabel: 'K',     gm: 47, letter: 't', hand: 'R', cymbal: false, x: 45, y: 24, size: 17 },
+    { id: 'tom2',   name: '탐2',        key: 'l', keyLabel: 'L',     gm: 45, letter: 't', hand: 'R', cymbal: false, x: 60, y: 26, size: 18 },
+    { id: 'floor',  name: '플로어탐',    key: ';', keyLabel: ';',     gm: 43, letter: 'g', hand: 'R', cymbal: false, x: 72, y: 54, size: 21 },
+    { id: 'ride',   name: '라이드',      key: 'i', keyLabel: 'I',     gm: 51, letter: 'r', hand: 'R', cymbal: true,  x: 79, y: 16, size: 22 },
+    { id: 'crash2', name: '크래시2',     key: 'o', keyLabel: 'O',     gm: 57, letter: 'c', hand: 'R', cymbal: true,  x: 62, y: 4,  size: 18 }
+  ];
+  var KEY_ALIAS = { j: 'kick' };            // J도 킥(오른손 검지)
+  function padById(id) { for (var i = 0; i < PADS.length; i++) if (PADS[i].id === id) return PADS[i]; return null; }
+  function keyToPad(key) {
+    key = String(key || '').toLowerCase();
+    if (KEY_ALIAS[key]) return padById(KEY_ALIAS[key]);
+    for (var i = 0; i < PADS.length; i++) if (PADS[i].key === key) return PADS[i];
+    return null;
+  }
+
+  /* 히트([{padId, t(초)}])를 8분음표로 양자화 → 스텝 배열 [{step, padIds:[..]}] */
+  function quantizeHits(hits, bpm, bars) {
+    var eighth = 60 / bpm / 2;                       // 8분음표 초
+    var total = bars * 8, byStep = {};
+    hits.forEach(function (h) {
+      var step = Math.round(h.t / eighth);
+      if (step < 0) step = 0;
+      step = step % total;                            // 루프 안으로 접기
+      (byStep[step] = byStep[step] || []).push(h.padId);
+    });
+    return Object.keys(byStep).map(Number).sort(function (a, b) { return a - b; })
+      .map(function (s) { return { step: s, padIds: byStep[s].filter(function (v, i, a) { return a.indexOf(v) === i; }) }; });
+  }
+
+  /* 양자화 히트 → 스튜디오 드럼 패턴 문자열("kh1 h1 sh1 …" · 마디 합=8 · | 구분) */
+  function hitsToPattern(hits, bpm, bars) {
+    bars = bars || 1;
+    var steps = quantizeHits(hits, bpm, bars);
+    var grid = {};
+    steps.forEach(function (s) { grid[s.step] = s.padIds; });
+    var barsOut = [];
+    for (var bar = 0; bar < bars; bar++) {
+      var toks = [];
+      for (var st = 0; st < 8; st++) {
+        var ids = grid[bar * 8 + st];
+        if (ids && ids.length) {
+          var letters = ids.map(function (id) { return padById(id).letter; })
+            .filter(function (v, i, a) { return a.indexOf(v) === i; }).sort().join('');
+          toks.push(letters + '1');
+        } else toks.push('z1');
+      }
+      // 뒤에서부터 z를 앞 토큰에 합쳐 간결하게 (z1 z1 → z2, kh1 z1 → kh2)
+      var merged = [];
+      toks.forEach(function (tk) {
+        var m = /^([a-z]+)(\d+)$/.exec(tk);
+        var last = merged[merged.length - 1];
+        if (last && m[1] === 'z' && merged.length) { var lm = /^([a-z]+)(\d+)$/.exec(last); merged[merged.length - 1] = lm[1] + (+lm[2] + +m[2]); }
+        else merged.push(tk);
+      });
+      barsOut.push(merged.join(' '));
+    }
+    return barsOut.join(' | ');
+  }
+
+  /* 히트 → 드럼 MIDI(ch10, 실시간 타이밍 유지) */
+  function hitsToMidi(hits, bpm) {
+    var PPQ = 480, tempo = bpm || 100;
+    function vlq(v) { var a = [v & 0x7f]; v >>= 7; while (v > 0) { a.unshift((v & 0x7f) | 0x80); v >>= 7; } return a; }
+    function u32(v) { return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255]; }
+    function u16(v) { return [(v >>> 8) & 255, v & 255]; }
+    function chunk(id, d) { var a = []; for (var i = 0; i < id.length; i++) a.push(id.charCodeAt(i)); return a.concat(u32(d.length), d); }
+    var secPerTick = 60 / tempo / PPQ;
+    var ev = [];
+    hits.forEach(function (h) {
+      var pad = padById(h.padId); if (!pad) return;
+      var tick = Math.max(0, Math.round(h.t / secPerTick));
+      ev.push({ t: tick, on: 1, m: pad.gm }); ev.push({ t: tick + 120, on: 0, m: pad.gm });
+    });
+    ev.sort(function (a, b) { return a.t - b.t || (a.on - b.on); });
+    var uspq = Math.round(60000000 / tempo);
+    var trk = [].concat(vlq(0), [0xff, 0x51, 3, (uspq >> 16) & 255, (uspq >> 8) & 255, uspq & 255]);
+    trk = trk.concat(vlq(0), [0xff, 0x58, 4, 4, 2, 24, 8]);
+    var last = 0;
+    ev.forEach(function (e) { trk = trk.concat(vlq(e.t - last)); trk.push((e.on ? 0x99 : 0x89), e.m & 0x7f, e.on ? 100 : 0); last = e.t; });
+    trk = trk.concat(vlq(0), [0xff, 0x2f, 0]);
+    var hdr = chunk('MThd', u16(0).concat(u16(1)).concat(u16(PPQ)));
+    return Uint8Array.from(hdr.concat(chunk('MTrk', trk)));
+  }
+
+  /* 스튜디오 패턴 문자열 → 스텝(레슨 가이드용) — StudioCore와 같은 문법 */
+  var LETTER_PAD = { k: 'kick', s: 'snare', h: 'hhc', o: 'hho', c: 'crash', r: 'ride', t: 'tom1', g: 'floor', p: 'pedal' };
+  function patternToSteps(str) {
+    var out = [], bar = 0;
+    String(str || '').split('|').forEach(function (barStr) {
+      var toks = barStr.trim().split(/\s+/).filter(Boolean);
+      if (!toks.length) return;
+      var pos = 0;
+      toks.forEach(function (tk) {
+        var m = /^([a-z]+)(\d+)$/i.exec(tk); if (!m) return;
+        var letters = m[1].toLowerCase(), padIds = [];
+        for (var i = 0; i < letters.length; i++) if (LETTER_PAD[letters[i]]) padIds.push(LETTER_PAD[letters[i]]);
+        if (padIds.length) out.push({ step: bar * 8 + pos, padIds: padIds });
+        pos += +m[2];
+      });
+      bar++;
+    });
+    return { steps: out, totalSteps: bar * 8 };
+  }
+
+  var LESSONS = [
+    { name: '기본 록 비트', pattern: 'kh1 h1 sh1 h1 kh1 h1 sh1 h1', hint: '킥(오른손 Space)과 하이햇(왼손 A)을 같이, 3박에 스네어(D). 8분 하이햇은 계속.' },
+    { name: '포 온 더 플로어(댄스)', pattern: 'kh1 h1 ksh1 h1 kh1 h1 ksh1 h1', hint: '매 박마다 킥! 댄스곡의 심장. 2·4박엔 스네어도 같이.' },
+    { name: '8비트 드라이브', pattern: 'kh1 h1 sh1 kh1 h1 kh1 sh1 h1', hint: '킥이 엇박에도 들어가서 앞으로 달리는 느낌.' },
+    { name: '하프타임(느긋)', pattern: 'kh2 h2 sh2 h2', hint: '스네어가 3박에 한 번만 — 절반 속도처럼 느긋하게.' },
+    { name: '고고 비트', pattern: 'kh1 h1 sh1 h1 kh1 kh1 sh1 h1', hint: '한국 가요·트로트의 단골. 5·6박 연속 킥이 포인트.' }
+  ];
+
+  return { PADS: PADS, keyToPad: keyToPad, padById: padById, quantizeHits: quantizeHits,
+           hitsToPattern: hitsToPattern, hitsToMidi: hitsToMidi, patternToSteps: patternToSteps, LESSONS: LESSONS };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = BkdCore;
+if (typeof window !== 'undefined') window.BkdCore = BkdCore;
+</script>
+
+<script>
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+
+  /* ── 패드 렌더 ── */
+  var kit = $('kit');
+  BkdCore.PADS.forEach(function (p) {
+    var el = document.createElement('div');
+    el.className = 'pad ' + (p.kick ? 'kickpad' : (p.cymbal ? 'cymbal' : 'drumhead'));
+    el.id = 'pad-' + p.id;
+    el.style.left = p.x + '%'; el.style.top = p.y + '%';
+    el.style.width = p.size + '%'; el.style.aspectRatio = '1';
+    el.innerHTML = '<span class="nm">' + p.name + '</span><span class="ky">' + p.keyLabel + '</span>';
+    el.addEventListener('pointerdown', function (ev) { ev.preventDefault(); hit(p.id); });
+    kit.appendChild(el);
+  });
+
+  /* ── WebAudio 신스 드럼(샘플 불필요 · 오프라인) ── */
+  var ctx = null;
+  function audio() {
+    if (!ctx) {
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+      $('audioNote').textContent = '';
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function noiseBuf(ac, sec) {
+    var b = ac.createBuffer(1, Math.max(1, (sec * ac.sampleRate) | 0), ac.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  function playPad(padId) {
+    var ac = audio(); if (!ac) return;
+    var t = ac.currentTime, g = ac.createGain(); g.connect(ac.destination);
+    function env(gain, peak, dur) { gain.gain.setValueAtTime(0.0001, t); gain.gain.exponentialRampToValueAtTime(peak, t + 0.005); gain.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
+    function osc(type, f0, f1, dur) { var o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.85); o.connect(g); o.start(t); o.stop(t + dur + 0.05); }
+    function noise(dur, filterType, freq, q) {
+      var s = ac.createBufferSource(); s.buffer = noiseBuf(ac, dur + 0.05);
+      var f = ac.createBiquadFilter(); f.type = filterType; f.frequency.value = freq; if (q) f.Q.value = q;
+      s.connect(f); f.connect(g); s.start(t); s.stop(t + dur + 0.05);
+    }
+    switch (padId) {
+      case 'kick':   env(g, 0.9, 0.28); osc('sine', 150, 48, 0.28); break;
+      case 'snare':  env(g, 0.5, 0.18); noise(0.18, 'highpass', 1600); osc('triangle', 210, 160, 0.12); break;
+      case 'hhc':    env(g, 0.3, 0.06); noise(0.06, 'highpass', 7500); break;
+      case 'pedal':  env(g, 0.25, 0.05); noise(0.05, 'highpass', 6800); break;
+      case 'hho':    env(g, 0.3, 0.4); noise(0.4, 'highpass', 7000); break;
+      case 'tom1':   env(g, 0.6, 0.3); osc('sine', 190, 110, 0.3); break;
+      case 'tom2':   env(g, 0.6, 0.32); osc('sine', 150, 90, 0.32); break;
+      case 'floor':  env(g, 0.65, 0.38); osc('sine', 110, 65, 0.38); break;
+      case 'crash': case 'crash2': env(g, 0.4, 1.1); noise(1.1, 'bandpass', 5200, 0.7); noise(1.1, 'highpass', 8200); break;
+      case 'ride':   env(g, 0.3, 0.7); noise(0.7, 'bandpass', 6800, 2.5); break;
+    }
+  }
+
+  /* ── 타격(터치·키보드 공통) ── */
+  var recording = false, recStart = 0, recHits = [];
+  function hit(padId, silent) {
+    if (!silent) playPad(padId);
+    var el = $('pad-' + padId);
+    if (el) { el.classList.add('hit'); setTimeout(function () { el.classList.remove('hit'); }, 90); }
+    if (recording) recHits.push({ padId: padId, t: (performance.now() - recStart) / 1000 });
+  }
+  var down = {};
+  document.addEventListener('keydown', function (ev) {
+    if (ev.repeat) return;
+    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    var pad = BkdCore.keyToPad(ev.key);
+    if (pad) { ev.preventDefault(); if (!down[pad.id]) { down[pad.id] = 1; hit(pad.id); } }
+  });
+  document.addEventListener('keyup', function (ev) {
+    var pad = BkdCore.keyToPad(ev.key);
+    if (pad) down[pad.id] = 0;
+  });
+
+  /* ── 메트로놈 ── */
+  var metroTimer = null;
+  function tick(accent) {
+    var ac = audio(); if (!ac) return;
+    var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'square'; o.frequency.value = accent ? 1500 : 1000;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(accent ? 0.22 : 0.12, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + 0.08);
+  }
+  var beatCount = 0;
+  function startMetro() {
+    stopMetro(); beatCount = 0;
+    var bpm = Math.max(40, Math.min(220, +$('bpm').value || 100));
+    metroTimer = setInterval(function () { tick(beatCount % 4 === 0); beatCount++; }, 60000 / bpm);
+    $('btnMetro').textContent = '🕒 메트로놈 끄기';
+  }
+  function stopMetro() { if (metroTimer) { clearInterval(metroTimer); metroTimer = null; $('btnMetro').textContent = '🕒 메트로놈 켜기'; } }
+  $('btnMetro').addEventListener('click', function () { metroTimer ? stopMetro() : startMetro(); });
+
+  /* ── 녹음 → 패턴/미디 ── */
+  $('btnRec').addEventListener('click', function () {
+    if (!recording) {
+      recording = true; recHits = []; recStart = performance.now();
+      this.textContent = '⏹ 녹음 끝'; $('recStatus').innerHTML = '<span class="err">● 녹음 중… 패드를 쳐보세요</span>';
+    } else {
+      recording = false; this.textContent = '⏺ 녹음';
+      var on = recHits.length > 0;
+      ['btnPlayRec', 'btnClearRec', 'btnCopyPattern', 'btnSaveMidi'].forEach(function (id) { $(id).disabled = !on; });
+      $('recStatus').innerHTML = on ? '<span class="ok">✓ ' + recHits.length + '타 녹음됨</span>' : '녹음된 타격이 없습니다.';
+    }
+  });
+  $('btnClearRec').addEventListener('click', function () {
+    recHits = []; ['btnPlayRec', 'btnClearRec', 'btnCopyPattern', 'btnSaveMidi'].forEach(function (id) { $(id).disabled = true; });
+    $('recStatus').textContent = ''; $('exportStatus').textContent = '';
+  });
+  var playTimers = [];
+  $('btnPlayRec').addEventListener('click', function () {
+    playTimers.forEach(clearTimeout); playTimers = [];
+    recHits.forEach(function (h) { playTimers.push(setTimeout(function () { hit(h.padId); }, h.t * 1000)); });
+    $('recStatus').innerHTML = '<span class="ok">▶ 재생 중…</span>';
+  });
+  $('btnCopyPattern').addEventListener('click', function () {
+    var bpm = Math.max(40, Math.min(220, +$('bpm').value || 100));
+    var lastT = recHits.reduce(function (a, h) { return Math.max(a, h.t); }, 0);
+    var bars = Math.max(1, Math.min(4, Math.ceil((lastT + 0.01) / (60 / bpm * 4))));
+    var pat = BkdCore.hitsToPattern(recHits, bpm, bars);
+    var self = this;
+    function done() { $('exportStatus').innerHTML = '<span class="ok">✓ 복사됨: <b>' + pat + '</b> — 스튜디오 드럼 「직접 입력」에 붙여넣으세요</span>'; }
+    if (navigator.clipboard) navigator.clipboard.writeText(pat).then(done, function () { done(); });
+    else done();
+  });
+  $('btnSaveMidi').addEventListener('click', function () {
+    var bpm = Math.max(40, Math.min(220, +$('bpm').value || 100));
+    var bytes = BkdCore.hitsToMidi(recHits, bpm);
+    var blob = new Blob([bytes], { type: 'audio/midi' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'bkd-drum.mid';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
+  });
+
+  /* ── 레슨(시범 가이드) ── */
+  BkdCore.LESSONS.forEach(function (l, i) { var o = document.createElement('option'); o.value = i; o.textContent = l.name; $('lessonSel').appendChild(o); });
+  var lessonTimer = null, lessonStep = 0, lessonData = null;
+  function renderLessonSteps(activeStep) {
+    var box = $('lessonSteps'); box.innerHTML = '';
+    if (!lessonData) return;
+    for (var s = 0; s < lessonData.totalSteps; s++) {
+      var d = document.createElement('div');
+      d.className = 'step' + (lessonData.steps.some(function (x) { return x.step === s; }) ? ' on' : '');
+      if (s === activeStep) d.style.outline = '2px solid var(--brass-deep)';
+      box.appendChild(d);
+    }
+  }
+  function startLesson() {
+    stopLesson();
+    var l = BkdCore.LESSONS[+$('lessonSel').value];
+    lessonData = BkdCore.patternToSteps(l.pattern);
+    $('lessonHint').textContent = '💡 ' + l.hint + '  (패턴: ' + l.pattern + ')';
+    lessonStep = 0;
+    var bpm = Math.max(40, Math.min(220, +$('bpm').value || 100));
+    var eighthMs = 60000 / bpm / 2;
+    $('btnLessonStop').disabled = false;
+    $('lessonStatus').innerHTML = '<span class="ok">▶ 시범 반복 중 — 불 들어오는 패드를 따라 치세요</span>';
+    lessonTimer = setInterval(function () {
+      document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); });
+      lessonData.steps.filter(function (s) { return s.step === lessonStep; }).forEach(function (s) {
+        s.padIds.forEach(function (id) {
+          var el = $('pad-' + id); if (el) el.classList.add('guide');
+          playPad(id);
+        });
+      });
+      renderLessonSteps(lessonStep);
+      lessonStep = (lessonStep + 1) % lessonData.totalSteps;
+    }, eighthMs);
+  }
+  function stopLesson() {
+    if (lessonTimer) { clearInterval(lessonTimer); lessonTimer = null; }
+    document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); });
+    $('btnLessonStop').disabled = true; $('lessonStatus').textContent = '';
+  }
+  $('btnLesson').addEventListener('click', startLesson);
+  $('btnLessonStop').addEventListener('click', stopLesson);
+  $('lessonSel').addEventListener('change', function () {
+    var l = BkdCore.LESSONS[+this.value];
+    lessonData = BkdCore.patternToSteps(l.pattern);
+    $('lessonHint').textContent = '💡 ' + l.hint + '  (패턴: ' + l.pattern + ')';
+    renderLessonSteps(-1);
+  });
+  // 초기 레슨 미리보기
+  lessonData = BkdCore.patternToSteps(BkdCore.LESSONS[0].pattern);
+  $('lessonHint').textContent = '💡 ' + BkdCore.LESSONS[0].hint + '  (패턴: ' + BkdCore.LESSONS[0].pattern + ')';
+  renderLessonSteps(-1);
+
+  if (!(window.AudioContext || window.webkitAudioContext)) $('audioNote').textContent = '(이 브라우저는 소리를 낼 수 없습니다)';
+})();
+</script>
