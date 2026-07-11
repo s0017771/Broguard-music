@@ -171,3 +171,76 @@ test('parseDrumPattern/genDrumsPattern: 동시타(kh) · 반복 · 벨로시티'
   const kick = lane.find(n => n.midi === 36), hat = lane.find(n => n.midi === 42);
   assert.ok(kick.vel > hat.vel, '킥이 햇보다 큼');
 });
+
+test('genPiano: 코드 구성음 화음, 패턴별 밀도(온음 < 4박 컴핑)', () => {
+  const hold = StudioCore.genPiano(PLAN, { pattern: 0 });
+  const four = StudioCore.genPiano(PLAN, { pattern: 2 });
+  assert.equal(hold.length, PLAN.totalBars * 3, '온음 = 마디당 3음(트라이어드)');
+  assert.equal(four.length, PLAN.totalBars * 12, '4박 = 마디당 12음');
+  // 첫 마디 화음 = 첫 코드 구성음, C4 옥타브(60~71)
+  const sym = PLAN.sections[0].chords[0];
+  const chord = StudioCore.parseChord(sym);
+  const first = hold.slice(0, 3).map(n => ((n.midi % 12) + 12) % 12).sort((a, b) => a - b);
+  assert.deepEqual(first, [chord.root, chord.third, chord.fifth].sort((a, b) => a - b), '구성음(' + sym + ')');
+  assert.ok(hold.every(n => n.midi >= 60 && n.midi <= 71), 'C4 옥타브 보이싱');
+});
+
+test('genGuitar: 파워코드(근음+5도+옥타브), 아르페지오는 단음 흐름', () => {
+  const pw = StudioCore.genGuitar(PLAN, { pattern: 0 });
+  const chord = StudioCore.parseChord(PLAN.sections[0].chords[0]);
+  const first3 = pw.slice(0, 3).map(n => n.midi).sort((a, b) => a - b);
+  assert.equal(first3[1] - first3[0], 7, '근음+5도');
+  assert.equal(first3[2] - first3[0], 12, '+옥타브');
+  assert.equal(((first3[0] % 12) + 12) % 12, chord.root, '근음 일치');
+  const arp = StudioCore.genGuitar(PLAN, { pattern: 3 });
+  // 아르페지오는 같은 시각에 한 음만
+  const byStart = {};
+  arp.forEach(n => { byStart[n.start] = (byStart[n.start] || 0) + 1; });
+  assert.ok(Object.values(byStart).every(c => c === 1), '아르페지오 = 단음');
+  const drive = StudioCore.genGuitar(PLAN, { pattern: 2 });
+  assert.ok(drive.length > pw.length, '8분 드라이브가 더 촘촘');
+});
+
+test('genMelody: 음역·마디 첫 음=코드톤·시드 재현·재생성 차이·성격별 밀도', () => {
+  const lane = StudioCore.genMelody(PLAN, { style: 1, seed: 7 });
+  assert.ok(lane.every(n => n.midi >= 67 && n.midi <= 83), '멜로디 음역 G4~B5');
+  // 각 마디 첫 음은 그 코드 구성음
+  let bar = 0;
+  PLAN.sections.forEach(sec => {
+    for (let b = 0; b < sec.bars; b++) {
+      const chord = StudioCore.parseChord(sec.chords[b % sec.chords.length]);
+      const first = lane.find(n => n.start === bar * BAR);
+      assert.ok(first, '마디 ' + bar + ' 첫 음');
+      const pc = ((first.midi % 12) + 12) % 12;
+      assert.ok([chord.root, chord.third, chord.fifth].includes(pc), '마디 ' + bar + ' 강박=코드톤');
+      bar++;
+    }
+  });
+  // 시드 재현 + 재생성 차이
+  const again = StudioCore.genMelody(PLAN, { style: 1, seed: 7 });
+  assert.deepEqual(lane, again, '같은 시드 = 같은 멜로디');
+  const other = StudioCore.genMelody(PLAN, { style: 1, seed: 999 });
+  assert.notDeepEqual(lane.map(n => n.midi), other.map(n => n.midi), '다른 시드 = 다른 멜로디');
+  // 성격: 활발 > 차분 밀도
+  const calm = StudioCore.genMelody(PLAN, { style: 0, seed: 7 }).length;
+  const busy = StudioCore.genMelody(PLAN, { style: 2, seed: 7 }).length;
+  assert.ok(busy > calm, `활발(${busy}) > 차분(${calm})`);
+});
+
+test('combine: 5트랙 전체 — 채널·프로그램 올바름', () => {
+  const lanes = {
+    drums: StudioCore.genDrums(PLAN, { style: 0 }),
+    bass: StudioCore.genBass(PLAN, { pattern: 1 }),
+    piano: StudioCore.genPiano(PLAN, { pattern: 1 }),
+    guitar: StudioCore.genGuitar(PLAN, { pattern: 0 }),
+    melody: StudioCore.genMelody(PLAN, { style: 1, seed: 7 })
+  };
+  const out = StudioCore.combine(lanes, { tempo: PLAN.tempo, order: ['drums', 'bass', 'piano', 'guitar', 'melody'] });
+  const p = parse(out.bytes);
+  assert.equal(p.trackCount, 6, '메타 + 5트랙');
+  const chs = new Set(p.ons.map(o => o.ch));
+  [9, 3, 1, 2, 0].forEach(ch => assert.ok(chs.has(ch), '채널 ' + ch));
+  assert.ok(p.progs.some(x => x.ch === 2 && x.prog === 29), '기타 프로그램(29)');
+  assert.ok(p.progs.some(x => x.ch === 0 && x.prog === 54), '멜로디 프로그램(54)');
+  assert.deepEqual(out.tracks, ['drums', 'bass', 'piano', 'guitar', 'melody']);
+});
