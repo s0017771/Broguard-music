@@ -34,7 +34,7 @@ await (async () => { try {
   ['스네어', '하이햇', '킥(베이스)', '라이드', '크래시'].forEach(n =>
     assert.ok(labels.some(l => l.includes(n.split('(')[0])), n + ' 패드'));
   const keys = await page.$$eval('#kit .pad .ky', els => els.map(e => e.textContent));
-  assert.ok(keys.includes('W') && keys.includes('C·M') && keys.some(k => /Space/.test(k)), '새 키 라벨: ' + keys.join(','));
+  assert.ok(keys.includes('S') && keys.includes('G·H') && keys.some(k => /Space/.test(k)), '새 키 라벨: ' + keys.join(','));
   // 가림 없음: 모든 패드가 킷 컨테이너 안에
   const fits = await page.evaluate(() => {
     const kit = document.getElementById('kit').getBoundingClientRect();
@@ -48,7 +48,7 @@ await (async () => { try {
 } catch (e) { bad('킷 렌더', e); } })();
 
 await (async () => { try {
-  // 키보드 타격: Space(스네어)·M(킥) → hit 클래스
+  // 키보드 타격: Space(킥)·H(스네어) → hit 클래스
   const flashed = await page.evaluate(() => new Promise(res => {
     const sn = document.getElementById('pad-snare'), kk = document.getElementById('pad-kick');
     let snHit = false, kkHit = false;
@@ -57,18 +57,26 @@ await (async () => { try {
     new MutationObserver(() => { if (kk.classList.contains('hit')) { kkHit = true; check(); } }).observe(kk, { attributes: true });
     document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     document.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'm', bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }));
     setTimeout(() => res(snHit && kkHit), 400);
   }));
-  assert.ok(flashed, '스네어(Space)·킥(M) 시각 반응');
-  ok('새 키맵 타격(Space=스네어, M=킥) 시각 반응');
+  assert.ok(flashed, '킥(Space)·스네어(H) 시각 반응');
+  ok('새 키맵 타격(Space=킥, H=스네어) 시각 반응');
 } catch (e) { bad('키보드 타격', e); } })();
+
+await (async () => { try {
+  // 스피커 깨워두기: 체크박스 존재·기본 켜짐, 끄고 켜도 오류 없음
+  assert.equal(await page.isChecked('#wakeOn'), true, '기본 켜짐');
+  await page.uncheck('#wakeOn');
+  await page.check('#wakeOn');
+  ok('스피커 깨워두기 토글');
+} catch (e) { bad('스피커 깨워두기', e); } })();
 
 await (async () => { try {
   // 녹음: 시작 → 키 타격 3번(킥·스네어·킥) → 종료 → 패턴 복사
   await page.click('#btnRec');
   await page.evaluate(() => new Promise(res => {
-    const seq = ['c', ' ', 'm'];   // 킥, 스네어, 킥
+    const seq = [' ', 'g', ' '];   // 킥, 스네어, 킥
     let i = 0;
     const iv = setInterval(() => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: seq[i], bubbles: true }));
