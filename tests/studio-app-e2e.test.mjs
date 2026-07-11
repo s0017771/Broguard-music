@@ -95,6 +95,32 @@ await (async () => { try {
   ok('이 트랙만 듣기(솔로) 동작');
 } catch (e) { bad('솔로', e); } })();
 
+await (async () => { try {
+  // 베이스 직접 입력 패턴 → 생성 + 저장 → 저장 목록에 나타남
+  await page.selectOption('#bassPattern', 'custom');
+  await page.waitForSelector('#bassCustomRow', { state: 'visible' });
+  await page.fill('#bassCustom', 'r2 z2 f2 z2 | r4 f4');
+  await page.click('#btnGenBass');
+  await page.waitForFunction(() => /직접 패턴/.test(document.getElementById('bassStatus').textContent), undefined, { timeout: 4000 });
+  await page.click('#btnSaveBassPat');
+  const opts = await page.$$eval('#bassPattern option', els => els.map(o => o.textContent));
+  assert.ok(opts.some(t => t.includes('💾 직접 베이스: r2 z2 f2 z2')), '저장 항목: ' + opts.join(' / '));
+  ok('베이스 직접 입력 + 저장');
+} catch (e) { bad('베이스 직접 입력', e); } })();
+
+await (async () => { try {
+  // 드럼 직접 입력 패턴(동시타 kh) → 생성 + 잘못된 패턴은 오류 안내
+  await page.selectOption('#drumStyle', 'custom');
+  await page.waitForSelector('#drumCustomRow', { state: 'visible' });
+  await page.fill('#drumCustom', 'kh1 h1 sh1 h1 kh1 h1 sh1 h1');
+  await page.click('#btnGenDrum');
+  await page.waitForFunction(() => /직접 패턴/.test(document.getElementById('drumStatus').textContent), undefined, { timeout: 4000 });
+  await page.fill('#drumCustom', 'kh1 h1');   // 합=2 → 오류
+  await page.click('#btnGenDrum');
+  await page.waitForFunction(() => /마디 길이 합/.test(document.getElementById('drumStatus').textContent), undefined, { timeout: 4000 });
+  ok('드럼 직접 입력 + 오류 안내');
+} catch (e) { bad('드럼 직접 입력', e); } })();
+
 await (async () => { try { assert.deepEqual(errors, []); ok('심각한 JS 오류 없음'); } catch (e) { bad('JS 오류', e); } })();
 
 await browser.close(); server.close();
