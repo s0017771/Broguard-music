@@ -549,7 +549,9 @@ var StudioCore = (function () {
           if (i === 0) pitch = cur;
           else if (strong || rnd() < 0.25) pitch = chordToneNear(chord, cur + Math.round(rnd() * 6 - 3), lo, hi);
           else pitch = Math.max(lo, Math.min(hi, scaleStep(cur, rnd() < 0.5 ? 1 : -1)));
-          lane.push({ midi: pitch, start: barStart + pos * e, dur: Math.round(len * e * 0.92), vel: 96 });
+          // 레가토(음을 다음 음까지 꽉 채움) — 지속형 음색(바이올린·허밍)에서 음이 일찍 끊기며 나던 '틱' 방지.
+          // SMF 쓰기에서 같은 틱의 노트오프가 노트온보다 먼저 정렬되므로 같은 음 연타도 안전.
+          lane.push({ midi: pitch, start: barStart + pos * e, dur: len * e, vel: 92 });
           cur = pitch; pos += len;
         }
         prev = cur; bar++;
