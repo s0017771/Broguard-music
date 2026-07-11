@@ -118,6 +118,29 @@ await (async () => { try {
 } catch (e) { bad('5트랙 합주', e); } })();
 
 await (async () => { try {
+  // 멜로디 소리(악기) 선택 — 7종 목록 + 바이올린 선택 후 솔로
+  const voices = await page.$$eval('#melodyVoice option', els => els.map(o => o.textContent));
+  assert.equal(voices.length, 7, '소리 7종: ' + voices.join(','));
+  assert.ok(voices.some(v => /바이올린/.test(v)) && voices.some(v => /남성 보컬/.test(v)), '바이올린·허밍 포함');
+  await page.selectOption('#melodyVoice', '2');   // 바이올린
+  await page.click('#btnSoloMelody');
+  await page.waitForFunction(() => /바이올린/.test(document.getElementById('mixStatus').textContent), undefined, { timeout: 4000 });
+  ok('멜로디 소리 선택(바이올린) → 솔로 반영');
+} catch (e) { bad('멜로디 소리 선택', e); } })();
+
+await (async () => { try {
+  // 구간 배치: 격자 렌더(5트랙×섹션) + 추천 프리셋 → 기타 벌스 꺼짐
+  const rows = await page.$$eval('#arrangeGrid tbody tr .trk', els => els.map(e => e.textContent.trim()));
+  assert.equal(rows.length, 5, '5트랙 행: ' + rows.join(','));
+  await page.click('#btnArrangeVerseLite');
+  const guitarCells = await page.$$eval('#arrangeGrid input.scell[data-k="guitar"]', els => els.map(c => c.checked));
+  assert.ok(guitarCells.some(c => !c) && guitarCells.some(c => c), '추천 프리셋: 기타가 일부 구간만 켜짐');
+  await page.click('#btnMix');
+  await page.waitForFunction(() => /합주 완성/.test(document.getElementById('mixStatus').textContent), undefined, { timeout: 5000 });
+  ok('구간 배치 격자 + 추천 프리셋 → 합주 반영');
+} catch (e) { bad('구간 배치', e); } })();
+
+await (async () => { try {
   // 베이스 직접 입력 패턴 → 생성 + 저장 → 저장 목록에 나타남
   await page.selectOption('#bassPattern', 'custom');
   await page.waitForSelector('#bassCustomRow', { state: 'visible' });

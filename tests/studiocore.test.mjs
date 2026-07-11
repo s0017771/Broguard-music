@@ -244,3 +244,38 @@ test('combine: 5트랙 전체 — 채널·프로그램 올바름', () => {
   assert.ok(p.progs.some(x => x.ch === 0 && x.prog === 54), '멜로디 프로그램(54)');
   assert.deepEqual(out.tracks, ['drums', 'bass', 'piano', 'guitar', 'melody']);
 });
+
+test('MELODY_VOICES: 악기 5종 + 허밍 2종, 남성 보컬은 옥타브 아래', () => {
+  const v = StudioCore.MELODY_VOICES;
+  assert.equal(v.length, 7, '7종');
+  assert.ok(v.some(x => /여성 보컬/.test(x.name)) && v.some(x => /남성 보컬/.test(x.name)), '허밍 2종');
+  ['바이올린', '플루트', '오보에', '클라리넷', '신스'].forEach(n =>
+    assert.ok(v.some(x => x.name.includes(n)), n));
+  const male = v.find(x => /남성/.test(x.name));
+  assert.equal(male.oct, -12, '남성 = -12(한 옥타브 아래)');
+  v.forEach(x => assert.ok(x.prog >= 0 && x.prog <= 127, x.name + ' GM 번호'));
+});
+
+test('combine: progs 덮어쓰기 — 멜로디를 바이올린(40)으로', () => {
+  const melody = StudioCore.genMelody(PLAN, { style: 1, seed: 7 });
+  const p = parse(StudioCore.combine({ melody }, { tempo: 100, progs: { melody: 40 } }).bytes);
+  assert.ok(p.progs.some(x => x.ch === 0 && x.prog === 40), '바이올린 프로그램');
+  assert.ok(!p.progs.some(x => x.ch === 0 && x.prog === 54), '기본(54) 아님');
+});
+
+test('sectionRanges + filterBySections: 구간 배치 — 끈 섹션의 음이 빠진다', () => {
+  const ranges = StudioCore.sectionRanges(PLAN);
+  assert.equal(ranges.length, PLAN.sections.length);
+  assert.equal(ranges[0].startTick, 0);
+  assert.equal(ranges[ranges.length - 1].endTick, PLAN.totalBars * BAR, '마지막 끝 = 총 마디');
+  const lane = StudioCore.genBass(PLAN, { pattern: 1 });
+  // 첫 섹션만 끄기
+  const enabled = PLAN.sections.map((s, i) => i !== 0);
+  const filtered = StudioCore.filterBySections(lane, ranges, enabled);
+  assert.ok(filtered.length < lane.length, '음이 줄어듦');
+  assert.ok(filtered.every(n => n.start >= ranges[0].endTick), '첫 섹션 구간에 음이 없음');
+  // 모두 켜면 그대로
+  assert.equal(StudioCore.filterBySections(lane, ranges, PLAN.sections.map(() => true)).length, lane.length);
+  // enabled 없으면 그대로
+  assert.equal(StudioCore.filterBySections(lane, ranges, null).length, lane.length);
+});
