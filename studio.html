@@ -66,11 +66,12 @@
       <button id="btnPlan">🎼 곡 설계</button>
     </div>
     <div class="row">
-      <button id="btnImportSong" class="alt">🎵 내 곡 불러오기 (.mid) — 멜로디로</button>
-      <input type="file" id="songFile" accept=".mid,.midi,audio/midi" style="display:none">
+      <button id="btnImportSong" class="alt">🎵 내 곡 불러오기 (.mid / .abc) — 멜로디로</button>
+      <input type="file" id="songFile" accept=".mid,.midi,.abc,.txt,audio/midi,text/plain" style="display:none">
+      <button id="btnExpand" class="alt" disabled title="지금 멜로디를 씨앗으로 전체 곡 구성(인트로·벌스·코러스…)을 채웁니다">🧩 전체 곡으로 확장</button>
       <span id="importStatus" class="note" style="margin:0"></span>
     </div>
-    <p class="note">뮤직랩(송메이커·연구소·스튜디오·BKD)에서 저장한 <b>.mid</b>를 불러오면 그 <b>멜로디를 그대로 쓰고</b>, 조성·템포·코드 진행을 자동으로 판단해 그 위에 드럼·베이스·피아노·기타를 붙입니다.</p>
+    <p class="note">뮤직랩(송메이커·연구소·스튜디오·BKD)에서 저장한 <b>.mid / .abc</b>를 불러오면 그 <b>멜로디를 그대로 쓰고</b>, 조성·템포·코드를 자동 판단해 드럼·베이스·피아노를 붙입니다. <b>짧은 4·8마디</b> 멜로디는 <b>🧩 전체 곡으로 확장</b>으로 채우세요.</p>
     <div id="summary" style="margin-top:12px"></div>
     <div id="chords" class="note" style="margin-top:6px"></div>
   </div>
@@ -156,6 +157,7 @@
       <button id="btnGenMelody">🎵 멜로디 생성</button>
       <button id="btnRegenMelody" class="alt" disabled>🎲 다시 생성</button>
       <button id="btnSoloMelody" class="alt" disabled>🔊 이 트랙만 듣기</button>
+      <button id="btnMelodyToLab" class="alt" disabled>🎼 연구소로(멜로디 편집)</button>
       <span id="melodyStatus" class="note" style="margin:0"></span>
     </div>
     <div class="tctl">
@@ -751,38 +753,22 @@ var StudioCore = (function () {
     return (minor ? degMin : degMaj).map(function (d) { return { pc: (root + d[0]) % 12, min: d[1] }; });
   }
   function chordSym(pc, min) { return PC_NAME[((pc % 12) + 12) % 12] + (min ? 'm' : ''); }
-  function importMelody(bytes) {
-    var mid = parseSMF(bytes);
-    if (mid.error) return mid;
-    // 멜로디 트랙 = 평균 음고 최고
-    mid.tracks.sort(function (a, b) {
-      var av = a.reduce(function (s, n) { return s + n.midi; }, 0) / a.length;
-      var bv = b.reduce(function (s, n) { return s + n.midi; }, 0) / b.length;
-      return bv - av;
-    });
-    // 시작시각별 최상성(단선율화)
-    var by = {};
-    mid.tracks[0].forEach(function (n) { if (!by[n.s] || n.midi > by[n.s].midi) by[n.s] = n; });
-    var src = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return a.s - b.s; });
+  // 멜로디 노트([{midi,s,d}], srcPpq, tempo) → 조성·코드 판단 + plan + 스튜디오 PPQ 멜로디 레인
+  function analyzeMelody(src, srcPpq, tempo) {
+    src = src.slice().sort(function (a, b) { return a.s - b.s; });
     if (!src.length) return { error: '멜로디 음표를 찾지 못했습니다.' };
-    // 겹침 방지 + 스튜디오 PPQ(480)로 재스케일
-    var scale = PPQ / mid.ppq;
-    var melodyLane = [];
+    var scale = PPQ / srcPpq, melodyLane = [];
     for (var i = 0; i < src.length; i++) {
       var dur = src[i].d;
       if (i < src.length - 1) dur = Math.min(dur, src[i + 1].s - src[i].s) || dur;   // 레가토
       melodyLane.push({ midi: src[i].midi, start: Math.round(src[i].s * scale), dur: Math.max(1, Math.round(dur * scale)), vel: 92 });
     }
-    // 조성 판단(길이 가중)
     var weights = new Array(12).fill(0);
     src.forEach(function (n) { weights[((n.midi % 12) + 12) % 12] += n.d; });
-    var key = detectKey(weights);
-    var cands = diatonicChords(key.root, key.minor);
-    // 마디(4/4 가정) — src 원본 틱 기준
-    var beatsPerBar = 4, barTicks = mid.ppq * beatsPerBar;
+    var key = detectKey(weights), cands = diatonicChords(key.root, key.minor);
+    var beatsPerBar = 4, barTicks = srcPpq * beatsPerBar;
     var maxTick = src.reduce(function (a, n) { return Math.max(a, n.s + n.d); }, 0);
     var totalBars = Math.max(1, Math.ceil((maxTick - 1) / barTicks));
-    // 마디별 코드 추정 + 에너지(음 밀도)
     var perBarChord = [], perBarDensity = [];
     for (var bar = 0; bar < totalBars; bar++) {
       var b0 = bar * barTicks, b1 = b0 + barTicks, w = new Array(12).fill(0), cnt = 0;
@@ -794,29 +780,138 @@ var StudioCore = (function () {
       cands.forEach(function (c, ci) {
         var third = (c.pc + (c.min ? 3 : 4)) % 12, fifth = (c.pc + 7) % 12;
         var score = w[c.pc] * 1.4 + w[third] * 1.0 + w[fifth] * 0.9;
-        if (bar === 0 || bar === totalBars - 1) if (ci === 0) score += 0.01;   // 처음·끝 살짝 으뜸화음 선호
+        if ((bar === 0 || bar === totalBars - 1) && ci === 0) score += 0.01;
         if (score > bestScore) { bestScore = score; best = ci; }
       });
       if (best < 0) best = 0;
-      if (bestScore <= 0 && bar > 0) perBarChord.push(perBarChord[bar - 1]);   // 음 없는 마디는 앞 코드 유지
+      if (bestScore <= 0 && bar > 0) perBarChord.push(perBarChord[bar - 1]);
       else perBarChord.push(chordSym(cands[best].pc, cands[best].min));
       perBarDensity.push(cnt);
     }
-    // 4마디 단위 섹션
     var sections = [], maxD = Math.max.apply(null, perBarDensity.concat([1]));
     for (var s0 = 0; s0 < totalBars; s0 += 4) {
-      var chunk = perBarChord.slice(s0, s0 + 4);
-      var dens = perBarDensity.slice(s0, s0 + 4).reduce(function (a, x) { return a + x; }, 0) / (chunk.length || 1);
-      sections.push({ name: (s0 / 4 + 1) + '구간', bars: chunk.length, chords: chunk.slice(), energy: Math.max(0.3, Math.min(1, dens / maxD)) });
+      var ch = perBarChord.slice(s0, s0 + 4);
+      var dens = perBarDensity.slice(s0, s0 + 4).reduce(function (a, x) { return a + x; }, 0) / (ch.length || 1);
+      sections.push({ name: (s0 / 4 + 1) + '구간', bars: ch.length, chords: ch.slice(), energy: Math.max(0.3, Math.min(1, dens / maxD)) });
     }
     var plan = {
-      title: '내 곡', tempo: mid.tempo || 100, meter: '4/4',
+      title: '내 곡', tempo: tempo || 100, meter: '4/4',
       key: PC_NAME[key.root] + (key.minor ? ' 단조' : ' 장조'), minor: key.minor,
       keyRoot: key.root, genreKey: 'pop', moodKey: key.minor ? 'sad' : 'bright',
       seed: 1, sections: sections, totalBars: totalBars,
-      estSec: Math.round(totalBars * beatsPerBar * (60 / (mid.tempo || 100)))
+      estSec: Math.round(totalBars * beatsPerBar * (60 / (tempo || 100)))
     };
     return { ok: true, plan: plan, melodyLane: melodyLane };
+  }
+  function importMelody(bytes) {
+    var mid = parseSMF(bytes);
+    if (mid.error) return mid;
+    mid.tracks.sort(function (a, b) {
+      return (b.reduce(function (s, n) { return s + n.midi; }, 0) / b.length) - (a.reduce(function (s, n) { return s + n.midi; }, 0) / a.length);
+    });
+    var by = {};
+    mid.tracks[0].forEach(function (n) { if (!by[n.s] || n.midi > by[n.s].midi) by[n.s] = n; });   // 시작시각별 최상성
+    var src = Object.keys(by).map(function (k) { return by[k]; });
+    return analyzeMelody(src, mid.ppq, mid.tempo);
+  }
+
+  // ── ABC(단선율) → 멜로디 노트 ──  ('C'=60, 'c'=72, ',' -12, "'" +12, ^올림 _내림, L 기본 1/8)
+  function parseAbcMelody(text) {
+    var lines = String(text || '').split('\n');
+    var L = 1 / 8, tempo = 100, header = true, body = [];
+    var LETTER = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+    lines.forEach(function (ln) {
+      var h = ln.match(/^([A-Za-z]):\s*(.*)$/);
+      if (h && h[1] !== 'w') {
+        if (h[1] === 'L') { var m = h[2].match(/(\d+)\s*\/\s*(\d+)/); if (m) L = +m[1] / +m[2]; }
+        else if (h[1] === 'Q') { var q = h[2].match(/=\s*(\d+)/); if (q) tempo = +q[1]; }
+        else if (h[1] === 'K') { header = false; }
+        return;
+      }
+      if (!header && !/^%/.test(ln)) body.push(ln);
+    });
+    var ppq = 480, unit = ppq * (L * 4), s = String(body.join(' '));
+    s = s.replace(/"[^"]*"/g, '').replace(/!.*?!/g, '').replace(/\[[A-Za-z]:[^\]]*\]/g, '');   // 주석·장식·인라인필드 제거
+    var re = /([_^=]*)([A-Ga-gz])([,']*)(\d*)(?:\/(\d+))?/g, m2, tick = 0, notes = [];
+    while ((m2 = re.exec(s))) {
+      var acc = m2[1], let2 = m2[2], oct = m2[3], num = m2[4], den = m2[5];
+      var len = (num ? +num : 1) / (den ? +den : 1);
+      var durTick = Math.max(1, Math.round(len * unit));
+      if (let2 === 'z') { tick += durTick; continue; }
+      var up = let2 >= 'a' && let2 <= 'g';
+      var pc = LETTER[let2.toUpperCase()];
+      var midi = (up ? 72 : 60) + pc;
+      for (var oi = 0; oi < oct.length; oi++) midi += (oct[oi] === "'") ? 12 : -12;
+      var accCount = (acc.match(/\^/g) || []).length - (acc.match(/_/g) || []).length;
+      midi += accCount;
+      notes.push({ midi: midi, s: tick, d: durTick }); tick += durTick;
+    }
+    if (!notes.length) return { error: 'ABC에서 멜로디 음표를 찾지 못했습니다.' };
+    return { notes: notes, ppq: ppq, tempo: tempo };
+  }
+  function importMelodyAbc(text) {
+    var a = parseAbcMelody(text);
+    if (a.error) return a;
+    return analyzeMelody(a.notes, a.ppq, a.tempo);
+  }
+
+  // ── 멜로디 레인 → ABC(연구소 편집용) ──
+  function midiToAbcName(m) {
+    var names = ['C', '^C', 'D', '^D', 'E', 'F', '^F', 'G', '^G', 'A', '^A', 'B'];
+    var pc = ((m % 12) + 12) % 12, oct = Math.floor(m / 12) - 1, nm = names[pc], acc = '', ln = nm;
+    if (nm.length > 1) { acc = '^'; ln = nm[1]; }
+    var out;
+    if (oct >= 5) { out = acc + ln.toLowerCase(); for (var o = 6; o <= oct; o++) out += "'"; }
+    else { out = acc + ln.toUpperCase(); for (var o2 = oct; o2 < 4; o2++) out += ','; }
+    return out;
+  }
+  function laneToAbc(lane, plan) {
+    var tempo = (plan && plan.tempo) || 100, unit = PPQ / 2;   // L:1/8
+    var notes = lane.slice().sort(function (a, b) { return a.start - b.start; });
+    var head = 'X:1\nT:' + ((plan && plan.title) || '내 멜로디') + ' (멜로디)\nM:4/4\nL:1/8\nQ:1/4=' + tempo + '\nK:C\n';
+    var body = '', cursor = 0, barU = 8, barCount = 0, pos = 0;
+    function emit(tok) { body += tok + ((pos % 2 === 1) ? ' ' : ''); pos++; }
+    function unitsToLen(u) { return u > 1 ? String(u) : ''; }
+    notes.forEach(function (n) {
+      var st = Math.round(n.start / unit), du = Math.max(1, Math.round(n.dur / unit));
+      if (st > cursor) { emit('z' + unitsToLen(st - cursor)); cursor = st; }         // 쉼표로 간격 채움
+      emit(midiToAbcName(n.midi) + unitsToLen(du)); cursor = st + du;
+      // 마디(8단위)마다 바라인
+      while (cursor >= (barCount + 1) * barU) { barCount++; body += '| ' + (barCount % 4 === 0 ? '\n' : ''); pos = 0; }
+    });
+    return head + body.trim() + ' |]\n';
+  }
+
+  // ── 짧은 멜로디(씨앗)를 전체 곡 구성으로 확장 ──
+  var EXPAND_FORM = [
+    { name: '인트로', energy: 0.4, thin: true },
+    { name: '벌스', energy: 0.5 }, { name: '벌스', energy: 0.55 },
+    { name: '프리코러스', energy: 0.7 },
+    { name: '코러스', energy: 1.0 }, { name: '코러스', energy: 1.0 },
+    { name: '브릿지', energy: 0.6 }, { name: '코러스', energy: 1.0 },
+    { name: '아웃트로', energy: 0.4, thin: true }
+  ];
+  function expandLoop(plan, lane, opts) {
+    opts = opts || {};
+    var form = opts.form || EXPAND_FORM, seedBars = plan.totalBars, barTicks = PPQ * 4;
+    var seedChords = [];
+    plan.sections.forEach(function (s) { for (var b = 0; b < s.bars; b++) seedChords.push(s.chords[b % s.chords.length]); });
+    var seedLane = lane.slice().sort(function (a, b) { return a.start - b.start; });
+    var newSections = [], newLane = [], barCursor = 0;
+    form.forEach(function (f) {
+      var off = barCursor * barTicks;
+      seedLane.forEach(function (n) {
+        if (f.thin && (n.start % PPQ !== 0)) return;                 // 인트로·아웃트로는 강박 음만(성기게)
+        newLane.push({ midi: n.midi, start: n.start + off, dur: n.dur, vel: n.vel });
+      });
+      newSections.push({ name: f.name, bars: seedBars, chords: seedChords.slice(), energy: f.energy });
+      barCursor += seedBars;
+    });
+    var newPlan = {};
+    for (var k in plan) newPlan[k] = plan[k];
+    newPlan.sections = newSections; newPlan.totalBars = barCursor;
+    newPlan.estSec = Math.round(barCursor * 4 * (60 / (plan.tempo || 100)));
+    return { plan: newPlan, melodyLane: newLane };
   }
 
   // ── 멀티트랙 SMF 조합 ──
@@ -862,7 +957,8 @@ var StudioCore = (function () {
            TRACK_META: TRACK_META, DRUM_LETTER: DRUM_LETTER,
            parseChord: parseChord, genDrums: genDrums, genBass: genBass, genPiano: genPiano, genGuitar: genGuitar, genMelody: genMelody, combine: combine,
            sectionRanges: sectionRanges, filterBySections: filterBySections, genTrackSections: genTrackSections,
-           importMelody: importMelody, detectKey: detectKey,
+           importMelody: importMelody, importMelodyAbc: importMelodyAbc, parseAbcMelody: parseAbcMelody,
+           analyzeMelody: analyzeMelody, laneToAbc: laneToAbc, expandLoop: expandLoop, detectKey: detectKey,
            parseBassPattern: parseBassPattern, genBassPattern: genBassPattern,
            parseDrumPattern: parseDrumPattern, genDrumsPattern: genDrumsPattern };
 })();
@@ -953,36 +1049,68 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     $('importStatus').textContent = '';
   });
 
-  // ── 내 곡 불러오기(.mid) → 멜로디로 ──
+  // ── 내 곡 불러오기(.mid / .abc) → 멜로디로 ──
+  function applyImported(res, title) {
+    if (res.error) { $('importStatus').innerHTML = '<span class="err">' + res.error + '</span>'; return false; }
+    plan = res.plan; plan.title = title;
+    $('title').value = plan.title;
+    renderPlanCards();
+    tracks.melody.lane = res.melodyLane;
+    ['btnSoloMelody', 'melodyOn', 'btnMelodyToLab', 'btnExpand'].forEach(function (id) { $(id).disabled = false; });
+    setMelodyImported(true);
+    $('melodyStatus').innerHTML = '<span class="ok">✓ 불러온 멜로디 ' + res.melodyLane.length + '음 · 소리를 고르세요</span>';
+    regenExistingTracks();
+    if (!tracks.drums.lane) tracks.drums.lane = StudioCore.genDrums(plan, { style: +$('drumStyle').value });
+    if (!tracks.bass.lane) tracks.bass.lane = StudioCore.genBass(plan, { pattern: +$('bassPattern').value });
+    if (!tracks.piano.lane) tracks.piano.lane = StudioCore.genPiano(plan, { pattern: +$('pianoPattern').value });
+    ['btnRegenDrum', 'btnSoloDrum', 'drumOn', 'btnRegenBass', 'btnSoloBass', 'bassOn', 'btnSoloPiano', 'pianoOn'].forEach(function (id) { $(id).disabled = false; });
+    $('drumStatus').innerHTML = '<span class="ok">✓ 드럼 자동 생성</span>';
+    $('bassStatus').innerHTML = '<span class="ok">✓ 베이스 자동 생성(추정 코드)</span>';
+    $('pianoStatus').innerHTML = '<span class="ok">✓ 피아노 자동 생성(추정 코드)</span>';
+    $('importStatus').innerHTML = '<span class="ok">✓ ' + plan.title + ' 불러옴 · 조성 ' + plan.key + ' · ' + plan.tempo + ' BPM · ' + plan.totalBars + '마디 · 코드 자동 판단 — 「합쳐 재생」 또는 「🧩 확장」</span>';
+    $('mixStatus').innerHTML = '<span class="note">내 멜로디 + 자동 반주 준비됨. 소리·패턴 고르고 「합쳐 재생 만들기」!</span>';
+    return true;
+  }
   $('btnImportSong').addEventListener('click', function () { $('songFile').click(); });
   $('songFile').addEventListener('change', function () {
     var f = this.files && this.files[0]; this.value = '';
     if (!f) return;
+    var isAbc = /\.(abc|txt)$/i.test(f.name);
     var r = new FileReader();
     r.onload = function () {
       var res;
-      try { res = StudioCore.importMelody(new Uint8Array(r.result)); } catch (e) { res = { error: e.message }; }
-      if (res.error) { $('importStatus').innerHTML = '<span class="err">' + res.error + '</span>'; return; }
-      plan = res.plan; plan.title = f.name.replace(/\.midi?$/i, '');
-      $('title').value = plan.title;
-      renderPlanCards();
-      // 멜로디 = 불러온 곡, 나머지는 새 코드로 생성
-      tracks.melody.lane = res.melodyLane;
-      ['btnSoloMelody', 'melodyOn'].forEach(function (id) { $(id).disabled = false; });
-      setMelodyImported(true);
-      $('melodyStatus').innerHTML = '<span class="ok">✓ 불러온 멜로디 ' + res.melodyLane.length + '음 · 소리를 고르세요</span>';
-      regenExistingTracks();       // 이미 만든 반주가 있으면 새 코드로 재생성
-      if (!tracks.drums.lane) tracks.drums.lane = StudioCore.genDrums(plan, { style: +$('drumStyle').value });
-      if (!tracks.bass.lane) tracks.bass.lane = StudioCore.genBass(plan, { pattern: +$('bassPattern').value });
-      if (!tracks.piano.lane) tracks.piano.lane = StudioCore.genPiano(plan, { pattern: +$('pianoPattern').value });
-      ['btnRegenDrum', 'btnSoloDrum', 'drumOn', 'btnRegenBass', 'btnSoloBass', 'bassOn', 'btnSoloPiano', 'pianoOn'].forEach(function (id) { $(id).disabled = false; });
-      $('drumStatus').innerHTML = '<span class="ok">✓ 드럼 자동 생성</span>';
-      $('bassStatus').innerHTML = '<span class="ok">✓ 베이스 자동 생성(추정 코드)</span>';
-      $('pianoStatus').innerHTML = '<span class="ok">✓ 피아노 자동 생성(추정 코드)</span>';
-      $('importStatus').innerHTML = '<span class="ok">✓ ' + plan.title + ' 불러옴 · 조성 ' + plan.key + ' · ' + plan.tempo + ' BPM · 코드 자동 판단 — 「합쳐 재생 만들기」를 누르세요</span>';
-      $('mixStatus').innerHTML = '<span class="note">내 멜로디 + 자동 반주가 준비됐습니다. 소리·패턴을 고르고 「합쳐 재생 만들기」!</span>';
+      try { res = isAbc ? StudioCore.importMelodyAbc(String(r.result || '')) : StudioCore.importMelody(new Uint8Array(r.result)); }
+      catch (e) { res = { error: e.message }; }
+      applyImported(res, f.name.replace(/\.(midi?|abc|txt)$/i, ''));
     };
-    r.readAsArrayBuffer(f);
+    if (isAbc) r.readAsText(f); else r.readAsArrayBuffer(f);
+  });
+
+  // ── 전체 곡으로 확장 (짧은 멜로디를 씨앗으로) ──
+  $('btnExpand').addEventListener('click', function () {
+    if (!plan || !tracks.melody.lane) { $('importStatus').innerHTML = '<span class="err">먼저 멜로디를 불러오거나 만드세요.</span>'; return; }
+    var out = StudioCore.expandLoop(plan, tracks.melody.lane);
+    plan = out.plan;
+    tracks.melody.lane = out.melodyLane;
+    setMelodyImported(true);
+    ['btnSoloMelody', 'melodyOn', 'btnMelodyToLab'].forEach(function (id) { $(id).disabled = false; });
+    renderPlanCards();
+    // 반주를 새 (확장된) 구성으로 다시 생성
+    tracks.drums.lane = StudioCore.genDrums(plan, { style: +$('drumStyle').value });
+    tracks.bass.lane = StudioCore.genBass(plan, { pattern: +$('bassPattern').value });
+    tracks.piano.lane = StudioCore.genPiano(plan, { pattern: +$('pianoPattern').value });
+    if (tracks.guitar.lane) tracks.guitar.lane = StudioCore.genGuitar(plan, { pattern: +$('guitarPattern').value });
+    ['btnRegenDrum', 'btnSoloDrum', 'drumOn', 'btnRegenBass', 'btnSoloBass', 'bassOn', 'btnSoloPiano', 'pianoOn'].forEach(function (id) { $(id).disabled = false; });
+    mixMidi = null; $('btnSaveMix').disabled = true;
+    $('melodyStatus').innerHTML = '<span class="ok">✓ 확장된 멜로디 ' + tracks.melody.lane.length + '음 · 소리를 고르세요</span>';
+    $('importStatus').innerHTML = '<span class="ok">✓ 전체 곡으로 확장 · ' + plan.sections.length + '섹션 · ' + plan.totalBars + '마디 — 「합쳐 재생 만들기」를 누르세요</span>';
+  });
+
+  // ── 스튜디오 멜로디 → 악보 연구소에서 편집 ──
+  $('btnMelodyToLab').addEventListener('click', function () {
+    if (!tracks.melody.lane) return;
+    try { localStorage.setItem('broguard_lab_abc', StudioCore.laneToAbc(tracks.melody.lane, plan)); } catch (e) {}
+    window.open('lab.html', '_blank');
   });
 
   // 선택값 해석: 숫자 스타일 / 'custom'(입력칸) / 'saved:N'(저장 패턴)
@@ -1084,7 +1212,7 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     if (!plan) { $('melodyStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
     if (regen || !tracks.melody.seedSet) { tracks.melody.seed = regen ? ((Math.random() * 1e9) | 0) : (plan.seed || 1); tracks.melody.seedSet = true; }
     tracks.melody.lane = StudioCore.genMelody(plan, { style: +$('melodyStyle').value, seed: tracks.melody.seed });
-    ['btnRegenMelody', 'btnSoloMelody', 'melodyOn'].forEach(function (id) { $(id).disabled = false; });
+    ['btnRegenMelody', 'btnSoloMelody', 'melodyOn', 'btnMelodyToLab', 'btnExpand'].forEach(function (id) { $(id).disabled = false; });
     $('melodyStatus').innerHTML = '<span class="ok">✓ 멜로디 ' + tracks.melody.lane.length + '음 · ' + StudioCore.MELODY_STYLES[+$('melodyStyle').value] + ' · 시드 ' + tracks.melody.seed + '</span>';
   }
   $('btnGenMelody').addEventListener('click', function () { makeMelody(false); });
