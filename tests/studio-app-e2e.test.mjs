@@ -254,6 +254,30 @@ await (async () => { try {
   ok('자동 곡 설계 복귀 → 멜로디 생성 재활성화');
 } catch (e) { bad('멜로디 재활성화', e); } })();
 
+await (async () => { try {
+  // ABC(4마디 씨앗) 불러오기 → 확장 → 섹션 늘어남
+  const abc = 'X:1\nL:1/8\nQ:1/4=100\nK:C\n"C"C2 E2 G2 E2 | "F"F2 A2 c2 A2 | "G"G2 B2 d2 B2 | "C"C2 E2 G2 c2 |]\n';
+  await page.setInputFiles('#songFile', { name: '씨앗.abc', mimeType: 'text/plain', buffer: Buffer.from(abc) });
+  await page.waitForFunction(() => /불러옴/.test(document.getElementById('importStatus').textContent), undefined, { timeout: 4000 });
+  const secBefore = (await page.textContent('#summary')).match(/(\d+)섹션/)[1];
+  assert.equal(await page.isDisabled('#btnExpand'), false, '확장 버튼 활성화');
+  await page.click('#btnExpand');
+  await page.waitForFunction(() => /확장/.test(document.getElementById('importStatus').textContent), undefined, { timeout: 4000 });
+  const secAfter = (await page.textContent('#summary')).match(/(\d+)섹션/)[1];
+  assert.ok(+secAfter > +secBefore, `섹션 확장: ${secBefore}→${secAfter}`);
+  assert.ok(/코러스|벌스/.test(await page.textContent('#chords')), '구성에 벌스·코러스');
+  ok('ABC 불러오기 → 전체 곡으로 확장');
+} catch (e) { bad('ABC 불러오기/확장', e); } })();
+
+await (async () => { try {
+  // 멜로디 → 연구소로(멜로디 편집): localStorage에 ABC 저장
+  await page.evaluate(() => { window.open = () => null; });
+  await page.click('#btnMelodyToLab');
+  const abc = await page.evaluate(() => localStorage.getItem('broguard_lab_abc'));
+  assert.ok(abc && /L:1\/8/.test(abc) && /\|\]/.test(abc), '연구소용 ABC 저장: ' + (abc || '').slice(0, 40));
+  ok('스튜디오 멜로디 → 연구소로(ABC)');
+} catch (e) { bad('멜로디 연구소로', e); } })();
+
 await (async () => { try { assert.deepEqual(errors, []); ok('심각한 JS 오류 없음'); } catch (e) { bad('JS 오류', e); } })();
 
 await browser.close(); server.close();

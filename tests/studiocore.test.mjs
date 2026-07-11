@@ -385,3 +385,52 @@ test('detectKey: A단조 멜로디를 단조로 판단', () => {
   assert.equal(k.root, 9, '으뜸 A');
   assert.equal(k.minor, true, '단조');
 });
+
+test('parseAbcMelody / importMelodyAbc: ABC 단선율을 멜로디로', () => {
+  const abc = 'X:1\nT:t (멜로디)\nM:4/4\nL:1/8\nQ:1/4=110\nK:C\n"C"C2 E2 G2 c2 | "G"G2 B2 d2 z2 |]\n';
+  const p = StudioCore.parseAbcMelody(abc);
+  assert.ok(!p.error, p.error);
+  assert.equal(p.tempo, 110, '템포');
+  assert.deepEqual(p.notes.map(n => n.midi), [60, 64, 67, 72, 67, 71, 74], 'C E G c / G B d (z 제외)');
+  assert.equal(p.notes[0].d, 480, '2/8=4분음표=480틱(ppq480)');
+  const res = StudioCore.importMelodyAbc(abc);
+  assert.ok(res.ok, res.error);
+  assert.equal(res.plan.tempo, 110);
+  assert.ok(res.melodyLane.length === 7, '멜로디 레인 7음');
+});
+
+test('laneToAbc → parseAbcMelody 왕복: 음높이 보존', () => {
+  const u = StudioCore.PPQ / 2; // 1/8
+  const lane = [
+    { midi: 60, start: 0, dur: u * 2, vel: 92 }, { midi: 64, start: u * 2, dur: u * 2, vel: 92 },
+    { midi: 67, start: u * 4, dur: u * 2, vel: 92 }, { midi: 72, start: u * 6, dur: u * 2, vel: 92 }
+  ];
+  const abc = StudioCore.laneToAbc(lane, { tempo: 100, title: 'x' });
+  assert.ok(/L:1\/8/.test(abc) && /\|\]/.test(abc), 'ABC 형식');
+  const back = StudioCore.parseAbcMelody(abc);
+  assert.deepEqual(back.notes.map(n => n.midi), [60, 64, 67, 72], '왕복 음높이 보존');
+});
+
+test('expandLoop: 씨앗(4마디)을 전체 곡 구성으로 채운다', () => {
+  // 4마디 씨앗 plan + 멜로디
+  const seed = StudioCore.importMelodyAbc('X:1\nL:1/8\nQ:1/4=100\nK:C\n"C"C2 E2 G2 E2 | "F"F2 A2 c2 A2 | "G"G2 B2 d2 B2 | "C"C2 E2 G2 c2 |]\n');
+  assert.equal(seed.plan.totalBars, 4, '씨앗 4마디');
+  const out = StudioCore.expandLoop(seed.plan, seed.melodyLane);
+  assert.ok(out.plan.totalBars > seed.plan.totalBars, '확장됨: ' + out.plan.totalBars);
+  assert.equal(out.plan.sections.length, 9, '인트로~아웃트로 9섹션');
+  assert.equal(out.plan.totalBars, 9 * 4, '9섹션 × 4마디');
+  assert.ok(out.plan.sections.some(s => s.name === '코러스') && out.plan.sections.some(s => s.name === '벌스'), '구성에 벌스·코러스');
+  // 벌스 섹션 코드 = 씨앗 코드 타일링
+  const verse = out.plan.sections.find(s => s.name === '벌스');
+  assert.deepEqual(verse.chords, seed.plan.sections[0].chords, '씨앗 코드 반복');
+  // 멜로디도 확장(음 수 증가), 코러스 구간에 음이 있다
+  assert.ok(out.melodyLane.length > seed.melodyLane.length, '멜로디 확장');
+  const BARt = StudioCore.PPQ * 4;
+  const chorusIdx = out.plan.sections.findIndex(s => s.name === '코러스');
+  const chorusStart = out.plan.sections.slice(0, chorusIdx).reduce((a, s) => a + s.bars, 0) * BARt;
+  assert.ok(out.melodyLane.some(n => n.start >= chorusStart && n.start < chorusStart + 4 * BARt), '코러스 구간 멜로디');
+  // 인트로는 성겨야(강박 음만) — 인트로 음 수 < 벌스 음 수
+  const introCount = out.melodyLane.filter(n => n.start < 4 * BARt).length;
+  const verseStart = 4 * BARt, verseCount = out.melodyLane.filter(n => n.start >= verseStart && n.start < 2 * verseStart).length;
+  assert.ok(introCount <= verseCount, `인트로(${introCount}) ≤ 벌스(${verseCount})`);
+});
