@@ -315,3 +315,73 @@ test('genMelody: 같은 시드라도 장르/분위기가 다르면 멜로디가 
   const c = StudioCore.genMelody(planC, { style: 1, seed: 7 });
   assert.notDeepEqual(a.map(n => n.midi + ':' + n.start), c.map(n => n.midi + ':' + n.start), '분위기 다르면 멜로디 다름');
 });
+
+// ── 내 곡 불러오기(importMelody) ──
+function makeMelodyMidi(notes, ppq = 480, bpm = 100) {
+  // notes: [[midi, startBeats, lenBeats], ...]  (드럼 아님, ch0)
+  function vlq(v) { const a = [v & 0x7f]; v >>= 7; while (v > 0) { a.unshift((v & 0x7f) | 0x80); v >>= 7; } return a; }
+  function u32(v) { return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255]; }
+  function u16(v) { return [(v >>> 8) & 255, v & 255]; }
+  function chunk(id, d) { const a = []; for (const ch of id) a.push(ch.charCodeAt(0)); return a.concat(u32(d.length), d); }
+  const uspq = Math.round(60000000 / bpm);
+  let ev = [];
+  notes.forEach(([m, s, l]) => { ev.push({ t: Math.round(s * ppq), on: 1, m }); ev.push({ t: Math.round((s + l) * ppq), on: 0, m }); });
+  ev.sort((a, b) => a.t - b.t || (a.on - b.on));
+  let trk = [].concat(vlq(0), [0xff, 0x51, 3, (uspq >> 16) & 255, (uspq >> 8) & 255, uspq & 255]);
+  let last = 0;
+  ev.forEach(e => { trk = trk.concat(vlq(e.t - last)); trk.push(e.on ? 0x90 : 0x80, e.m & 0x7f, e.on ? 90 : 0); last = e.t; });
+  trk = trk.concat(vlq(0), [0xff, 0x2f, 0]);
+  return Uint8Array.from(chunk('MThd', u16(0).concat(u16(1), u16(ppq))).concat(chunk('MTrk', trk)));
+}
+
+test('importMelody: 조성·템포·멜로디 추출 (C장조 8마디)', () => {
+  // C major 멜로디(흰건반만): C E G E / A C E C / F A C A / G B D B … → 명확한 C장조
+  const barTones = [
+    [60, 64, 67, 64], [69, 72, 76, 72], [65, 69, 72, 69], [67, 71, 74, 71],
+    [60, 64, 67, 64], [69, 72, 76, 72], [65, 69, 72, 69], [60, 64, 67, 72]
+  ];
+  const notes = [];
+  for (let bar = 0; bar < 8; bar++) barTones[bar].forEach((m, i) => notes.push([m, bar * 4 + i, 1]));
+  const bytes = makeMelodyMidi(notes, 480, 120);
+  const res = StudioCore.importMelody(bytes);
+  assert.ok(res.ok, res.error);
+  assert.equal(res.plan.tempo, 120, '템포 추출');
+  assert.equal(res.plan.totalBars, 8, '8마디');
+  assert.equal(res.plan.sections.reduce((a, s) => a + s.bars, 0), 8, '섹션 합=총 마디');
+  // C장조 ↔ A단조는 나란한 조(구성음 동일) — 둘 중 하나로 판단되면 OK
+  assert.ok((res.plan.keyRoot === 0 && !res.plan.minor) || (res.plan.keyRoot === 9 && res.plan.minor),
+    '조성 = C장조 또는 나란한 A단조: ' + res.plan.key);
+  // 추정 코드는 모두 C장조 다이어토닉({C Dm Em F G Am})이어야 한다
+  const DIATONIC = new Set(['C', 'Dm', 'Em', 'F', 'G', 'Am']);
+  const all = res.plan.sections.flatMap(s => s.chords);
+  assert.ok(all.every(c => DIATONIC.has(c)), '모든 코드가 C장조 다이어토닉: ' + [...new Set(all)].join(','));
+  // 멜로디 레인: 음이 있고 스튜디오 PPQ 기준 시작이 0
+  assert.ok(res.melodyLane.length >= 32, '멜로디 음 수');
+  assert.equal(res.melodyLane[0].start, 0, '첫 음 시작 0');
+});
+
+test('importMelody: 추정 코드로 반주 생성이 이어진다 (베이스 근음 일치)', () => {
+  const notes = [];
+  for (let bar = 0; bar < 4; bar++) { const root = 60; notes.push([root, bar * 4, 2], [root + 4, bar * 4 + 2, 2]); }
+  const res = StudioCore.importMelody(makeMelodyMidi(notes, 480, 100));
+  assert.ok(res.ok);
+  const bass = StudioCore.genBass(res.plan, { pattern: 1 });
+  // 첫 마디 베이스 근음 = 첫 코드 근음
+  const sym = res.plan.sections[0].chords[0];
+  const PCn = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  let pc = PCn[sym[0]]; if (sym[1] === '#') pc = (pc + 1) % 12;
+  const first = bass.find(n => n.start === 0);
+  assert.equal(((first.midi % 12) + 12) % 12, pc, '베이스 근음 = 추정 코드 근음');
+});
+
+test('importMelody: 비 MIDI·빈 파일은 오류', () => {
+  assert.ok(StudioCore.importMelody(Uint8Array.from([1, 2, 3, 4])).error, '비 MIDI');
+});
+
+test('detectKey: A단조 멜로디를 단조로 판단', () => {
+  const w = new Array(12).fill(0);
+  [9, 11, 0, 2, 4, 5, 7].forEach((pc, i) => { w[pc] = [8, 2, 5, 4, 5, 4, 3][i]; }); // A minor 스케일 가중
+  const k = StudioCore.detectKey(w);
+  assert.equal(k.root, 9, '으뜸 A');
+  assert.equal(k.minor, true, '단조');
+});
