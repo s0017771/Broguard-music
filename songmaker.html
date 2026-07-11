@@ -1554,22 +1554,7 @@ if (typeof module !== 'undefined') module.exports = Stage3;
     $('lyrics').innerHTML = ''; $('lyricStatus').textContent = '';
   });
 
-  /* 프로듀싱 스튜디오에서 넘어온 설계도(plan) — 커버·가라오케(3단계)를 스튜디오 곡으로 */
-  (function () {
-    var raw = null;
-    try { raw = localStorage.getItem('broguard_sm_plan'); } catch (e) {}
-    if (!raw) return;
-    try {
-      var p = JSON.parse(raw);
-      if (p && p.sections && p.sections.length && p.tempo) {
-        plan = p;
-        $('title').value = p.title || '';
-        renderPlan(plan);
-        $('planNote').textContent = '🎛️ 프로듀싱 스튜디오에서 넘어온 곡입니다 — 가사를 만들고 ④ 뮤직비디오(커버·가라오케)로 이어가세요.';
-      }
-    } catch (e) {}
-    try { localStorage.removeItem('broguard_sm_plan'); } catch (e) {}
-  })();
+  var studioMidi = null;   // 프로듀싱 스튜디오에서 넘어온 합주 반주(가라오케에 사용)
 
   function renderLyrics(blocks, src) {
     curLyrics = blocks;
@@ -1923,10 +1908,10 @@ if (typeof module !== 'undefined') module.exports = Stage3;
     karaoke = Stage3.buildKaraoke(plan, blocks);
     $('kLine').textContent = karaoke.lines[0] ? karaoke.lines[0].text : '';
     $('kNext').textContent = karaoke.lines[1] ? karaoke.lines[1].text : '';
-    // 반주 MIDI 준비(없으면 생성)
+    // 반주 MIDI 준비 — 스튜디오에서 넘어온 합주가 있으면 그 반주(악기 소리 그대로), 없으면 자체 생성
     try {
-      var out = buildArrangement();
-      var blob = new Blob([out.bytes], { type: 'audio/midi' });
+      var bytes = studioMidi || buildArrangement().bytes;
+      var blob = new Blob([bytes], { type: 'audio/midi' });
       if (mvUrl) URL.revokeObjectURL(mvUrl);
       mvUrl = URL.createObjectURL(blob);
       var el = $('mvPlayer'); el.setAttribute('src', mvUrl); try { el.src = mvUrl; } catch (e) {}
@@ -2024,6 +2009,38 @@ if (typeof module !== 'undefined') module.exports = Stage3;
     else { a.addEventListener('loadedmetadata', start, { once: true }); a.load(); }
   });
   $('btnVocalStop').addEventListener('click', stopAllPlay);
+
+  /* 프로듀싱 스튜디오에서 넘어온 설계도(plan) + 합주 반주(MIDI) — 커버·가라오케를 스튜디오 곡·소리 그대로.
+     (모든 초기화가 끝난 뒤 실행되어야 lastMidi/curUrl이 덮이지 않는다) */
+  (function () {
+    var raw = null, rawMidi = null;
+    try { raw = localStorage.getItem('broguard_sm_plan'); rawMidi = localStorage.getItem('broguard_sm_midi'); } catch (e) {}
+    if (!raw) return;
+    try {
+      var p = JSON.parse(raw);
+      if (p && p.sections && p.sections.length && p.tempo) {
+        plan = p;
+        $('title').value = p.title || '';
+        renderPlan(plan);
+        if (rawMidi) {
+          var bin = atob(rawMidi), bytes = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) === 'MThd') {
+            studioMidi = bytes; lastMidi = bytes;                       // 반주·저장·연구소 파이프라인에도 연결
+            var blob = new Blob([bytes], { type: 'audio/midi' });
+            if (curUrl) URL.revokeObjectURL(curUrl);
+            curUrl = URL.createObjectURL(blob);
+            $('playerWrap').style.display = ''; bigViz('viz');
+            try { $('player').src = curUrl; } catch (e) {}
+            ['btnSaveMidi', 'btnToDrum', 'btnToLab'].forEach(function (id) { $(id).disabled = false; });
+            $('arrStatus').innerHTML = '<span class="ok">✓ 스튜디오 반주(악기 소리 그대로) 불러옴 — 가라오케도 이 반주로 재생됩니다.</span>';
+          }
+        }
+        $('planNote').textContent = '🎛️ 프로듀싱 스튜디오에서 넘어온 곡입니다 — ② 가사만 만들면 ④ 뮤직비디오(커버·가라오케)가 완성됩니다.';
+      }
+    } catch (e) {}
+    try { localStorage.removeItem('broguard_sm_plan'); localStorage.removeItem('broguard_sm_midi'); } catch (e) {}
+  })();
 })();
 </script>
 </body>

@@ -159,11 +159,19 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + e.messa
   await page.close();
 }
 
-// 3) 송메이커: 스튜디오에서 넘어온 설계도(plan) 자동 복원
+// 3) 송메이커: 스튜디오에서 넘어온 설계도(plan) + 반주(MIDI) 자동 복원 → 가라오케가 그 반주 사용
 {
   const page = await browser.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.addInitScript(() => {
+  // 간단한 유효 MIDI(2음) 생성
+  function vlq(v) { const a = [v & 0x7f]; v >>= 7; while (v > 0) { a.unshift((v & 0x7f) | 0x80); v >>= 7; } return a; }
+  function u32(v) { return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255]; }
+  function u16(v) { return [(v >>> 8) & 255, v & 255]; }
+  function chunk(id, d) { const a = []; for (const ch of id) a.push(ch.charCodeAt(0)); return a.concat(u32(d.length), d); }
+  let trk = [].concat(vlq(0), [0xc0, 40], vlq(0), [0x90, 72, 90], vlq(480), [0x80, 72, 0], vlq(0), [0x90, 76, 90], vlq(480), [0x80, 76, 0], vlq(0), [0xff, 0x2f, 0]);
+  const midiBytes = chunk('MThd', u16(0).concat(u16(1), u16(480))).concat(chunk('MTrk', trk));
+  const midiB64 = Buffer.from(midiBytes).toString('base64');
+  await page.addInitScript(b64 => {
     localStorage.setItem('broguard_sm_plan', JSON.stringify({
       title: '스튜디오곡', theme: '', genre: '팝', genreKey: 'pop', mood: '밝음', moodKey: 'bright',
       key: 'C(장조)', minor: false, tempo: 110, meter: '4/4', drumStyle: '팝', energy: 0.7, seed: 7,
@@ -173,19 +181,36 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + e.messa
         { name: '코러스', bars: 8, chords: ['C', 'G', 'Am', 'F'], energy: 1.0 }
       ], totalBars: 20, estSec: 44
     }));
-  });
+    localStorage.setItem('broguard_sm_midi', b64);
+  }, midiB64);
   await page.goto(`${base}/songmaker.html`, { waitUntil: 'domcontentloaded' });
   try {
     await page.waitForSelector('#planCard', { state: 'visible', timeout: 5000 });
     const note = await page.textContent('#planNote');
     assert.ok(/스튜디오에서 넘어온/.test(note), '안내 문구: ' + note);
     assert.equal(await page.inputValue('#title'), '스튜디오곡', '제목 복원');
-    const secs = await page.$$('#sections .sec');
-    assert.equal(secs.length, 3, '섹션 복원');
-    const cleared = await page.evaluate(() => localStorage.getItem('broguard_sm_plan'));
+    assert.equal((await page.$$('#sections .sec')).length, 3, '섹션 복원');
+    // 반주 수신: 상태 문구 + 플레이어 로드 + 저장 활성화
+    const arrSt = await page.textContent('#arrStatus');
+    assert.ok(/스튜디오 반주/.test(arrSt), '반주 불러옴: ' + arrSt);
+    assert.equal(await page.isEnabled('#btnSaveMidi'), true, '.mid 저장 활성화');
+    const cleared = await page.evaluate(() => localStorage.getItem('broguard_sm_plan') || localStorage.getItem('broguard_sm_midi'));
     assert.equal(cleared, null, '핸드오프 키 정리');
-    ok('송메이커: 스튜디오 설계도 자동 복원');
+    ok('송메이커: 스튜디오 설계도+반주 자동 복원');
   } catch (e) { bad('스튜디오→송메이커 복원', e); }
+  try {
+    // 뮤직비디오 만들기 → 가라오케 반주가 스튜디오 MIDI(그 바이트)로 설정된다
+    await page.click('#btnMv');
+    await page.waitForFunction(() => document.getElementById('stage').style.display !== 'none', undefined, { timeout: 8000 });
+    const usesStudio = await page.evaluate(async (expectLen) => {
+      const src = document.getElementById('mvPlayer').getAttribute('src');
+      if (!src) return 'no-src';
+      const r = await fetch(src); const buf = await r.arrayBuffer();
+      return buf.byteLength === expectLen ? 'match' : ('len:' + buf.byteLength);
+    }, midiBytes.length);
+    assert.equal(usesStudio, 'match', '가라오케 반주 = 스튜디오 MIDI: ' + usesStudio);
+    ok('가라오케가 스튜디오 반주(악기 소리 그대로)로 재생 준비');
+  } catch (e) { bad('가라오케 스튜디오 반주', e); }
   try { assert.deepEqual(errors, []); ok('송메이커(복원) JS 오류 없음'); } catch (e) { bad('복원 JS 오류', e); }
   await page.close();
 }
