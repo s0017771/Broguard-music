@@ -96,6 +96,28 @@ await (async () => { try {
 } catch (e) { bad('솔로', e); } })();
 
 await (async () => { try {
+  // 피아노·기타·멜로디 생성 → 5트랙 합주
+  await page.click('#btnGenPiano');
+  await page.waitForFunction(() => /피아노/.test(document.getElementById('pianoStatus').textContent), undefined, { timeout: 4000 });
+  await page.selectOption('#guitarPattern', '0');
+  await page.click('#btnGenGuitar');
+  await page.waitForFunction(() => /기타/.test(document.getElementById('guitarStatus').textContent), undefined, { timeout: 4000 });
+  await page.click('#btnGenMelody');
+  await page.waitForFunction(() => /멜로디/.test(document.getElementById('melodyStatus').textContent), undefined, { timeout: 4000 });
+  const seed1 = (await page.textContent('#melodyStatus')).match(/시드 (\d+)/)[1];
+  await page.click('#btnRegenMelody');
+  await page.waitForFunction(s => !document.getElementById('melodyStatus').textContent.includes('시드 ' + s + ' '), seed1, { timeout: 4000 }).catch(() => {});
+  const seed2 = (await page.textContent('#melodyStatus')).match(/시드 (\d+)/)[1];
+  assert.notEqual(seed1, seed2, '다시 생성 = 새 시드');
+  await page.check('#bassOn');
+  await page.click('#btnMix');
+  await page.waitForFunction(() => /합주 완성/.test(document.getElementById('mixStatus').textContent), undefined, { timeout: 5000 });
+  const st = await page.textContent('#mixStatus');
+  ['드럼', '베이스', '피아노', '메인기타', '멜로디'].forEach(n => assert.ok(st.includes(n), n + ' 포함: ' + st));
+  ok('피아노·기타·멜로디 생성 → 5트랙 합주');
+} catch (e) { bad('5트랙 합주', e); } })();
+
+await (async () => { try {
   // 베이스 직접 입력 패턴 → 생성 + 저장 → 저장 목록에 나타남
   await page.selectOption('#bassPattern', 'custom');
   await page.waitForSelector('#bassCustomRow', { state: 'visible' });
