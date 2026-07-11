@@ -175,8 +175,25 @@
     <div class="row" style="margin-top:0">
       <button id="btnMix" class="brass">▶ 합쳐 재생 만들기</button>
       <button id="btnSaveMix" class="alt" disabled>⬇ .mid 저장</button>
+      <button id="btnToSongmaker" class="alt" disabled>🎬 송메이커로 (커버·가라오케)</button>
       <span id="mixStatus" class="note" style="margin:0"></span>
     </div>
+    <div class="row">
+      <button id="btnAceBrief" class="alt" disabled>🎤 ACE-Step 브리프 복사</button>
+      <span id="aceStatus" class="note" style="margin:0"></span>
+    </div>
+    <details style="margin-top:8px">
+      <summary>🎙️ 내 반주 위에 ACE-Step 보컬 얹기 (audio2audio 안내)</summary>
+      <p class="note" style="line-height:1.8">
+        <b>목표:</b> AI가 반주를 새로 만들지 않고, <b>이 스튜디오에서 만든 반주 그대로</b> 위에 노래만 부르게 하기.<br>
+        <b>① .mid → .wav 변환</b> — 무료 <b>VLC</b>로: 미디어 → 변환/저장 → .mid 추가 → 변환 → 프로파일 Audio-CD(WAV) → 시작.
+        (또는 이 페이지에서 재생하며 Windows 녹음기로 녹음해도 됩니다.)<br>
+        <b>② ACE-Step</b> — <b>Audio2Audio 탭</b> → Ref Audio에 변환한 .wav 업로드 → <b>ref strength 0.5~0.7</b>(높을수록 내 반주 유지) →
+        Lyrics에 가사, Tags에 위 「ACE-Step 브리프」 붙여넣고 Generate.<br>
+        <b>③ 완성 wav</b> — 송메이커 「완성 노래 가져오기」로 불러오면 커버·가라오케와 함께 재생됩니다.<br>
+        ※ 팁: 처음엔 30초로 테스트 → 마음에 들면 전체 길이로.
+      </p>
+    </details>
     <div id="mixPlayerWrap" style="margin-top:10px; display:none">
       <midi-player id="mixPlayer" sound-font visualizer="#mixViz"></midi-player>
       <div class="viz-scroll"><midi-visualizer id="mixViz" type="piano-roll"></midi-visualizer></div>
@@ -646,6 +663,26 @@ var StudioCore = (function () {
       return true;
     });
   }
+  // 섹션별로 '다른 패턴'을 쓰는 트랙 생성 — patterns[i]=패턴번호(null=그 섹션 건너뜀)
+  // 전체 곡을 그 패턴으로 생성한 뒤 해당 섹션 범위만 취하므로 코드 진행·마디 위상이 정확히 유지된다.
+  function genTrackSections(plan, key, patterns) {
+    var gens = {
+      drums:  function (p) { return genDrums(plan, { style: p }); },
+      bass:   function (p) { return genBass(plan, { pattern: p }); },
+      piano:  function (p) { return genPiano(plan, { pattern: p }); },
+      guitar: function (p) { return genGuitar(plan, { pattern: p }); }
+    };
+    if (!gens[key]) return [];
+    var ranges = sectionRanges(plan), out = [], bySame = {};
+    (patterns || []).forEach(function (p, i) { if (p != null) (bySame[p] = bySame[p] || []).push(i); });
+    Object.keys(bySame).forEach(function (p) {
+      var full = gens[key](+p);
+      var enabled = ranges.map(function (r, i) { return bySame[p].indexOf(i) >= 0; });
+      out = out.concat(filterBySections(full, ranges, enabled));
+    });
+    out.sort(function (a, b) { return a.start - b.start; });
+    return out;
+  }
 
   // ── 멀티트랙 SMF 조합 ──
   function vlq(v) { var a = [v & 0x7f]; v >>= 7; while (v > 0) { a.unshift((v & 0x7f) | 0x80); v >>= 7; } return a; }
@@ -689,7 +726,7 @@ var StudioCore = (function () {
            GUITAR_PATTERNS: GUITAR_PATTERNS, MELODY_STYLES: MELODY_STYLES, MELODY_VOICES: MELODY_VOICES,
            TRACK_META: TRACK_META, DRUM_LETTER: DRUM_LETTER,
            parseChord: parseChord, genDrums: genDrums, genBass: genBass, genPiano: genPiano, genGuitar: genGuitar, genMelody: genMelody, combine: combine,
-           sectionRanges: sectionRanges, filterBySections: filterBySections,
+           sectionRanges: sectionRanges, filterBySections: filterBySections, genTrackSections: genTrackSections,
            parseBassPattern: parseBassPattern, genBassPattern: genBassPattern,
            parseDrumPattern: parseDrumPattern, genDrumsPattern: genDrumsPattern };
 })();
@@ -749,7 +786,8 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     });
     $('chords').textContent = '코드 진행: ' + plan.sections.map(function (s, i) { return (i + 1) + '.' + s.name + ' [' + s.chords.join(' ') + ']'; }).join('  ·  ');
     ['drumCard', 'bassCard', 'pianoCard', 'guitarCard', 'melodyCard', 'arrangeCard', 'mixCard'].forEach(function (id) { $(id).style.display = ''; });
-    secOn = null; buildArrangeGrid();
+    $('btnToSongmaker').disabled = false; $('btnAceBrief').disabled = false;
+    secArr = null; buildArrangeGrid();
   });
 
   // 선택값 해석: 숫자 스타일 / 'custom'(입력칸) / 'saved:N'(저장 패턴)
@@ -866,39 +904,51 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     return v.oct ? lane.map(function (n) { return { midi: n.midi + v.oct, start: n.start, dur: n.dur, vel: n.vel }; }) : lane;
   }
 
-  // ── 구간 배치(섹션별 On/Off) ──
-  var secOn = null;   // {trackKey: [bool,...]}
+  // ── 구간 배치(섹션별 On/Off + 섹션별 '다른 패턴') ──
+  // 셀 값: 'def'=트랙 카드의 기본 설정 · 'off'=그 섹션에서 끔 · 숫자=그 섹션만 이 패턴으로
+  var secArr = null;   // {trackKey: ['def'|'off'|number, ...]}
   var TRACK_KEYS = ['drums', 'bass', 'piano', 'guitar', 'melody'];
+  var CELL_PATTERNS = { drums: StudioCore.DRUM_STYLES, bass: StudioCore.BASS_PATTERNS,
+                        piano: StudioCore.PIANO_PATTERNS, guitar: StudioCore.GUITAR_PATTERNS, melody: null };
   function buildArrangeGrid() {
     var g = $('arrangeGrid'); if (!g || !plan) return;
-    if (!secOn) { secOn = {}; TRACK_KEYS.forEach(function (k) { secOn[k] = plan.sections.map(function () { return true; }); }); }
+    if (!secArr) { secArr = {}; TRACK_KEYS.forEach(function (k) { secArr[k] = plan.sections.map(function () { return 'def'; }); }); }
     var head = '<thead><tr><th class="trk">트랙 \\ 섹션</th>';
     plan.sections.forEach(function (s, i) { head += '<th>' + (i + 1) + '.<br>' + s.name + '</th>'; });
     head += '</tr></thead><tbody>';
     TRACK_KEYS.forEach(function (k) {
       head += '<tr><td class="trk">' + StudioCore.TRACK_META[k].name + '</td>';
       plan.sections.forEach(function (s, i) {
-        head += '<td><input type="checkbox" class="scell" data-k="' + k + '" data-i="' + i + '"' + (secOn[k][i] ? ' checked' : '') + '></td>';
+        var cur = secArr[k][i];
+        var opts = '<option value="def"' + (cur === 'def' ? ' selected' : '') + '>✔ 기본</option>' +
+                   '<option value="off"' + (cur === 'off' ? ' selected' : '') + '>✖ 끄기</option>';
+        (CELL_PATTERNS[k] || []).forEach(function (nm, pi) {
+          opts += '<option value="' + pi + '"' + (cur === pi ? ' selected' : '') + '>' + nm + '</option>';
+        });
+        head += '<td><select class="scell" data-k="' + k + '" data-i="' + i + '" style="font-size:.7rem;max-width:96px">' + opts + '</select></td>';
       });
       head += '</tr>';
     });
     g.innerHTML = head + '</tbody>';
-    g.querySelectorAll('input.scell').forEach(function (cb) {
-      cb.addEventListener('change', function () { secOn[cb.getAttribute('data-k')][+cb.getAttribute('data-i')] = cb.checked; });
+    g.querySelectorAll('select.scell').forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        var v = sel.value;
+        secArr[sel.getAttribute('data-k')][+sel.getAttribute('data-i')] = (v === 'def' || v === 'off') ? v : +v;
+      });
     });
   }
-  $('btnArrangeAll').addEventListener('click', function () { secOn = null; buildArrangeGrid(); });
+  $('btnArrangeAll').addEventListener('click', function () { secArr = null; buildArrangeGrid(); });
   $('btnArrangeVerseLite').addEventListener('click', function () {
     if (!plan) return;
-    secOn = {};
+    secArr = {};
     TRACK_KEYS.forEach(function (k) {
-      secOn[k] = plan.sections.map(function (s) {
+      secArr[k] = plan.sections.map(function (s) {
         var e = s.energy != null ? s.energy : 0.6;
-        if (k === 'guitar') return e >= 0.8;                          // 기타는 코러스급에서만
-        if (k === 'drums') return e >= 0.4;                           // 아주 여린 구간만 드럼 제외
-        if (k === 'piano') return true;
-        if (k === 'bass') return e >= 0.35;
-        return true;                                                  // 멜로디는 항상
+        if (k === 'guitar') return e >= 0.8 ? 'def' : 'off';          // 기타는 코러스급에서만
+        if (k === 'drums') return e >= 0.4 ? 'def' : 'off';           // 아주 여린 구간만 드럼 제외
+        if (k === 'bass') return e >= 0.35 ? 'def' : 'off';
+        if (k === 'piano') return (e < 0.55) ? 3 : 'def';             // 여린 구간은 피아노 아르페지오
+        return 'def';                                                  // 멜로디는 항상
       });
     });
     buildArrangeGrid();
@@ -931,11 +981,21 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     var ranges = StudioCore.sectionRanges(plan);
     MIX_DEF.forEach(function (d) {
       var key = d[0];
-      var lane = (key === 'melody') ? melodyLaneVoiced() : tracks[key].lane;
-      if (lane && $(d[1]).checked) {
-        lanes[key] = StudioCore.filterBySections(lane, ranges, secOn && secOn[key]);   // 구간 배치 반영
-        vol[key] = (+$(d[2]).value) / 100;
+      if (!$(d[1]).checked) return;
+      var base = (key === 'melody') ? melodyLaneVoiced() : tracks[key].lane;
+      var cells = secArr ? secArr[key] : null;
+      var lane;
+      if (!cells) lane = base;
+      else {
+        var defOn = ranges.map(function (r, i) { return cells[i] === 'def'; });
+        lane = base ? StudioCore.filterBySections(base, ranges, defOn) : [];
+        var patMap = cells.map(function (c) { return (typeof c === 'number') ? c : null; });   // 섹션별 다른 패턴
+        if (patMap.some(function (p) { return p != null; }) && key !== 'melody') {
+          lane = lane.concat(StudioCore.genTrackSections(plan, key, patMap));
+          lane.sort(function (a, b) { return a.start - b.start; });
+        }
       }
+      if (lane && lane.length) { lanes[key] = lane; vol[key] = (+$(d[2]).value) / 100; }
     });
     progs.melody = melodyVoice().prog;
     return { lanes: lanes, vol: vol, progs: progs, count: Object.keys(lanes).length };
@@ -962,6 +1022,39 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     a.download = ((plan && plan.title) || 'studio').replace(/[\\/:*?"<>|]/g, '_') + '-합주.mid';
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
+  });
+
+  /* ── ACE-Step 브리프(반주 스타일 태그·instrumental) ── */
+  var STYLE_TAGS = {
+    pop: 'pop, catchy, polished, synth, electric guitar, bass, drums',
+    ballad: 'ballad, emotional, piano, strings, soft drums',
+    dance: 'dance pop, EDM, four-on-the-floor, bright synth, punchy bass',
+    rock: 'rock, driving, distorted electric guitar, bass, powerful drums',
+    trot: 'trot, korean retro pop, cheerful, brass, synth, bouncy rhythm',
+    hiphop: 'hip hop, boom bap, 808 bass, trap hi-hats, punchy drums',
+    rnb: 'R&B, smooth, soulful, electric piano, mellow bass, groovy',
+    citypop: 'city pop, 80s, retro, funky guitar, warm synth, groovy bass',
+    jazz: 'jazz, swing, upright bass, brushed drums, saxophone, warm',
+    lofi: 'lo-fi, chill, dusty piano, vinyl crackle, mellow beat, relaxing',
+    folk: 'folk, acoustic guitar, warm, gentle, intimate, fingerpicking',
+    synthwave: 'synthwave, retrowave, 80s synth, arpeggio, neon, driving bass',
+    acoustic: 'acoustic pop, cozy, acoustic guitar, soft vocals, claps'
+  };
+  $('btnAceBrief').addEventListener('click', function () {
+    if (!plan) return;
+    var tags = STYLE_TAGS[plan.genreKey] || STYLE_TAGS.pop;
+    var key = plan.minor ? 'A minor' : 'C major';
+    var brief = tags + ', ' + plan.tempo + ' BPM, ' + key + ', instrumental backing kept, korean vocal on top';
+    var self = this;
+    function done() { $('aceStatus').innerHTML = '<span class="ok">✓ 복사됨 — ACE-Step Tags 칸에 붙여넣으세요 (아래 audio2audio 안내 참고)</span>'; }
+    if (navigator.clipboard) navigator.clipboard.writeText(brief).then(done, done); else done();
+  });
+
+  /* ── 송메이커로 — 설계도(plan)를 넘겨 커버·가라오케(3단계)와 연결 ── */
+  $('btnToSongmaker').addEventListener('click', function () {
+    if (!plan) return;
+    try { localStorage.setItem('broguard_sm_plan', JSON.stringify(plan)); } catch (e) {}
+    window.open('songmaker.html', '_blank');
   });
 })();
 </script>

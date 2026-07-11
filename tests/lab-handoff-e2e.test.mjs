@@ -159,6 +159,37 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + e.messa
   await page.close();
 }
 
+// 3) 송메이커: 스튜디오에서 넘어온 설계도(plan) 자동 복원
+{
+  const page = await browser.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => {
+    localStorage.setItem('broguard_sm_plan', JSON.stringify({
+      title: '스튜디오곡', theme: '', genre: '팝', genreKey: 'pop', mood: '밝음', moodKey: 'bright',
+      key: 'C(장조)', minor: false, tempo: 110, meter: '4/4', drumStyle: '팝', energy: 0.7, seed: 7,
+      sections: [
+        { name: '인트로', bars: 4, chords: ['C', 'G', 'Am', 'F'], energy: 0.4 },
+        { name: '벌스', bars: 8, chords: ['C', 'G', 'Am', 'F'], energy: 0.5 },
+        { name: '코러스', bars: 8, chords: ['C', 'G', 'Am', 'F'], energy: 1.0 }
+      ], totalBars: 20, estSec: 44
+    }));
+  });
+  await page.goto(`${base}/songmaker.html`, { waitUntil: 'domcontentloaded' });
+  try {
+    await page.waitForSelector('#planCard', { state: 'visible', timeout: 5000 });
+    const note = await page.textContent('#planNote');
+    assert.ok(/스튜디오에서 넘어온/.test(note), '안내 문구: ' + note);
+    assert.equal(await page.inputValue('#title'), '스튜디오곡', '제목 복원');
+    const secs = await page.$$('#sections .sec');
+    assert.equal(secs.length, 3, '섹션 복원');
+    const cleared = await page.evaluate(() => localStorage.getItem('broguard_sm_plan'));
+    assert.equal(cleared, null, '핸드오프 키 정리');
+    ok('송메이커: 스튜디오 설계도 자동 복원');
+  } catch (e) { bad('스튜디오→송메이커 복원', e); }
+  try { assert.deepEqual(errors, []); ok('송메이커(복원) JS 오류 없음'); } catch (e) { bad('복원 JS 오류', e); }
+  await page.close();
+}
+
 await browser.close(); server.close();
 console.log(fail ? `\n${fail}개 실패` : '\n연구소 연동 E2E 전체 통과');
 process.exit(fail ? 1 : 0);

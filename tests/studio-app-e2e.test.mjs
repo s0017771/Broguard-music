@@ -18,7 +18,8 @@ const server = createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch();
-const page = await browser.newPage();
+const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+const page = await context.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 let fail = 0;
 const ok = n => console.log('ok - ' + n);
@@ -129,16 +130,44 @@ await (async () => { try {
 } catch (e) { bad('멜로디 소리 선택', e); } })();
 
 await (async () => { try {
-  // 구간 배치: 격자 렌더(5트랙×섹션) + 추천 프리셋 → 기타 벌스 꺼짐
+  // 구간 배치: 셀렉트 격자(기본/끄기/패턴) + 추천 프리셋 → 기타 일부 꺼짐·피아노 일부 아르페지오
   const rows = await page.$$eval('#arrangeGrid tbody tr .trk', els => els.map(e => e.textContent.trim()));
   assert.equal(rows.length, 5, '5트랙 행: ' + rows.join(','));
   await page.click('#btnArrangeVerseLite');
-  const guitarCells = await page.$$eval('#arrangeGrid input.scell[data-k="guitar"]', els => els.map(c => c.checked));
-  assert.ok(guitarCells.some(c => !c) && guitarCells.some(c => c), '추천 프리셋: 기타가 일부 구간만 켜짐');
+  const guitarCells = await page.$$eval('#arrangeGrid select.scell[data-k="guitar"]', els => els.map(c => c.value));
+  assert.ok(guitarCells.includes('off') && guitarCells.includes('def'), '추천: 기타 일부 끄기: ' + guitarCells.join(','));
+  const pianoCells = await page.$$eval('#arrangeGrid select.scell[data-k="piano"]', els => els.map(c => c.value));
+  assert.ok(pianoCells.includes('3'), '추천: 여린 구간 피아노=아르페지오: ' + pianoCells.join(','));
+  // 섹션별 다른 패턴 직접 지정: 기타 마지막 섹션만 8분 드라이브(2)
+  await page.evaluate(() => {
+    const sels = [...document.querySelectorAll('#arrangeGrid select.scell[data-k="guitar"]')];
+    const last = sels[sels.length - 1];
+    last.value = '2'; last.dispatchEvent(new Event('change'));
+  });
   await page.click('#btnMix');
   await page.waitForFunction(() => /합주 완성/.test(document.getElementById('mixStatus').textContent), undefined, { timeout: 5000 });
-  ok('구간 배치 격자 + 추천 프리셋 → 합주 반영');
+  assert.ok((await page.textContent('#mixStatus')).includes('메인기타'), '패턴 지정 구간의 기타가 합주에 포함');
+  ok('구간 배치(셀렉트) + 섹션별 다른 패턴 → 합주 반영');
 } catch (e) { bad('구간 배치', e); } })();
+
+await (async () => { try {
+  // ACE 브리프 복사
+  await page.click('#btnAceBrief');
+  await page.waitForFunction(() => /복사됨/.test(document.getElementById('aceStatus').textContent), undefined, { timeout: 3000 });
+  const clip = await page.evaluate(() => navigator.clipboard.readText());
+  assert.ok(/BPM/.test(clip) && /instrumental/.test(clip) && !/[가-힣]/.test(clip), 'ACE 브리프(영어·instrumental): ' + clip);
+  ok('ACE-Step 브리프 복사');
+} catch (e) { bad('ACE 브리프', e); } })();
+
+await (async () => { try {
+  // 송메이커로 — plan 핸드오프
+  await page.evaluate(() => { window.open = () => null; });
+  await page.click('#btnToSongmaker');
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('broguard_sm_plan') || 'null'));
+  assert.ok(stored && stored.sections && stored.tempo, 'plan 저장됨');
+  assert.equal(stored.title, '리듬 습작', '제목 유지');
+  ok('송메이커로 설계도 핸드오프');
+} catch (e) { bad('송메이커 핸드오프', e); } })();
 
 await (async () => { try {
   // 베이스 직접 입력 패턴 → 생성 + 저장 → 저장 목록에 나타남
