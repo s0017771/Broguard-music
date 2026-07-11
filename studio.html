@@ -33,6 +33,12 @@
   .tctl input[type=checkbox] { width:16px; height:16px; accent-color:var(--brass-deep); }
   .flow { padding:12px 14px; background:var(--card); border:1px dashed var(--line); border-radius:12px; font-size:.78rem; color:var(--ink-soft); line-height:1.7; }
   .flow b { color:var(--brass-deep); }
+  .grid-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:10px; }
+  table.grid { border-collapse:collapse; font-size:.74rem; width:100%; }
+  table.grid th, table.grid td { border:1px solid var(--line); padding:4px 7px; text-align:center; white-space:nowrap; }
+  table.grid thead th { background:#f0ecd8; color:var(--brass-deep); font-weight:800; }
+  table.grid .trk { text-align:left; font-weight:700; background:#faf6e8; position:sticky; left:0; z-index:1; }
+  table.grid input[type=checkbox] { width:16px; height:16px; cursor:pointer; accent-color:var(--brass-deep); }
   .viz-scroll { overflow-x:auto; overflow-y:hidden; border:1px solid var(--line); border-radius:8px; margin-top:8px; }
   .viz-scroll midi-visualizer { display:block; overflow:visible !important; height:auto !important; max-height:none !important; }
   .viz-scroll svg { display:block; max-height:none !important; }
@@ -140,6 +146,7 @@
     <p class="sub">곡의 얼굴. 코드 진행 위에 노래 멜로디를 만듭니다. 마음에 들 때까지 <b>다시 생성</b>하세요.</p>
     <div class="row" style="margin-top:0">
       <label class="fld">멜로디 성격<select id="melodyStyle"></select></label>
+      <label class="fld">소리(악기)<select id="melodyVoice"></select></label>
       <button id="btnGenMelody">🎵 멜로디 생성</button>
       <button id="btnRegenMelody" class="alt" disabled>🎲 다시 생성</button>
       <button id="btnSoloMelody" class="alt" disabled>🔊 이 트랙만 듣기</button>
@@ -151,9 +158,20 @@
     </div>
   </div>
 
+  <div class="card" id="arrangeCard" style="display:none">
+    <h2>🗺️ 구간 배치 (섹션별 On/Off)</h2>
+    <p class="sub">악기를 <b>부분부분 다르게</b> — 칸을 끄면 그 <b>섹션에서 그 악기가 빠집니다</b>. 벌스는 비우고 코러스는 채우는 프로 편곡의 핵심!</p>
+    <div class="grid-scroll"><table class="grid" id="arrangeGrid"></table></div>
+    <div class="row" style="margin-top:6px">
+      <button id="btnArrangeAll" class="alt">✅ 전부 켜기</button>
+      <button id="btnArrangeVerseLite" class="alt">🎚 추천: 벌스 절제·코러스 폭발</button>
+      <span class="note">바꾼 뒤 「합쳐 재생 만들기」를 다시 누르세요.</span>
+    </div>
+  </div>
+
   <div class="card" id="mixCard" style="display:none">
     <h2>② 조합기 (합주)</h2>
-    <p class="sub">만든 트랙을 <b>합쳐서</b> 재생합니다. 각 트랙의 「합주에 포함」·볼륨이 반영됩니다.</p>
+    <p class="sub">만든 트랙을 <b>합쳐서</b> 재생합니다. 각 트랙의 「합주에 포함」·볼륨·<b>구간 배치</b>가 반영됩니다.</p>
     <div class="row" style="margin-top:0">
       <button id="btnMix" class="brass">▶ 합쳐 재생 만들기</button>
       <button id="btnSaveMix" class="alt" disabled>⬇ .mid 저장</button>
@@ -365,6 +383,16 @@ var StudioCore = (function () {
   var PIANO_PATTERNS = ['온음(홀드)', '2박 컴핑', '4박 컴핑', '아르페지오', '싱코 컴핑'];
   var GUITAR_PATTERNS = ['파워코드 2박', '파워코드 4박', '8분 드라이브', '아르페지오(클린)'];
   var MELODY_STYLES = ['차분(4분 위주)', '보통(8분 섞기)', '활발(8분 위주)'];
+  // 멜로디 소리(GM 악기) — 맑고 높은 악기 5종 + 가상 보컬(허밍) 2종(남성은 한 옥타브 아래)
+  var MELODY_VOICES = [
+    { name: '여성 보컬(허밍)', prog: 54, oct: 0 },
+    { name: '남성 보컬(허밍)', prog: 53, oct: -12 },
+    { name: '바이올린',        prog: 40, oct: 0 },
+    { name: '플루트',          prog: 73, oct: 0 },
+    { name: '오보에',          prog: 68, oct: 0 },
+    { name: '클라리넷',        prog: 71, oct: 0 },
+    { name: '맑은 신스 리드',  prog: 80, oct: 0 }
+  ];
   var TRACK_META = {
     drums:  { name: '드럼',       ch: 9, prog: 0 },
     bass:   { name: '베이스',     ch: 3, prog: 33 },
@@ -600,6 +628,25 @@ var StudioCore = (function () {
     return lane;
   }
 
+  // ── 구간(섹션) 범위·필터 — "부분부분 배치": 섹션별로 트랙을 켜고 끈다 ──
+  function sectionRanges(plan) {
+    var out = [], bar = 0, barTicks = PPQ * 4;
+    (plan.sections || []).forEach(function (sec, i) {
+      out.push({ index: i, name: sec.name, startTick: bar * barTicks, endTick: (bar + sec.bars) * barTicks });
+      bar += sec.bars;
+    });
+    return out;
+  }
+  function filterBySections(lane, ranges, enabled) {
+    if (!enabled) return lane;
+    return lane.filter(function (n) {
+      for (var i = 0; i < ranges.length; i++) {
+        if (n.start >= ranges[i].startTick && n.start < ranges[i].endTick) return enabled[i] !== false;
+      }
+      return true;
+    });
+  }
+
   // ── 멀티트랙 SMF 조합 ──
   function vlq(v) { var a = [v & 0x7f]; v >>= 7; while (v > 0) { a.unshift((v & 0x7f) | 0x80); v >>= 7; } return a; }
   function u32(v) { return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255]; }
@@ -629,7 +676,8 @@ var StudioCore = (function () {
       var lane = lanes[key]; if (!lane || !lane.length) return;
       var meta2 = TRACK_META[key] || { name: key, ch: 0, prog: 0 };
       var vol = (opts.vol && opts.vol[key] != null) ? opts.vol[key] : 1;
-      chunks.push(chunk('MTrk', noteTrack(lane, meta2.ch, meta2.prog, meta2.name, vol)));
+      var prog = (opts.progs && opts.progs[key] != null) ? opts.progs[key] : meta2.prog;   // 악기(음색) 덮어쓰기
+      chunks.push(chunk('MTrk', noteTrack(lane, meta2.ch, prog, meta2.name, vol)));
       used.push(key);
     });
     var header = chunk('MThd', u16(1).concat(u16(chunks.length)).concat(u16(PPQ)));
@@ -638,8 +686,10 @@ var StudioCore = (function () {
   }
 
   return { PPQ: PPQ, DRUM_STYLES: DRUM_STYLES, BASS_PATTERNS: BASS_PATTERNS, PIANO_PATTERNS: PIANO_PATTERNS,
-           GUITAR_PATTERNS: GUITAR_PATTERNS, MELODY_STYLES: MELODY_STYLES, TRACK_META: TRACK_META, DRUM_LETTER: DRUM_LETTER,
+           GUITAR_PATTERNS: GUITAR_PATTERNS, MELODY_STYLES: MELODY_STYLES, MELODY_VOICES: MELODY_VOICES,
+           TRACK_META: TRACK_META, DRUM_LETTER: DRUM_LETTER,
            parseChord: parseChord, genDrums: genDrums, genBass: genBass, genPiano: genPiano, genGuitar: genGuitar, genMelody: genMelody, combine: combine,
+           sectionRanges: sectionRanges, filterBySections: filterBySections,
            parseBassPattern: parseBassPattern, genBassPattern: genBassPattern,
            parseDrumPattern: parseDrumPattern, genDrumsPattern: genDrumsPattern };
 })();
@@ -681,6 +731,7 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
   StudioCore.GUITAR_PATTERNS.forEach(function (s, i) { var o = document.createElement('option'); o.value = i; o.textContent = s; $('guitarPattern').appendChild(o); });
   StudioCore.MELODY_STYLES.forEach(function (s, i) { var o = document.createElement('option'); o.value = i; o.textContent = s; $('melodyStyle').appendChild(o); });
   $('melodyStyle').value = '1';
+  StudioCore.MELODY_VOICES.forEach(function (v, i) { var o = document.createElement('option'); o.value = i; o.textContent = v.name; $('melodyVoice').appendChild(o); });
 
   function playerReady() { return !!(window.customElements && customElements.get('midi-player')); }
   function bigViz(id) { try { var v = $(id); if (v) v.config = { noteHeight: 6 }; } catch (e) {} }
@@ -697,7 +748,8 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
       var el = document.createElement('span'); el.className = 'pill'; el.textContent = kv[0] + ': ' + kv[1]; sum.appendChild(el);
     });
     $('chords').textContent = '코드 진행: ' + plan.sections.map(function (s, i) { return (i + 1) + '.' + s.name + ' [' + s.chords.join(' ') + ']'; }).join('  ·  ');
-    ['drumCard', 'bassCard', 'pianoCard', 'guitarCard', 'melodyCard', 'mixCard'].forEach(function (id) { $(id).style.display = ''; });
+    ['drumCard', 'bassCard', 'pianoCard', 'guitarCard', 'melodyCard', 'arrangeCard', 'mixCard'].forEach(function (id) { $(id).style.display = ''; });
+    secOn = null; buildArrangeGrid();
   });
 
   // 선택값 해석: 숫자 스타일 / 'custom'(입력칸) / 'saved:N'(저장 패턴)
@@ -806,16 +858,64 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
   $('btnRegenMelody').addEventListener('click', function () { makeMelody(true); });
   $('melodyStyle').addEventListener('change', function () { if (tracks.melody.lane) makeMelody(false); });
 
+  // ── 멜로디 소리(악기·허밍) — 남성 보컬은 한 옥타브 아래 ──
+  function melodyVoice() { return StudioCore.MELODY_VOICES[+$('melodyVoice').value] || StudioCore.MELODY_VOICES[0]; }
+  function melodyLaneVoiced() {
+    var lane = tracks.melody.lane; if (!lane) return null;
+    var v = melodyVoice();
+    return v.oct ? lane.map(function (n) { return { midi: n.midi + v.oct, start: n.start, dur: n.dur, vel: n.vel }; }) : lane;
+  }
+
+  // ── 구간 배치(섹션별 On/Off) ──
+  var secOn = null;   // {trackKey: [bool,...]}
+  var TRACK_KEYS = ['drums', 'bass', 'piano', 'guitar', 'melody'];
+  function buildArrangeGrid() {
+    var g = $('arrangeGrid'); if (!g || !plan) return;
+    if (!secOn) { secOn = {}; TRACK_KEYS.forEach(function (k) { secOn[k] = plan.sections.map(function () { return true; }); }); }
+    var head = '<thead><tr><th class="trk">트랙 \\ 섹션</th>';
+    plan.sections.forEach(function (s, i) { head += '<th>' + (i + 1) + '.<br>' + s.name + '</th>'; });
+    head += '</tr></thead><tbody>';
+    TRACK_KEYS.forEach(function (k) {
+      head += '<tr><td class="trk">' + StudioCore.TRACK_META[k].name + '</td>';
+      plan.sections.forEach(function (s, i) {
+        head += '<td><input type="checkbox" class="scell" data-k="' + k + '" data-i="' + i + '"' + (secOn[k][i] ? ' checked' : '') + '></td>';
+      });
+      head += '</tr>';
+    });
+    g.innerHTML = head + '</tbody>';
+    g.querySelectorAll('input.scell').forEach(function (cb) {
+      cb.addEventListener('change', function () { secOn[cb.getAttribute('data-k')][+cb.getAttribute('data-i')] = cb.checked; });
+    });
+  }
+  $('btnArrangeAll').addEventListener('click', function () { secOn = null; buildArrangeGrid(); });
+  $('btnArrangeVerseLite').addEventListener('click', function () {
+    if (!plan) return;
+    secOn = {};
+    TRACK_KEYS.forEach(function (k) {
+      secOn[k] = plan.sections.map(function (s) {
+        var e = s.energy != null ? s.energy : 0.6;
+        if (k === 'guitar') return e >= 0.8;                          // 기타는 코러스급에서만
+        if (k === 'drums') return e >= 0.4;                           // 아주 여린 구간만 드럼 제외
+        if (k === 'piano') return true;
+        if (k === 'bass') return e >= 0.35;
+        return true;                                                  // 멜로디는 항상
+      });
+    });
+    buildArrangeGrid();
+  });
+
   // ── 이 트랙만 듣기(솔로) ──
   function playSolo(key) {
-    var lane = tracks[key] && tracks[key].lane; if (!lane) return;
+    var lane = (key === 'melody') ? melodyLaneVoiced() : (tracks[key] && tracks[key].lane); if (!lane) return;
     var lanes = {}; lanes[key] = lane;
-    var out = StudioCore.combine(lanes, { tempo: plan.tempo });
+    var progs = {}; if (key === 'melody') progs.melody = melodyVoice().prog;
+    var out = StudioCore.combine(lanes, { tempo: plan.tempo, progs: progs });
     var blob = new Blob([out.bytes], { type: 'audio/midi' });
     if (soloUrl) URL.revokeObjectURL(soloUrl); soloUrl = URL.createObjectURL(blob);
     $('mixPlayerWrap').style.display = ''; bigViz('mixViz');
     try { $('mixPlayer').src = soloUrl; } catch (e) {}
-    $('mixStatus').innerHTML = '<span class="ok">🔊 ' + StudioCore.TRACK_META[key].name + ' 트랙만 재생 (위 재생기 ▶)</span>';
+    var vName = key === 'melody' ? ' (' + melodyVoice().name + ')' : '';
+    $('mixStatus').innerHTML = '<span class="ok">🔊 ' + StudioCore.TRACK_META[key].name + vName + ' 트랙만 재생 (위 재생기 ▶)</span>';
   }
   $('btnSoloDrum').addEventListener('click', function () { playSolo('drums'); });
   $('btnSoloBass').addEventListener('click', function () { playSolo('bass'); });
@@ -827,17 +927,24 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
   var MIX_DEF = [['drums', 'drumOn', 'drumVol'], ['bass', 'bassOn', 'bassVol'], ['piano', 'pianoOn', 'pianoVol'],
                  ['guitar', 'guitarOn', 'guitarVol'], ['melody', 'melodyOn', 'melodyVol']];
   function buildMix() {
-    var lanes = {}, vol = {};
+    var lanes = {}, vol = {}, progs = {};
+    var ranges = StudioCore.sectionRanges(plan);
     MIX_DEF.forEach(function (d) {
-      if (tracks[d[0]].lane && $(d[1]).checked) { lanes[d[0]] = tracks[d[0]].lane; vol[d[0]] = (+$(d[2]).value) / 100; }
+      var key = d[0];
+      var lane = (key === 'melody') ? melodyLaneVoiced() : tracks[key].lane;
+      if (lane && $(d[1]).checked) {
+        lanes[key] = StudioCore.filterBySections(lane, ranges, secOn && secOn[key]);   // 구간 배치 반영
+        vol[key] = (+$(d[2]).value) / 100;
+      }
     });
-    return { lanes: lanes, vol: vol, count: Object.keys(lanes).length };
+    progs.melody = melodyVoice().prog;
+    return { lanes: lanes, vol: vol, progs: progs, count: Object.keys(lanes).length };
   }
   $('btnMix').addEventListener('click', function () {
     if (!plan) { $('mixStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
     var m = buildMix();
     if (!m.count) { $('mixStatus').innerHTML = '<span class="err">먼저 트랙을 하나 이상 생성하세요.</span>'; return; }
-    var out = StudioCore.combine(m.lanes, { tempo: plan.tempo, order: ['drums', 'bass', 'piano', 'guitar', 'melody'], vol: m.vol });
+    var out = StudioCore.combine(m.lanes, { tempo: plan.tempo, order: ['drums', 'bass', 'piano', 'guitar', 'melody'], vol: m.vol, progs: m.progs });
     mixMidi = out.bytes;
     var blob = new Blob([mixMidi], { type: 'audio/midi' });
     if (mixUrl) URL.revokeObjectURL(mixUrl); mixUrl = URL.createObjectURL(blob);
