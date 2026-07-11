@@ -535,7 +535,10 @@ var StudioCore = (function () {
   function genMelody(plan, opts) {
     opts = opts || {};
     var style = ((opts.style || 1) % 3 + 3) % 3;
-    var rnd = rng((opts.seed != null ? opts.seed : (plan.seed || 1)) >>> 0);
+    // 시드에 장르·분위기를 섞는다 → 같은 시드라도 장르/분위기가 다르면 멜로디가 달라짐
+    var gm = (plan.genreKey || 'pop') + ':' + (plan.moodKey || 'bright');
+    var gh = 2166136261; for (var ci = 0; ci < gm.length; ci++) { gh ^= gm.charCodeAt(ci); gh = Math.imul(gh, 16777619); }
+    var rnd = rng((((opts.seed != null ? opts.seed : (plan.seed || 1)) >>> 0) ^ (gh >>> 0)) >>> 0);
     var e = PPQ / 2, barTicks = PPQ * 4, lane = [], bar = 0, prev = 74, lo = 67, hi = 83;
     var set = MEL_RHY[style];
     plan.sections.forEach(function (sec) {
@@ -790,6 +793,15 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     ['drumCard', 'bassCard', 'pianoCard', 'guitarCard', 'melodyCard', 'arrangeCard', 'mixCard'].forEach(function (id) { $(id).style.display = ''; });
     $('btnToSongmaker').disabled = false; $('btnAceBrief').disabled = false;
     secArr = null; buildArrangeGrid();
+    // 새 곡 설계 → 이미 만든 트랙은 '새 곡 기준'으로 자동 재생성 (옛 곡이 남아 매번 같은 곡으로 들리던 버그)
+    tracks.melody.seedSet = false;                                 // 멜로디 시드도 새 곡을 따라감
+    if (tracks.drums.lane) makeDrum(false);
+    if (tracks.bass.lane) makeBass(false);
+    if (tracks.piano.lane) $('btnGenPiano').click();
+    if (tracks.guitar.lane) $('btnGenGuitar').click();
+    if (tracks.melody.lane) makeMelody(false);
+    mixMidi = null; $('btnSaveMix').disabled = true;
+    if (tracks.drums.lane || tracks.melody.lane) $('mixStatus').innerHTML = '<span class="note">새 곡 설계에 맞춰 트랙을 다시 만들었습니다 — 「합쳐 재생 만들기」를 다시 누르세요.</span>';
   });
 
   // 선택값 해석: 숫자 스타일 / 'custom'(입력칸) / 'saved:N'(저장 패턴)
@@ -1052,10 +1064,19 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     if (navigator.clipboard) navigator.clipboard.writeText(brief).then(done, done); else done();
   });
 
-  /* ── 송메이커로 — 설계도(plan)를 넘겨 커버·가라오케(3단계)와 연결 ── */
+  /* ── 송메이커로 — 설계도(plan) + 합주 반주(MIDI)를 넘겨 커버·가라오케(3단계)와 연결 ── */
   $('btnToSongmaker').addEventListener('click', function () {
     if (!plan) return;
-    try { localStorage.setItem('broguard_sm_plan', JSON.stringify(plan)); } catch (e) {}
+    try {
+      localStorage.setItem('broguard_sm_plan', JSON.stringify(plan));
+      if (mixMidi) {                                            // 합주까지 만들었으면 그 반주(악기 소리 그대로)도 전달
+        var s = ''; for (var i = 0; i < mixMidi.length; i++) s += String.fromCharCode(mixMidi[i]);
+        localStorage.setItem('broguard_sm_midi', btoa(s));
+      } else {
+        localStorage.removeItem('broguard_sm_midi');
+        $('mixStatus').innerHTML = '<span class="note">💡 「합쳐 재생 만들기」를 먼저 누르면 이 반주(악기 소리 그대로)가 가라오케에도 실립니다.</span>';
+      }
+    } catch (e) {}
     window.open('songmaker.html', '_blank');
   });
 })();

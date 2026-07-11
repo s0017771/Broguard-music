@@ -160,14 +160,29 @@ await (async () => { try {
 } catch (e) { bad('ACE 브리프', e); } })();
 
 await (async () => { try {
-  // 송메이커로 — plan 핸드오프
+  // 송메이커로 — plan + 합주 반주(MIDI)까지 핸드오프
   await page.evaluate(() => { window.open = () => null; });
   await page.click('#btnToSongmaker');
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('broguard_sm_plan') || 'null'));
   assert.ok(stored && stored.sections && stored.tempo, 'plan 저장됨');
   assert.equal(stored.title, '리듬 습작', '제목 유지');
-  ok('송메이커로 설계도 핸드오프');
+  const midiB64 = await page.evaluate(() => localStorage.getItem('broguard_sm_midi'));
+  assert.ok(midiB64 && midiB64.length > 100, '합주 MIDI도 저장됨');
+  const head = await page.evaluate(b64 => atob(b64).slice(0, 4), midiB64);
+  assert.equal(head, 'MThd', 'MIDI 헤더');
+  ok('송메이커로 설계도+반주 핸드오프');
 } catch (e) { bad('송메이커 핸드오프', e); } })();
+
+await (async () => { try {
+  // 곡 재설계 → 만들어둔 트랙 자동 재생성(멜로디 시드 = 새 plan 시드) + 합주 무효화
+  await page.fill('#seed', '4242'); await page.selectOption('#genre', 'ballad');
+  await page.click('#btnPlan');
+  await page.waitForFunction(() => /다시 만들었습니다/.test(document.getElementById('mixStatus').textContent), undefined, { timeout: 4000 });
+  const mst = await page.textContent('#melodyStatus');
+  assert.ok(/시드 4242/.test(mst), '멜로디가 새 plan 시드로 재생성: ' + mst);
+  assert.equal(await page.isEnabled('#btnSaveMix'), false, '옛 합주 저장 비활성화');
+  ok('재설계 → 트랙 자동 재생성(새 시드 반영)');
+} catch (e) { bad('재설계 자동 재생성', e); } })();
 
 await (async () => { try {
   // 베이스 직접 입력 패턴 → 생성 + 저장 → 저장 목록에 나타남
