@@ -55,8 +55,8 @@
     <h2>드럼 킷 <span id="audioNote" class="note" style="font-weight:400"></span></h2>
     <div id="kit"></div>
     <div class="hands">
-      <span>👈 <b>왼손</b> Q페달햇 · W하이햇 · E크래시 · R오픈햇 · <b>Space스네어</b></span>
-      <span><b>오른손</b> 👉 F탐1 · G·H탐2 · J플로어탐 · I크래시 · O라이드 · <b>C·M킥(두 발)</b></span>
+      <span>👈 <b>왼손</b> A페달햇 · S하이햇 · D크래시 · F오픈햇 · G·H스네어</span>
+      <span><b>오른손</b> 👉 J탐1 · K탐2 · L플로어탐 · I크래시 · O라이드 · <b>Space킥(발)</b></span>
     </div>
   </div>
 
@@ -64,6 +64,8 @@
     <h2>🎵 메트로놈 · 녹음</h2>
     <div class="row" style="margin-top:0">
       <label class="note">BPM <input type="number" id="bpm" min="40" max="220" value="100" style="width:76px"></label>
+      <label class="note" style="display:flex;align-items:center;gap:5px" title="블루투스 스피커가 절전으로 첫 소리를 늦게 내는 문제를 막습니다 — 들리지 않는 소리를 계속 흘려 스피커를 깨워둡니다">
+        <input type="checkbox" id="wakeOn" checked style="width:16px;height:16px;accent-color:var(--brass-deep)"> 🔊 스피커 깨워두기</label>
       <button id="btnMetro" class="alt">🕒 메트로놈 켜기</button>
       <button id="btnRec" class="rec">⏺ 녹음</button>
       <button id="btnPlayRec" class="alt" disabled>▶ 녹음 재생</button>
@@ -118,19 +120,19 @@ var BkdCore = (function () {
   // 실제 드러머의 사지 배치를 키보드 좌/우로: 왼손(햇·스네어·크래시1) / 오른손(킥·탐·라이드·크래시2)
   // 실제 킷 배치(Real Drum 스타일): 심벌 위 · 탐 가운데 · 스네어/킥/플로어 아래 · 햇 왼쪽 · 라이드 오른쪽
   var PADS = [
-    { id: 'crash',  name: '크래시',      key: 'e', keyLabel: 'E',      gm: 49, letter: 'c', hand: 'L', cymbal: true,  x: 8,  y: 3,  size: 17 },
-    { id: 'hhc',    name: '하이햇',      key: 'w', keyLabel: 'W',      gm: 42, letter: 'h', hand: 'L', cymbal: true,  x: 2,  y: 32, size: 16 },
-    { id: 'hho',    name: '오픈햇',      key: 'r', keyLabel: 'R',      gm: 46, letter: 'o', hand: 'L', cymbal: true,  x: 18, y: 26, size: 15 },
-    { id: 'pedal',  name: '페달햇',      key: 'q', keyLabel: 'Q',      gm: 44, letter: 'p', hand: 'L', cymbal: true,  x: 4,  y: 66, size: 12 },
-    { id: 'snare',  name: '스네어',      key: ' ', keyLabel: 'Space',  gm: 38, letter: 's', hand: 'L', cymbal: false, x: 24, y: 52, size: 18 },
-    { id: 'tom1',   name: '탐1',        key: 'f', keyLabel: 'F',      gm: 47, letter: 't', hand: 'R', cymbal: false, x: 36, y: 16, size: 15 },
-    { id: 'tom2',   name: '탐2',        key: 'g', keyLabel: 'G·H',    gm: 45, letter: 't', hand: 'R', cymbal: false, x: 50, y: 18, size: 16 },
-    { id: 'kick',   name: '킥(베이스)',  key: 'c', keyLabel: 'C·M',    gm: 36, letter: 'k', hand: 'R', cymbal: false, x: 42, y: 50, size: 20, kick: true },
-    { id: 'floor',  name: '플로어탐',    key: 'j', keyLabel: 'J',      gm: 43, letter: 'g', hand: 'R', cymbal: false, x: 62, y: 48, size: 18 },
+    { id: 'crash',  name: '크래시',      key: 'd', keyLabel: 'D',      gm: 49, letter: 'c', hand: 'L', cymbal: true,  x: 8,  y: 3,  size: 17 },
+    { id: 'hhc',    name: '하이햇',      key: 's', keyLabel: 'S',      gm: 42, letter: 'h', hand: 'L', cymbal: true,  x: 2,  y: 32, size: 16 },
+    { id: 'hho',    name: '오픈햇',      key: 'f', keyLabel: 'F',      gm: 46, letter: 'o', hand: 'L', cymbal: true,  x: 18, y: 26, size: 15 },
+    { id: 'pedal',  name: '페달햇',      key: 'a', keyLabel: 'A',      gm: 44, letter: 'p', hand: 'L', cymbal: true,  x: 4,  y: 66, size: 12 },
+    { id: 'snare',  name: '스네어',      key: 'g', keyLabel: 'G·H',    gm: 38, letter: 's', hand: 'L', cymbal: false, x: 24, y: 52, size: 18 },
+    { id: 'tom1',   name: '탐1',        key: 'j', keyLabel: 'J',      gm: 47, letter: 't', hand: 'R', cymbal: false, x: 36, y: 16, size: 15 },
+    { id: 'tom2',   name: '탐2',        key: 'k', keyLabel: 'K',      gm: 45, letter: 't', hand: 'R', cymbal: false, x: 50, y: 18, size: 16 },
+    { id: 'kick',   name: '킥(베이스)',  key: ' ', keyLabel: 'Space',  gm: 36, letter: 'k', hand: 'R', cymbal: false, x: 42, y: 50, size: 20, kick: true },
+    { id: 'floor',  name: '플로어탐',    key: 'l', keyLabel: 'L',      gm: 43, letter: 'g', hand: 'R', cymbal: false, x: 62, y: 48, size: 18 },
     { id: 'crash2', name: '크래시2',     key: 'i', keyLabel: 'I',      gm: 57, letter: 'c', hand: 'R', cymbal: true,  x: 58, y: 3,  size: 16 },
     { id: 'ride',   name: '라이드',      key: 'o', keyLabel: 'O',      gm: 51, letter: 'r', hand: 'R', cymbal: true,  x: 76, y: 10, size: 20 }
   ];
-  var KEY_ALIAS = { m: 'kick', h: 'tom2' };  // 킥=C·M(두 발처럼) · 탐2=G·H
+  var KEY_ALIAS = { h: 'snare' };  // 스네어=G·H
   function padById(id) { for (var i = 0; i < PADS.length; i++) if (PADS[i].id === id) return PADS[i]; return null; }
   function keyToPad(key) {
     key = String(key || '').toLowerCase();
@@ -359,6 +361,45 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   }
+
+  /* ── 스피커 깨우기 — 블루투스 스피커가 절전으로 첫 소리를 5초쯤 먹는 문제 대응 ──
+     ① 첫 제스처에서 무음 블립으로 오디오 엔진 워밍업(BKP 방식)
+     ② 「항상 깨워두기」: 들리지 않는 저음을 계속 흘려 스피커가 잠들지 않게 유지 */
+  var warmedUp = false, keepAliveNode = null;
+  function warmUp() {
+    var ac = audio(); if (!ac || warmedUp) return;
+    try {
+      var o = ac.createOscillator(), g = ac.createGain();
+      g.gain.value = 0.0001; o.frequency.value = 440;
+      o.connect(g); g.connect(ac.destination);
+      o.start(ac.currentTime); o.stop(ac.currentTime + 0.05);
+      warmedUp = true;
+    } catch (e) {}
+  }
+  function startKeepAlive() {
+    var ac = audio(); if (!ac || keepAliveNode) return;
+    try {
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.value = 30;      // 사람 귀에 안 들리는 저음·초저볼륨
+      g.gain.value = 0.002;
+      o.connect(g); g.connect(ac.destination); o.start();
+      keepAliveNode = { o: o, g: g };
+    } catch (e) {}
+  }
+  function stopKeepAlive() {
+    if (!keepAliveNode) return;
+    try { keepAliveNode.o.stop(); } catch (e) {}
+    keepAliveNode = null;
+  }
+  function unlockAudio() {
+    warmUp();
+    if ($('wakeOn') && $('wakeOn').checked) startKeepAlive();
+  }
+  ['pointerdown', 'keydown', 'touchstart'].forEach(function (evt) {
+    document.addEventListener(evt, unlockAudio);
+  });
+  window.addEventListener('load', function () { try { audio(); warmUp(); } catch (e) {} });
+  $('wakeOn').addEventListener('change', function () { this.checked ? startKeepAlive() : stopKeepAlive(); });
   function noiseBuf(ac, sec) {
     var b = ac.createBuffer(1, Math.max(1, (sec * ac.sampleRate) | 0), ac.sampleRate), d = b.getChannelData(0);
     for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;

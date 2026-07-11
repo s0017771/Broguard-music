@@ -26,21 +26,20 @@ test('PADS: 11패드 — 왼손/오른손 배치, 키가 겹치지 않는다', (
   assert.ok(right.includes('kick') && right.includes('ride'), '오른손: 킥·라이드');
 });
 
-test('keyToPad: 새 키맵(C·M킥, Space스네어, QWER, F/G·H/J, I/O)', () => {
-  assert.equal(BkdCore.keyToPad('c').id, 'kick', 'C=킥');
-  assert.equal(BkdCore.keyToPad('m').id, 'kick', 'M=킥(별칭)');
-  assert.equal(BkdCore.keyToPad(' ').id, 'snare', 'Space=스네어');
-  assert.equal(BkdCore.keyToPad('q').id, 'pedal', 'Q=페달햇');
-  assert.equal(BkdCore.keyToPad('w').id, 'hhc', 'W=하이햇');
-  assert.equal(BkdCore.keyToPad('e').id, 'crash', 'E=크래시(좌)');
-  assert.equal(BkdCore.keyToPad('r').id, 'hho', 'R=오픈햇');
-  assert.equal(BkdCore.keyToPad('f').id, 'tom1', 'F=탐1');
-  assert.equal(BkdCore.keyToPad('g').id, 'tom2', 'G=탐2');
-  assert.equal(BkdCore.keyToPad('h').id, 'tom2', 'H=탐2(별칭)');
-  assert.equal(BkdCore.keyToPad('j').id, 'floor', 'J=플로어탐');
+test('keyToPad: 새 키맵(Space킥, G·H스네어, ASDF햇·크래시, JKL탐, I/O)', () => {
+  assert.equal(BkdCore.keyToPad(' ').id, 'kick', 'Space=킥');
+  assert.equal(BkdCore.keyToPad('g').id, 'snare', 'G=스네어');
+  assert.equal(BkdCore.keyToPad('h').id, 'snare', 'H=스네어(별칭)');
+  assert.equal(BkdCore.keyToPad('a').id, 'pedal', 'A=페달햇');
+  assert.equal(BkdCore.keyToPad('s').id, 'hhc', 'S=하이햇');
+  assert.equal(BkdCore.keyToPad('d').id, 'crash', 'D=크래시(좌)');
+  assert.equal(BkdCore.keyToPad('f').id, 'hho', 'F=오픈햇');
+  assert.equal(BkdCore.keyToPad('j').id, 'tom1', 'J=탐1');
+  assert.equal(BkdCore.keyToPad('k').id, 'tom2', 'K=탐2');
+  assert.equal(BkdCore.keyToPad('l').id, 'floor', 'L=플로어탐');
   assert.equal(BkdCore.keyToPad('i').id, 'crash2', 'I=크래시(우)');
   assert.equal(BkdCore.keyToPad('o').id, 'ride', 'O=라이드');
-  assert.equal(BkdCore.keyToPad('W').id, 'hhc', '대문자도');
+  assert.equal(BkdCore.keyToPad('S').id, 'hhc', '대문자도');
   assert.equal(BkdCore.keyToPad('x'), null, '없는 키');
 });
 
