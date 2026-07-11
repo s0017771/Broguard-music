@@ -210,6 +210,50 @@ await (async () => { try {
   ok('드럼 직접 입력 + 오류 안내');
 } catch (e) { bad('드럼 직접 입력', e); } })();
 
+await (async () => { try {
+  // 내 곡 불러오기(.mid) → 멜로디로. 그 위에 자동 반주 + 멜로디 생성 비활성화
+  const b64 = await page.evaluate(() => {
+    function vlq(v){const a=[v&0x7f];v>>=7;while(v>0){a.unshift((v&0x7f)|0x80);v>>=7;}return a;}
+    function u32(v){return [(v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255];}
+    function u16(v){return [(v>>>8)&255,v&255];}
+    function chunk(id,d){const a=[];for(const ch of id)a.push(ch.charCodeAt(0));return a.concat(u32(d.length),d);}
+    const ppq=480; const notes=[]; const tones=[[60,64,67,64],[65,69,72,69],[67,71,74,71],[60,64,67,72]];
+    for(let bar=0;bar<4;bar++)tones[bar].forEach((m,i)=>notes.push([m,bar*4+i,1]));
+    let ev=[]; notes.forEach(([m,s,l])=>{ev.push({t:s*ppq,on:1,m});ev.push({t:(s+l)*ppq,on:0,m});});
+    ev.sort((a,b)=>a.t-b.t||(a.on-b.on));
+    const uspq=Math.round(60000000/95);
+    let trk=[].concat(vlq(0),[0xff,0x51,3,(uspq>>16)&255,(uspq>>8)&255,uspq&255]); let last=0;
+    ev.forEach(e=>{trk=trk.concat(vlq(e.t-last));trk.push(e.on?0x90:0x80,e.m,e.on?90:0);last=e.t;});
+    trk=trk.concat(vlq(0),[0xff,0x2f,0]);
+    const bytes=Uint8Array.from(chunk('MThd',u16(0).concat(u16(1),u16(ppq))).concat(chunk('MTrk',trk)));
+    let s=''; for(const x of bytes)s+=String.fromCharCode(x); return btoa(s);
+  });
+  await page.setInputFiles('#songFile', { name: '내멜로디.mid', mimeType: 'audio/midi', buffer: Buffer.from(b64, 'base64') });
+  await page.waitForFunction(() => /불러옴/.test(document.getElementById('importStatus').textContent), undefined, { timeout: 4000 });
+  const imp = await page.textContent('#importStatus');
+  assert.ok(/BPM/.test(imp) && /조성/.test(imp), '불러오기 요약: ' + imp);
+  // 멜로디 생성 버튼 비활성화(불러온 멜로디 사용 중)
+  assert.equal(await page.isDisabled('#btnGenMelody'), true, '멜로디 생성 비활성화');
+  assert.equal(await page.isDisabled('#btnRegenMelody'), true, '다시 생성 비활성화');
+  // 소리는 고를 수 있음 → 바이올린 솔로
+  await page.selectOption('#melodyVoice', '2');
+  await page.click('#btnSoloMelody');
+  await page.waitForFunction(() => /바이올린/.test(document.getElementById('mixStatus').textContent), undefined, { timeout: 4000 });
+  // 합주 → 멜로디 채널(0) 존재 = 내 멜로디가 실림
+  await page.click('#btnMix');
+  await page.waitForFunction(() => /합주 완성/.test(document.getElementById('mixStatus').textContent), undefined, { timeout: 5000 });
+  assert.ok((await page.textContent('#mixStatus')).includes('멜로디'), '합주에 멜로디 포함');
+  ok('내 곡 불러오기 → 자동 반주 + 멜로디 고정');
+} catch (e) { bad('내 곡 불러오기', e); } })();
+
+await (async () => { try {
+  // 자동 곡 설계로 돌아가면 멜로디 버튼 재활성화
+  await page.fill('#seed', '5'); await page.selectOption('#genre', 'pop');
+  await page.click('#btnPlan');
+  assert.equal(await page.isDisabled('#btnGenMelody'), false, '자동 설계 → 멜로디 생성 재활성화');
+  ok('자동 곡 설계 복귀 → 멜로디 생성 재활성화');
+} catch (e) { bad('멜로디 재활성화', e); } })();
+
 await (async () => { try { assert.deepEqual(errors, []); ok('심각한 JS 오류 없음'); } catch (e) { bad('JS 오류', e); } })();
 
 await browser.close(); server.close();
