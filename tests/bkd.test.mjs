@@ -26,12 +26,29 @@ test('PADS: 11패드 — 왼손/오른손 배치, 키가 겹치지 않는다', (
   assert.ok(right.includes('kick') && right.includes('ride'), '오른손: 킥·라이드');
 });
 
-test('keyToPad: 대소문자·별칭(J=킥)·스페이스', () => {
-  assert.equal(BkdCore.keyToPad('a').id, 'hhc');
-  assert.equal(BkdCore.keyToPad('A').id, 'hhc', '대문자도');
-  assert.equal(BkdCore.keyToPad(' ').id, 'kick', 'Space=킥');
-  assert.equal(BkdCore.keyToPad('j').id, 'kick', 'J=킥 별칭');
+test('keyToPad: 새 키맵(C·M킥, Space스네어, QWER, F/G·H/J, I/O)', () => {
+  assert.equal(BkdCore.keyToPad('c').id, 'kick', 'C=킥');
+  assert.equal(BkdCore.keyToPad('m').id, 'kick', 'M=킥(별칭)');
+  assert.equal(BkdCore.keyToPad(' ').id, 'snare', 'Space=스네어');
+  assert.equal(BkdCore.keyToPad('q').id, 'pedal', 'Q=페달햇');
+  assert.equal(BkdCore.keyToPad('w').id, 'hhc', 'W=하이햇');
+  assert.equal(BkdCore.keyToPad('e').id, 'crash', 'E=크래시(좌)');
+  assert.equal(BkdCore.keyToPad('r').id, 'hho', 'R=오픈햇');
+  assert.equal(BkdCore.keyToPad('f').id, 'tom1', 'F=탐1');
+  assert.equal(BkdCore.keyToPad('g').id, 'tom2', 'G=탐2');
+  assert.equal(BkdCore.keyToPad('h').id, 'tom2', 'H=탐2(별칭)');
+  assert.equal(BkdCore.keyToPad('j').id, 'floor', 'J=플로어탐');
+  assert.equal(BkdCore.keyToPad('i').id, 'crash2', 'I=크래시(우)');
+  assert.equal(BkdCore.keyToPad('o').id, 'ride', 'O=라이드');
+  assert.equal(BkdCore.keyToPad('W').id, 'hhc', '대문자도');
   assert.equal(BkdCore.keyToPad('x'), null, '없는 키');
+});
+
+test('PADS: 패드가 킷 안에 들어온다(가림 없음 — x+size ≤ 100, y+size×1.8 ≤ 100)', () => {
+  BkdCore.PADS.forEach(p => {
+    assert.ok(p.x + p.size <= 100, p.id + ' 가로: ' + (p.x + p.size));
+    assert.ok(p.y + p.size * 1.8 <= 100, p.id + ' 세로: ' + (p.y + p.size * 1.8));
+  });
 });
 
 test('quantizeHits: 8분음표로 붙이고 같은 스텝은 합친다', () => {
@@ -87,9 +104,48 @@ test('patternToSteps: 레슨 패턴 → 스텝(가이드) — 라운드트립', 
   assert.equal(s.totalSteps, 8, '한 마디 = 8스텝');
   assert.ok(s.steps.some(x => x.step === 0 && x.padIds.includes('kick')), '1박 킥');
   assert.ok(s.steps.some(x => x.step === 2 && x.padIds.includes('snare')), '2박 스네어');
-  // 레슨 5종 모두 파싱 가능
+});
+
+test('LESSONS: 기본 비트 10종 — 모두 파싱되고 마디 단위', () => {
+  assert.equal(BkdCore.LESSONS.length, 10, '10종');
   BkdCore.LESSONS.forEach(les => {
     const st = BkdCore.patternToSteps(les.pattern);
     assert.ok(st.steps.length > 0 && st.totalSteps % 8 === 0, les.name);
+    assert.ok(les.hint && les.hint.length > 5, les.name + ' 힌트');
   });
+});
+
+test('SONGS: PD곡 10곡 — 멜로디 합=8의 배수, 음역 유효, 비트 파싱', () => {
+  assert.equal(BkdCore.SONGS.length, 10, '10곡');
+  BkdCore.SONGS.forEach(song => {
+    const total = song.melody.reduce((s, n) => s + n[1], 0);
+    assert.equal(total % 8, 0, song.name + ' 멜로디 합(' + total + ')은 8의 배수');
+    song.melody.forEach(n => { if (n[0] != null) assert.ok(n[0] >= 48 && n[0] <= 84, song.name + ' 음역: ' + n[0]); });
+    assert.ok(song.bpm >= 60 && song.bpm <= 160, song.name + ' BPM');
+    const st = BkdCore.patternToSteps(song.pattern);
+    assert.ok(st.steps.length > 0, song.name + ' 드럼 패턴');
+  });
+});
+
+test('parseMidiMelody: .mid에서 멜로디를 8분 양자화로 추출한다', () => {
+  // 간단한 SMF(멜로디 2음: C4 4분, E4 4분, 120BPM, PPQ480) 직접 제작
+  function vlq(v) { const a = [v & 0x7f]; v >>= 7; while (v > 0) { a.unshift((v & 0x7f) | 0x80); v >>= 7; } return a; }
+  function u32(v) { return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255]; }
+  function u16(v) { return [(v >>> 8) & 255, v & 255]; }
+  function chunk(id, d) { const a = []; for (const ch of id) a.push(ch.charCodeAt(0)); return a.concat(u32(d.length), d); }
+  let trk = [].concat(vlq(0), [0xff, 0x51, 3, 0x07, 0xa1, 0x20]);      // 120 BPM
+  trk = trk.concat(vlq(0), [0x90, 60, 90], vlq(480), [0x80, 60, 0]);   // C4 4분
+  trk = trk.concat(vlq(0), [0x90, 64, 90], vlq(480), [0x80, 64, 0]);   // E4 4분
+  trk = trk.concat(vlq(0), [0xff, 0x2f, 0]);
+  const bytes = Uint8Array.from(chunk('MThd', u16(0).concat(u16(1), u16(480))).concat(chunk('MTrk', trk)));
+  const res = BkdCore.parseMidiMelody(bytes);
+  assert.ok(!res.error, res.error);
+  assert.equal(res.bpm, 120);
+  const notes = res.melody.filter(n => n[0] != null);
+  assert.deepEqual(notes.map(n => n[0]), [60, 64], '두 음 추출');
+  assert.equal(notes[0][1], 2, '4분음표 = 2스텝(8분)');
+  const total = res.melody.reduce((s, n) => s + n[1], 0);
+  assert.equal(total % 8, 0, '마디 채움');
+  // 오류 처리
+  assert.ok(BkdCore.parseMidiMelody(Uint8Array.from([1, 2, 3, 4])).error, '비 MIDI 오류');
 });
