@@ -882,28 +882,57 @@ var StudioCore = (function () {
     return head + body.trim() + ' |]\n';
   }
 
-  // ── 짧은 멜로디(씨앗)를 전체 곡 구성으로 확장 ──
+  // ── 짧은 멜로디(씨앗)를 전체 곡 구성으로 확장 (섹션마다 멜로디 변형) ──
+  //   role별로 변형을 만들어 캐시 → 반복 코러스는 서로 같고, 벌스≠벌스2≠코러스
   var EXPAND_FORM = [
-    { name: '인트로', energy: 0.4, thin: true },
-    { name: '벌스', energy: 0.5 }, { name: '벌스', energy: 0.55 },
-    { name: '프리코러스', energy: 0.7 },
-    { name: '코러스', energy: 1.0 }, { name: '코러스', energy: 1.0 },
-    { name: '브릿지', energy: 0.6 }, { name: '코러스', energy: 1.0 },
-    { name: '아웃트로', energy: 0.4, thin: true }
+    { name: '인트로',     role: 'intro',  energy: 0.4, thin: true, lower: true, vary: 0 },
+    { name: '벌스',       role: 'verse',  energy: 0.5,  vary: 0 },
+    { name: '벌스',       role: 'verse2', energy: 0.55, vary: 0.30 },
+    { name: '프리코러스', role: 'pre',    energy: 0.7,  vary: 0.20 },
+    { name: '코러스',     role: 'chorus', energy: 1.0,  lift: true, vary: 0.12, accent: true },
+    { name: '코러스',     role: 'chorus', energy: 1.0,  lift: true, vary: 0.12, accent: true },
+    { name: '브릿지',     role: 'bridge', energy: 0.6,  vary: 0.45 },
+    { name: '코러스',     role: 'chorus', energy: 1.0,  lift: true, vary: 0.12, accent: true },
+    { name: '아웃트로',   role: 'outro',  energy: 0.4, thin: true, lower: true, vary: 0 }
   ];
+  function scalePcsOf(root, minor) {
+    var maj = [0, 2, 4, 5, 7, 9, 11], min = [0, 2, 3, 5, 7, 8, 10];
+    return (minor ? min : maj).map(function (x) { return (x + root) % 12; });
+  }
+  function nearestScale(m, scale, dir) {
+    var mm = m; for (var i = 0; i < 12; i++) { mm += dir; if (scale.indexOf(((mm % 12) + 12) % 12) >= 0) return mm; } return m;
+  }
+  function fold(m) { while (m > 84) m -= 12; while (m < 52) m += 12; return m; }
+  function transformSeed(seed, spec, scale, rnd) {
+    var out = [];
+    seed.forEach(function (n) {
+      var strong = (n.start % (PPQ * 4) === 0);                      // 마디 첫 박만 '강박'
+      if (spec.thin && !strong) return;                              // 성기게: 강박 음만
+      var m = n.midi;
+      if (spec.lift && m < 72) m += 12;                              // 코러스: 낮은 음 옥타브 올려 밝게
+      if (spec.lower && m > 67) m -= 12;                             // 인트로/아웃트로: 높은 음 내려 차분하게
+      if (!strong && spec.vary && rnd() < spec.vary) m = nearestScale(m, scale, rnd() < 0.5 ? 1 : -1); // 약박 변주(이웃 음)
+      m = fold(m);
+      var vel = spec.thin ? Math.max(1, n.vel - 12) : (spec.accent ? Math.min(120, n.vel + 8) : n.vel);
+      out.push({ midi: m, start: n.start, dur: n.dur, vel: vel });
+    });
+    return out;
+  }
   function expandLoop(plan, lane, opts) {
     opts = opts || {};
     var form = opts.form || EXPAND_FORM, seedBars = plan.totalBars, barTicks = PPQ * 4;
     var seedChords = [];
     plan.sections.forEach(function (s) { for (var b = 0; b < s.bars; b++) seedChords.push(s.chords[b % s.chords.length]); });
     var seedLane = lane.slice().sort(function (a, b) { return a.start - b.start; });
-    var newSections = [], newLane = [], barCursor = 0;
+    var scale = scalePcsOf(plan.keyRoot != null ? plan.keyRoot : (plan.minor ? 9 : 0), plan.minor);
+    var cache = {}, newSections = [], newLane = [], barCursor = 0;
     form.forEach(function (f) {
-      var off = barCursor * barTicks;
-      seedLane.forEach(function (n) {
-        if (f.thin && (n.start % PPQ !== 0)) return;                 // 인트로·아웃트로는 강박 음만(성기게)
-        newLane.push({ midi: n.midi, start: n.start + off, dur: n.dur, vel: n.vel });
-      });
+      if (!cache[f.role]) {
+        var h = 2166136261; for (var i = 0; i < f.role.length; i++) { h ^= f.role.charCodeAt(i); h = Math.imul(h, 16777619); }
+        cache[f.role] = transformSeed(seedLane, f, scale, rng(h >>> 0));
+      }
+      var variant = cache[f.role], off = barCursor * barTicks;
+      variant.forEach(function (n) { newLane.push({ midi: n.midi, start: n.start + off, dur: n.dur, vel: n.vel }); });
       newSections.push({ name: f.name, bars: seedBars, chords: seedChords.slice(), energy: f.energy });
       barCursor += seedBars;
     });

@@ -433,4 +433,22 @@ test('expandLoop: 씨앗(4마디)을 전체 곡 구성으로 채운다', () => {
   const introCount = out.melodyLane.filter(n => n.start < 4 * BARt).length;
   const verseStart = 4 * BARt, verseCount = out.melodyLane.filter(n => n.start >= verseStart && n.start < 2 * verseStart).length;
   assert.ok(introCount <= verseCount, `인트로(${introCount}) ≤ 벌스(${verseCount})`);
+  // ── 섹션마다 멜로디가 달라야 한다(단순 타일링 아님) ──
+  // 각 섹션 구간의 음을 (섹션-상대 시작, midi)로 뽑는 헬퍼
+  const secAt = i => {
+    const start = out.plan.sections.slice(0, i).reduce((a, s) => a + s.bars, 0) * BARt;
+    return out.melodyLane.filter(n => n.start >= start && n.start < start + seed.plan.totalBars * BARt)
+      .map(n => (n.start - start) + ':' + n.midi).join(',');
+  };
+  // 코러스 인덱스들(4,5,7) — role 캐시로 서로 동일해야
+  const chorusIdxs = out.plan.sections.map((s, i) => s.name === '코러스' ? i : -1).filter(i => i >= 0);
+  assert.ok(chorusIdxs.length >= 2, '코러스 2개 이상');
+  const firstChorus = secAt(chorusIdxs[0]);
+  chorusIdxs.slice(1).forEach(ci => assert.equal(secAt(ci), firstChorus, '반복 코러스는 동일한 변형'));
+  // 벌스(첫)와 코러스는 서로 달라야(변형 적용됨)
+  const firstVerse = secAt(1);
+  assert.notEqual(firstVerse, firstChorus, '벌스 ≠ 코러스(변형 적용)');
+  // 벌스1 ≠ 벌스2(둘째 벌스는 변주 vary=0.30)
+  const verse2Idx = out.plan.sections.map((s, i) => s.name === '벌스' ? i : -1).filter(i => i >= 0)[1];
+  assert.notEqual(secAt(1), secAt(verse2Idx), '벌스1 ≠ 벌스2(변주)');
 });
