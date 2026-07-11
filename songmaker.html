@@ -1554,6 +1554,23 @@ if (typeof module !== 'undefined') module.exports = Stage3;
     $('lyrics').innerHTML = ''; $('lyricStatus').textContent = '';
   });
 
+  /* 프로듀싱 스튜디오에서 넘어온 설계도(plan) — 커버·가라오케(3단계)를 스튜디오 곡으로 */
+  (function () {
+    var raw = null;
+    try { raw = localStorage.getItem('broguard_sm_plan'); } catch (e) {}
+    if (!raw) return;
+    try {
+      var p = JSON.parse(raw);
+      if (p && p.sections && p.sections.length && p.tempo) {
+        plan = p;
+        $('title').value = p.title || '';
+        renderPlan(plan);
+        $('planNote').textContent = '🎛️ 프로듀싱 스튜디오에서 넘어온 곡입니다 — 가사를 만들고 ④ 뮤직비디오(커버·가라오케)로 이어가세요.';
+      }
+    } catch (e) {}
+    try { localStorage.removeItem('broguard_sm_plan'); } catch (e) {}
+  })();
+
   function renderLyrics(blocks, src) {
     curLyrics = blocks;
     var box = $('lyrics'); box.innerHTML = '';
