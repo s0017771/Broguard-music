@@ -107,6 +107,7 @@ await (async () => { try {
 await (async () => { try {
   // 레슨: 시범 시작 → 가이드 불(guide 클래스) 켜짐 → 정지
   await page.selectOption('#lessonSel', '0');
+  await page.selectOption('#lessonMode', 'demo');
   await page.click('#btnLesson');
   await page.waitForFunction(() => document.querySelectorAll('#kit .pad.guide').length > 0, undefined, { timeout: 4000 });
   const hint = await page.textContent('#lessonHint');
@@ -115,6 +116,33 @@ await (async () => { try {
   await page.waitForFunction(() => document.querySelectorAll('#kit .pad.guide').length === 0, undefined, { timeout: 2000 });
   ok('레슨 시범(가이드 불) 시작·정지');
 } catch (e) { bad('레슨', e); } })();
+
+await (async () => { try {
+  // 레슨 '한 박씩': 안내된 패드를 쳐야만 다음으로 넘어가고, 틀린 패드는 대기 유지
+  const dispatch = (id) => page.evaluate((i) => document.getElementById(i)
+    .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })), id);
+  await page.selectOption('#lessonSel', '0');
+  await page.selectOption('#lessonMode', 'wait');
+  await page.click('#btnLesson');
+  await page.waitForFunction(() => document.querySelectorAll('#kit .pad.guide').length > 0, undefined, { timeout: 4000 });
+  const guided = await page.$$eval('#kit .pad.guide', els => els.map(e => e.id));
+  const key = guided.slice().sort().join(',');
+  // 안내되지 않은 패드를 치면 진행되지 않아야 한다(기다림)
+  const other = await page.evaluate((g) => [...document.querySelectorAll('#kit .pad')].map(e => e.id).find(id => g.indexOf(id) < 0), guided);
+  await dispatch(other);
+  await page.waitForTimeout(250);
+  const still = await page.$$eval('#kit .pad.guide', els => els.map(e => e.id).sort().join(','));
+  assert.equal(still, key, '틀린 패드로는 진행되지 않음(대기)');
+  // 안내된 패드를 모두 치면 다음 스텝으로 넘어간다
+  for (const id of guided) await dispatch(id);
+  await page.waitForFunction((prev) => {
+    const now = [...document.querySelectorAll('#kit .pad.guide')].map(e => e.id).sort().join(',');
+    return now.length > 0 && now !== prev;
+  }, key, { timeout: 3000 });
+  await page.click('#btnLessonStop');
+  await page.waitForFunction(() => document.querySelectorAll('#kit .pad.guide').length === 0, undefined, { timeout: 2000 });
+  ok('레슨 한 박씩(대기 후 진행)');
+} catch (e) { bad('레슨 한 박씩', e); } })();
 
 await (async () => { try {
   // 레슨 ① 10종 + 노래 레슨 10곡 목록

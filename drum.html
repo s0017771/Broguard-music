@@ -85,7 +85,12 @@
     <p class="sub">비트를 고르고 「시범」을 누르면 <b>패드에 불이 들어오며</b> 반복 재생됩니다. 불을 따라 쳐보세요.</p>
     <div class="row" style="margin-top:0">
       <select id="lessonSel"></select>
-      <button id="btnLesson" class="alt">👀 시범 (반복)</button>
+      <select id="lessonMode" title="연습 방식">
+        <option value="along">🥁 따라치기 (소리 없이 불만)</option>
+        <option value="wait">🐢 한 박씩 (칠 때까지 대기)</option>
+        <option value="demo">👀 시범 (자동 연주)</option>
+      </select>
+      <button id="btnLesson" class="alt">▶ 시작</button>
       <button id="btnLessonStop" class="alt" disabled>■ 정지</button>
       <span id="lessonStatus" class="note"></span>
     </div>
@@ -99,6 +104,10 @@
     <div class="row" style="margin-top:0">
       <label class="note">곡 <select id="songSel"></select></label>
       <label class="note">드럼 비트 <select id="songBeatSel"></select></label>
+      <select id="songMode" title="연습 방식">
+        <option value="along">🥁 따라치기 (드럼은 내가)</option>
+        <option value="demo">👀 시범 (드럼도 자동)</option>
+      </select>
       <button id="btnSong" class="brass">▶ 연습 시작 (반복)</button>
       <button id="btnSongStop" class="alt" disabled>■ 정지</button>
       <span id="songStatus" class="note"></span>
@@ -441,6 +450,7 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
     var el = $('pad-' + padId);
     if (el) { el.classList.add('hit'); setTimeout(function () { el.classList.remove('hit'); }, 90); }
     if (recording) recHits.push({ padId: padId, t: (performance.now() - recStart) / 1000 });
+    if (typeof checkWait === 'function') checkWait(padId);   // '한 박씩' 레슨 진행
   }
   var down = {};
   document.addEventListener('keydown', function (ev) {
@@ -528,22 +538,61 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
       box.appendChild(d);
     }
   }
+  function clearGuides() { document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); }); }
+  // 스텝별로 쳐야 할 패드를 모아 순서대로(쉼표 제외) — '한 박씩' 대기용
+  function lessonEvents() {
+    var byStep = {};
+    lessonData.steps.forEach(function (s) { byStep[s.step] = (byStep[s.step] || []).concat(s.padIds); });
+    return Object.keys(byStep).map(Number).sort(function (a, b) { return a - b; })
+      .map(function (st) { return { step: st, pads: byStep[st] }; });
+  }
+  var waitState = null;                       // '한 박씩' 진행 상태
+  function showWaitEvent() {
+    if (!waitState) return;
+    clearGuides();
+    var ev = waitState.events[waitState.idx];
+    waitState.remaining = {};
+    ev.pads.forEach(function (id) { var el = $('pad-' + id); if (el) el.classList.add('guide'); waitState.remaining[id] = 1; });
+    renderLessonSteps(ev.step);
+  }
+  function checkWait(padId) {                  // 사용자가 친 패드가 이번 차례면 표시하고, 다 치면 다음으로
+    if (!waitState || !waitState.remaining[padId]) return;
+    delete waitState.remaining[padId];
+    var el = $('pad-' + padId); if (el) el.classList.remove('guide');
+    if (Object.keys(waitState.remaining).length === 0) {
+      waitState.idx = (waitState.idx + 1) % waitState.events.length;
+      setTimeout(function () { if (waitState) showWaitEvent(); }, 150);
+    }
+  }
   function startLesson() {
     stopLesson(); if (typeof stopSong === 'function') stopSong();
     var l = BkdCore.LESSONS[+$('lessonSel').value];
     lessonData = BkdCore.patternToSteps(l.pattern);
     $('lessonHint').textContent = '💡 ' + l.hint + '  (패턴: ' + l.pattern + ')';
     lessonStep = 0;
+    var mode = $('lessonMode').value;
+    $('btnLessonStop').disabled = false;
+    if (mode === 'wait') {                     // 🐢 한 박씩 — 칠 때까지 기다림(템포 없음)
+      var evs = lessonEvents();
+      if (!evs.length) { $('lessonStatus').textContent = '이 비트에는 칠 것이 없습니다.'; return; }
+      waitState = { events: evs, idx: 0, remaining: {} };
+      $('lessonStatus').innerHTML = '<span class="ok">🐢 한 박씩 — 불 들어온 패드를 치면 다음으로 넘어갑니다</span>';
+      showWaitEvent();
+      return;
+    }
+    var silent = (mode === 'along');           // 🥁 따라치기 = 드럼 무음(내가 침) / 👀 시범 = 자동 연주
     var bpm = Math.max(40, Math.min(220, +$('bpm').value || 100));
     var eighthMs = 60000 / bpm / 2;
-    $('btnLessonStop').disabled = false;
-    $('lessonStatus').innerHTML = '<span class="ok">▶ 시범 반복 중 — 불 들어오는 패드를 따라 치세요</span>';
+    $('lessonStatus').innerHTML = silent
+      ? '<span class="ok">🥁 따라치기 — 딸깍(메트로놈)에 맞춰 불 들어온 패드를 치세요</span>'
+      : '<span class="ok">👀 시범 — 소리와 불을 따라 익히세요</span>';
     lessonTimer = setInterval(function () {
-      document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); });
+      clearGuides();
+      if (silent && lessonStep % 2 === 0) tick(lessonStep === 0);   // 따라치기: 4분박마다 메트로놈
       lessonData.steps.filter(function (s) { return s.step === lessonStep; }).forEach(function (s) {
         s.padIds.forEach(function (id) {
           var el = $('pad-' + id); if (el) el.classList.add('guide');
-          playPad(id);
+          if (!silent) playPad(id);
         });
       });
       renderLessonSteps(lessonStep);
@@ -552,7 +601,8 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
   }
   function stopLesson() {
     if (lessonTimer) { clearInterval(lessonTimer); lessonTimer = null; }
-    document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); });
+    waitState = null;
+    clearGuides();
     $('btnLessonStop').disabled = true; $('lessonStatus').textContent = '';
   }
   $('btnLesson').addEventListener('click', startLesson);
@@ -603,15 +653,17 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
     songStep = 0;
     var bpm = song.bpm || 100; $('bpm').value = bpm;
     var eighthSec = 60 / bpm / 2;
+    var silent = ($('songMode').value !== 'demo');   // 따라치기(기본) = 드럼 무음, 시범 = 드럼도 자동
     $('btnSongStop').disabled = false;
-    $('songStatus').innerHTML = '<span class="ok">▶ ' + song.name + ' · ' + bpm + ' BPM — 불 따라 치세요</span>';
+    $('songStatus').innerHTML = '<span class="ok">▶ ' + song.name + ' · ' + bpm + ' BPM — '
+      + (silent ? '드럼은 직접! 불 따라 치세요' : '시범(드럼도 자동)') + '</span>';
     songTimer = setInterval(function () {
       var n = songMel[songStep];
       if (n) playTone(n.midi, n.len * eighthSec);
       document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); });
       var gs = songStep % songGuide.totalSteps;
       songGuide.steps.filter(function (s) { return s.step === gs; }).forEach(function (s) {
-        s.padIds.forEach(function (id) { var el = $('pad-' + id); if (el) el.classList.add('guide'); playPad(id); });
+        s.padIds.forEach(function (id) { var el = $('pad-' + id); if (el) el.classList.add('guide'); if (!silent) playPad(id); });
       });
       songStep = (songStep + 1) % songTotal;
     }, eighthSec * 1000);
