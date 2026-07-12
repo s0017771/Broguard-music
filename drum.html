@@ -355,7 +355,7 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
   var ctx = null;
   function audio() {
     if (!ctx) {
-      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' }); } catch (e) { return null; }
       $('audioNote').textContent = '';
     }
     if (ctx.state === 'suspended') ctx.resume();
@@ -369,6 +369,7 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
   function warmUp() {
     var ac = audio(); if (!ac || warmedUp) return;
     try {
+      getNoise(ac);                                  // 잡음 버퍼 미리 생성(첫 타격 지연 방지)
       var o = ac.createOscillator(), g = ac.createGain();
       g.gain.value = 0.0001; o.frequency.value = 440;
       o.connect(g); g.connect(ac.destination);
@@ -405,13 +406,17 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
     for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     return b;
   }
+  // 잡음 버퍼는 타격마다 새로 만들지 않고 한 번만 만들어 재사용(연타 시 끊김·지연 방지).
+  // 가장 긴 소리(크래시 2s)를 덮는 길이로 하나만 두고, 필요한 만큼만 재생한다.
+  var sharedNoise = null;
+  function getNoise(ac) { if (!sharedNoise || sharedNoise.sampleRate !== ac.sampleRate) sharedNoise = noiseBuf(ac, 2.2); return sharedNoise; }
   function playPad(padId) {
     var ac = audio(); if (!ac) return;
     var t = ac.currentTime, g = ac.createGain(); g.connect(ac.destination);
     function env(gain, peak, dur) { gain.gain.setValueAtTime(0.0001, t); gain.gain.exponentialRampToValueAtTime(peak, t + 0.005); gain.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
     function osc(type, f0, f1, dur) { var o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.85); o.connect(g); o.start(t); o.stop(t + dur + 0.05); }
     function noise(dur, filterType, freq, q) {
-      var s = ac.createBufferSource(); s.buffer = noiseBuf(ac, dur + 0.05);
+      var s = ac.createBufferSource(); s.buffer = getNoise(ac);
       var f = ac.createBiquadFilter(); f.type = filterType; f.frequency.value = freq; if (q) f.Q.value = q;
       s.connect(f); f.connect(g); s.start(t); s.stop(t + dur + 0.05);
     }
