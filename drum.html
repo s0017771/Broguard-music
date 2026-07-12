@@ -52,7 +52,7 @@
 
 <main>
   <div class="card">
-    <h2>드럼 킷 <span id="audioNote" class="note" style="font-weight:400"></span></h2>
+    <h2>드럼 킷 <span id="audioNote" class="note" style="font-weight:400"></span><span id="latNote" class="note" style="font-weight:400"></span></h2>
     <div id="kit"></div>
     <div class="hands">
       <span>👈 <b>왼손</b> A페달햇 · S하이햇 · D크래시 · F오픈햇 · G·H스네어</span>
@@ -375,10 +375,23 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
      ① 첫 제스처에서 무음 블립으로 오디오 엔진 워밍업(BKP 방식)
      ② 「항상 깨워두기」: 들리지 않는 저음을 계속 흘려 스피커가 잠들지 않게 유지 */
   var warmedUp = false, keepAliveNode = null;
+  // 소리 지연(내가 친 순간 → 소리가 나는 순간)을 실제로 측정해 보여준다.
+  //   base(코덱) + output(스피커/OS 버퍼). 대부분의 지연은 여기서 나오며 JS로는 못 줄인다.
+  function measureLatency() {
+    var el = $('latNote'); if (!el || !ctx) return;
+    var base = ctx.baseLatency || 0;
+    var out = (typeof ctx.outputLatency === 'number') ? ctx.outputLatency : 0;
+    var ms = Math.round((base + out) * 1000);
+    if (!ms) { el.textContent = ''; return; }
+    var verdict = ms < 25 ? '좋음' : (ms < 60 ? '보통' : '높음');
+    var tip = ms >= 60 ? ' · 유선 이어폰을 꽂으면 줄어듭니다' : '';
+    el.textContent = ' · 🔊 소리 지연 약 ' + ms + 'ms(' + verdict + ')' + tip;
+  }
   function warmUp() {
     var ac = audio(); if (!ac || warmedUp) return;
     try {
       getNoise(ac);                                  // 잡음 버퍼 미리 생성(첫 타격 지연 방지)
+      setTimeout(measureLatency, 400);               // 재생이 시작된 뒤라야 outputLatency가 채워짐
       var o = ac.createOscillator(), g = ac.createGain();
       g.gain.value = 0.0001; o.frequency.value = 440;
       o.connect(g); g.connect(ac.destination);
@@ -422,7 +435,7 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
   function playPad(padId) {
     var ac = audio(); if (!ac) return;
     var t = ac.currentTime, g = ac.createGain(); g.connect(ac.destination);
-    function env(gain, peak, dur) { gain.gain.setValueAtTime(0.0001, t); gain.gain.exponentialRampToValueAtTime(peak, t + 0.005); gain.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
+    function env(gain, peak, dur) { gain.gain.setValueAtTime(0.0001, t); gain.gain.exponentialRampToValueAtTime(peak, t + 0.0012); gain.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
     function osc(type, f0, f1, dur) { var o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.85); o.connect(g); o.start(t); o.stop(t + dur + 0.05); }
     function noise(dur, filterType, freq, q) {
       var s = ac.createBufferSource(); s.buffer = getNoise(ac);
@@ -528,15 +541,22 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
   /* ── 레슨(시범 가이드) ── */
   BkdCore.LESSONS.forEach(function (l, i) { var o = document.createElement('option'); o.value = i; o.textContent = l.name; $('lessonSel').appendChild(o); });
   var lessonTimer = null, lessonStep = 0, lessonData = null;
+  // 스텝 표시는 패턴이 바뀔 때만 새로 그리고, 매 박에는 활성 표시만 옮긴다(매 박 DOM 재생성 → 입력 지연 방지).
+  var lessonStepEls = [], lessonStepsKey = '';
   function renderLessonSteps(activeStep) {
-    var box = $('lessonSteps'); box.innerHTML = '';
-    if (!lessonData) return;
-    for (var s = 0; s < lessonData.totalSteps; s++) {
-      var d = document.createElement('div');
-      d.className = 'step' + (lessonData.steps.some(function (x) { return x.step === s; }) ? ' on' : '');
-      if (s === activeStep) d.style.outline = '2px solid var(--brass-deep)';
-      box.appendChild(d);
+    var box = $('lessonSteps');
+    if (!lessonData) { box.innerHTML = ''; lessonStepEls = []; lessonStepsKey = ''; return; }
+    var key = lessonData.totalSteps + ':' + lessonData.steps.map(function (x) { return x.step; }).join(',');
+    if (key !== lessonStepsKey) {
+      box.innerHTML = ''; lessonStepEls = [];
+      var on = {}; lessonData.steps.forEach(function (x) { on[x.step] = 1; });
+      for (var s = 0; s < lessonData.totalSteps; s++) {
+        var d = document.createElement('div'); d.className = 'step' + (on[s] ? ' on' : '');
+        box.appendChild(d); lessonStepEls.push(d);
+      }
+      lessonStepsKey = key;
     }
+    for (var i = 0; i < lessonStepEls.length; i++) lessonStepEls[i].style.outline = (i === activeStep) ? '2px solid var(--brass-deep)' : '';
   }
   function clearGuides() { document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); }); }
   // 스텝별로 쳐야 할 패드를 모아 순서대로(쉼표 제외) — '한 박씩' 대기용
