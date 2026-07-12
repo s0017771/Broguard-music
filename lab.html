@@ -650,6 +650,8 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       <label class="check" style="margin:6px 0 10px;"><input type="checkbox" id="optChords" checked> 코드 기호 표시</label>
 
       <button id="genBtn" class="btn-brass btn-wide" type="button">&#127922; 전체 생성 (선택한 레이어 조합)</button>
+      <button id="genPopBtn" class="btn-ink btn-wide" type="button" style="margin-top:8px;">&#127926; 완성곡(팝 구성) — 인트로·벌스·코러스·간주·아웃트로</button>
+      <p class="fld" style="margin:6px 0 0; font-size:.8rem; color:var(--ink-soft);">위 조성·박자·무드를 바탕으로 섹션마다 코드·리듬·에너지를 달리해 전체 곡 흐름(약 60마디)을 만듭니다. 반복 코러스는 같은 후렴, 아웃트로는 으뜸음 종지.</p>
       <div class="regen-row">
         <button id="regenMelodyBtn" class="btn-ghost" type="button">&#127925; 멜로디만 다시</button>
         <button id="regenBassBtn" class="btn-ghost" type="button">&#127926; 베이스만 다시</button>
@@ -1881,11 +1883,12 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     var showChords = $("optChords").checked;
     var rhBars = [];
     for (var m = 0; m < c.bars; m++) {
+      var mark = (c.sectionMarks && c.sectionMarks[m]) ? ('"^' + c.sectionMarks[m] + '" ') : "";
       var label = showChords ? '"' + chordName(K, c.chordDegs[m]) + '" ' : "";
       var txt = c.melodyBars[m].map(function (n) {
         return ALL[n.idx] + (n.len === 1 ? "" : n.len);
       }).join(" ");
-      rhBars.push(label + txt);
+      rhBars.push(mark + label + txt);
     }
     var header = "X:1\nT:" + c.title + "\nC:Layer Lab\nM:" + c.meter + "\nL:1/8\nQ:1/4=" + c.tempo + "\n";
     if (c.bassStyles) {
@@ -1971,6 +1974,51 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     applyCur("'" + cur.title + "' 생성 완료 — 진행: " +
       chordBase.map(function (d) { return chordName(K, d); }).join("-") +
       " · 구조: A-A\u2032-B 모티프 전개 · 레이어별 버튼으로 부분만 다시 만들 수 있어요.");
+  }
+  /* ════════ 완성곡(팝 구성): 인트로·벌스·코러스·간주·브릿지·아웃트로 ════════ */
+  /* 섹션마다 코드(역할별 진행)·리듬(무드)·에너지를 달리해 전체 곡 흐름을 만든다.
+     모티프 엔진(genMelody)을 섹션별로 돌리고, 같은 역할(반복 코러스·벌스)은 캐시해 후렴 일관성을 준다. */
+  var POP_FORM = [
+    { label: "인트로", bars: 4, prog: 0, mood: "calm" },
+    { label: "벌스", bars: 8, prog: 0, mood: "lively" },
+    { label: "프리코러스", bars: 4, prog: 3, mood: "lively" },
+    { label: "코러스", bars: 8, prog: 2, mood: "sync" },
+    { label: "간주", bars: 4, prog: 1, mood: "lively" },
+    { label: "벌스", bars: 8, prog: 0, mood: "lively" },
+    { label: "코러스", bars: 8, prog: 2, mood: "sync" },
+    { label: "브릿지", bars: 4, prog: 4, mood: "calm" },
+    { label: "코러스", bars: 8, prog: 2, mood: "sync" },
+    { label: "아웃트로", bars: 4, prog: 1, mood: "ballad" }
+  ];
+  function composePopSong() {
+    var keyName = $("genKey").value, K = KEYS[keyName], meter = $("genMeter").value, mood0 = $("genMood").value;
+    var BANK = K.minor ? PROG_MIN : PROG_MAJ;
+    var tempo = (mood0 === "calm" || mood0 === "ballad") ? randInt(76, 100) : randInt(100, 132);
+    var allChordDegs = [], allMelody = [], allRhythms = [], sectionMarks = {}, cache = {}, barCursor = 0;
+    POP_FORM.forEach(function (sec) {
+      if (!cache[sec.label]) {
+        var base = BANK[sec.prog % BANK.length].slice();
+        var scur = {
+          keyName: keyName, meter: meter, bars: sec.bars, mood: sec.mood, rhythmLocked: false,
+          chordBase: base, chordDegs: expandChords(base, sec.bars), rhythms: genRhythms(meter, sec.bars, sec.mood)
+        };
+        scur.melodyBars = genMelody(scur);        // 모티프 엔진(자연스러운 멜로디)
+        cache[sec.label] = { chordDegs: scur.chordDegs, melodyBars: scur.melodyBars, rhythms: scur.rhythms };
+      }
+      var seg = cache[sec.label];
+      sectionMarks[barCursor] = sec.label;
+      for (var i = 0; i < sec.bars; i++) { allChordDegs.push(seg.chordDegs[i]); allMelody.push(seg.melodyBars[i]); allRhythms.push(seg.rhythms[i]); }
+      barCursor += sec.bars;
+    });
+    cur = {
+      keyName: keyName, meter: meter, bars: barCursor, mood: mood0, rhythmLocked: false,
+      chordBase: BANK[0].slice(), chordDegs: allChordDegs, rhythms: allRhythms, melodyBars: allMelody,
+      tempo: tempo, title: "완성곡·팝구성-" + keyName, sectionMarks: sectionMarks
+    };
+    var bs = genBassStyles(cur, mood0);
+    if (bs === undefined) return;               // 베이스 입력 오류 시 중단
+    cur.bassStyles = bs;
+    applyCur("완성곡(팝 구성) 생성 완료 — 인트로·벌스·코러스·간주·브릿지·아웃트로 (" + barCursor + "마디)");
   }
   /* ════════ 리듬 프레이즈 불러오기 (그 길이만큼 멜로디 생성) ════════ */
   /* ABC 악보에서 리듬(음 길이)만 추출 → "2 2 2 2 r ..." 형식 */
@@ -2582,6 +2630,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   });
   saveBtn.addEventListener("click", saveAbc);
   genBtn.addEventListener("click", fullGenerate);
+  $("genPopBtn").addEventListener("click", composePopSong);
   regenMelodyBtn.addEventListener("click", regenMelody);
   $("useRhythmPhraseBtn").addEventListener("click", useRhythmPhrase);
   $("loadRhythmFileBtn").addEventListener("click", function () { $("rhythmFileInput").click(); });
