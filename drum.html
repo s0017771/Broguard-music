@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BKD 드럼 교실 · 브로가드 뮤직 랩</title>
 <style>
-  :root { --ink:#1c2b3a; --ink-soft:#46586b; --brass:#b08a2e; --brass-deep:#8f6e1f; --paper:#faf8f2; --card:#fff; --line:#ddd6c8; }
+  :root { --ink:#1c2b3a; --ink-soft:#46586b; --brass:#b08a2e; --brass-deep:#8f6e1f; --paper:#faf8f2; --card:#fff; --line:#ddd6c8; --teal:#25a3b0; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { margin:0; background:var(--paper); color:var(--ink); font-family:'Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif; line-height:1.5; }
   header { padding:18px 16px 6px; text-align:center; }
@@ -21,22 +21,33 @@
   select, input[type=number], input[type=text] { font:inherit; font-size:.85rem; border:1px solid var(--line); border-radius:8px; padding:6px 9px; background:#fffdf7; }
   .note { font-size:.76rem; color:var(--ink-soft); }
   .ok { color:#2f7d4f; font-weight:700; } .err { color:#a33c2e; font-weight:700; }
-  /* ── 드럼 킷 ── */
-  #kit { position:relative; width:100%; max-width:860px; margin:0 auto; aspect-ratio: 1.8 / 1; user-select:none; touch-action:none;
-         background:linear-gradient(160deg,#2c2620,#191512); border-radius:14px; padding:0; overflow:hidden; }
-  .pad .nm { color:#1c2b3a; }
-  .kickpad .nm { color:#f3efe4; }
+  /* ── 드럼 킷 (다크 우드 · 코퍼 심벌 · 청록 림 · 스텐실 라벨) ── */
+  #kit { position:relative; width:100%; max-width:900px; margin:0 auto; aspect-ratio: 1.8 / 1; user-select:none; touch-action:none;
+         background:
+           repeating-linear-gradient(88deg, rgba(0,0,0,.32) 0 2px, rgba(255,255,255,.015) 2px 3px, transparent 3px 26px),
+           radial-gradient(130% 100% at 50% 0%, #2c2723 0%, #17130f 68%, #0d0a07 100%);
+         border-radius:16px; padding:0; overflow:hidden; box-shadow:inset 0 0 70px rgba(0,0,0,.6); }
   .pad { position:absolute; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center;
-         font-weight:800; cursor:pointer; border:3px solid rgba(0,0,0,.25); box-shadow:0 3px 10px rgba(0,0,0,.18);
+         cursor:pointer; border:2px solid rgba(0,0,0,.4); box-shadow:0 4px 14px rgba(0,0,0,.45);
          transition:transform .05s, filter .05s; }
-  .pad .nm { font-size:.72rem; line-height:1.15; text-align:center; text-shadow:0 1px 2px rgba(255,255,255,.35); }
-  .pad .ky { margin-top:2px; font-size:.68rem; background:rgba(0,0,0,.5); color:#fff; border-radius:6px; padding:1px 7px; }
-  .pad.hit { transform:scale(.93); filter:brightness(1.35); }
-  .pad.guide { outline:5px solid #ffd75e; outline-offset:2px; }
-  .cymbal { background:radial-gradient(circle at 35% 30%, #f4e3b0, #cda842 65%, #93762a); }
-  .drumhead { background:radial-gradient(circle at 40% 32%, #fffdf5, #e8e0cc 70%, #b9ad8f); }
-  .kickpad { background:radial-gradient(circle at 40% 32%, #5a4632, #3c2f22); color:#f3efe4; border-radius:18px; }
-  .kickpad .nm { text-shadow:none; }
+  .pad .nm { font-size:.74rem; line-height:1.1; text-align:center; font-weight:900; letter-spacing:.07em; text-transform:uppercase; }
+  .pad .ky { margin-top:3px; font-size:.66rem; background:rgba(0,0,0,.55); color:#fff; border-radius:6px; padding:1px 7px; }
+  .pad.hit { transform:scale(.93); filter:brightness(1.28); }
+  .pad.guide { outline:5px solid #ffd75e; outline-offset:3px; filter:brightness(1.12); }
+  /* 코퍼 심벌 — 방사형 브러싱 질감 */
+  .cymbal { overflow:hidden; background:radial-gradient(circle at 42% 36%, #f4dbaa 0%, #dcab64 40%, #b7823f 72%, #7d5525 100%); }
+  .cymbal::after { content:''; position:absolute; inset:5%; border-radius:50%; pointer-events:none;
+    background:repeating-radial-gradient(circle at 42% 36%, rgba(0,0,0,.05) 0 2px, transparent 2px 5px); }
+  .cymbal .nm { position:relative; z-index:1; color:#3c2909; text-shadow:0 1px 1px rgba(255,255,255,.35); }
+  .cymbal .ky { position:relative; z-index:1; }
+  /* 드럼헤드 — 어두운 헤드 + 청록 림 */
+  .drumhead { background:radial-gradient(circle at 45% 40%, #4b443b 0%, #322c25 60%, #211d17 100%);
+    box-shadow:inset 0 0 0 7px var(--teal), inset 0 4px 12px rgba(0,0,0,.55), 0 4px 14px rgba(0,0,0,.45); }
+  .drumhead .nm { color:#3fd0dc; text-shadow:0 1px 3px rgba(0,0,0,.7); }
+  /* 킥 — 밝은 중앙 헤드 + 청록 라벨 */
+  .kickpad { border-radius:50%; background:radial-gradient(circle at 50% 46%, #efeae0 0%, #dad2c2 31%, #3a332b 32%, #241f18 100%);
+    box-shadow:inset 0 4px 12px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.45); }
+  .kickpad .nm { color:#1f8f9c; text-shadow:0 1px 1px rgba(255,255,255,.4); }
   .hands { display:flex; justify-content:space-between; max-width:820px; margin:4px auto 0; font-size:.72rem; color:var(--ink-soft); }
   .hands b { color:var(--brass-deep); }
   .steps { display:grid; grid-template-columns:repeat(8,1fr); gap:4px; margin-top:8px; }
@@ -401,6 +412,7 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
     var ac = audio(); if (!ac || warmedUp) return;
     try {
       getNoise(ac);                                  // 잡음 버퍼 미리 생성(첫 타격 지연 방지)
+      renderKit(ac);                                 // 고급 드럼 샘플 미리 렌더(오프라인)
       setTimeout(measureLatency, 400);               // 재생이 시작된 뒤라야 outputLatency가 채워짐
       var o = ac.createOscillator(), g = ac.createGain();
       g.gain.value = 0.0001; o.frequency.value = 440;
@@ -442,8 +454,40 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
   // 가장 긴 소리(크래시 2s)를 덮는 길이로 하나만 두고, 필요한 만큼만 재생한다.
   var sharedNoise = null;
   function getNoise(ac) { if (!sharedNoise || sharedNoise.sampleRate !== ac.sampleRate) sharedNoise = noiseBuf(ac, 2.2); return sharedNoise; }
+
+  /* ── 고급 드럼 샘플: 오프라인 렌더 → 버퍼 재생(합성보다 가볍고 소리는 고급) ── */
+  var kitBuf = {}, kitRendered = false;
+  function renderKit(ac) {
+    if (kitRendered || !ac || !(window.OfflineAudioContext || window.webkitOfflineAudioContext)) return;
+    kitRendered = true;
+    var SR = ac.sampleRate;
+    function off(dur) { return new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(SR * dur), SR); }
+    function nb(c, dur) { var b = c.createBuffer(1, Math.ceil(SR * dur), SR), d = b.getChannelData(0); for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
+    function eg(g, peak, dur, atk) { atk = atk || 0.0015; g.gain.setValueAtTime(0.0001, 0); g.gain.exponentialRampToValueAtTime(peak, atk); g.gain.exponentialRampToValueAtTime(0.0001, dur); }
+    function o(c, type, f0, f1, dur) { var x = c.createOscillator(); x.type = type; x.frequency.setValueAtTime(f0, 0); if (f1) x.frequency.exponentialRampToValueAtTime(f1, dur * 0.9); return x; }
+    function nz(c, dur, ft, fr, q) { var s = c.createBufferSource(); s.buffer = nb(c, dur + 0.02); var f = c.createBiquadFilter(); f.type = ft; f.frequency.value = fr; if (q) f.Q.value = q; s.connect(f); return { s: s, out: f }; }
+    function metalOsc(c, dest, dur, amt) { var r = [2, 3, 4.16, 5.43, 6.79, 8.21], base = 317, mg = c.createGain(); mg.gain.value = 0.16 * amt; mg.connect(dest); r.forEach(function (k) { var x = c.createOscillator(); x.type = 'square'; x.frequency.value = base * k; x.connect(mg); x.start(0); x.stop(dur + 0.02); }); }
+    function metal(dur, peak) { var d = dur + 0.02, c = off(d), g = c.createGain(); eg(g, peak, dur, 0.002); g.connect(c.destination); metalOsc(c, g, dur, 1); var n = nz(c, d, 'highpass', 8000); var bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 10000; bp.Q.value = 1.2; n.out.connect(bp); bp.connect(g); n.s.start(0); n.s.stop(d); return c.startRendering(); }
+    function tom(f0, f1, dur) { var d = dur + 0.02, c = off(d), g = c.createGain(); eg(g, 0.8, dur); g.connect(c.destination); var x = o(c, 'sine', f0, f1, dur * 0.6); x.connect(g); x.start(0); x.stop(d); var ng = c.createGain(); eg(ng, 0.12, 0.03); ng.connect(c.destination); var n = nz(c, 0.04, 'highpass', 2000); n.out.connect(ng); n.s.start(0); n.s.stop(0.05); return c.startRendering(); }
+    var R = {
+      kick: function () { var d = 0.44, c = off(d), g = c.createGain(); eg(g, 1.0, 0.36); g.connect(c.destination); var x = o(c, 'sine', 165, 46, 0.14); x.connect(g); x.start(0); x.stop(d); var cg = c.createGain(); cg.gain.setValueAtTime(0.6, 0); cg.gain.exponentialRampToValueAtTime(0.0001, 0.035); cg.connect(c.destination); var ck = o(c, 'triangle', 440, 110, 0.03); ck.connect(cg); ck.start(0); ck.stop(0.05); return c.startRendering(); },
+      snare: function () { var d = 0.24, c = off(d); var bg = c.createGain(); eg(bg, 0.9, 0.2); bg.connect(c.destination); var n1 = nz(c, d, 'highpass', 1400); var bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.6; n1.out.connect(bp); bp.connect(bg); n1.s.start(0); n1.s.stop(d); var tg = c.createGain(); eg(tg, 0.5, 0.09); tg.connect(c.destination); var t1 = o(c, 'triangle', 190, 150, 0.09), t2 = o(c, 'triangle', 258, 190, 0.09); t1.connect(tg); t2.connect(tg); t1.start(0); t2.start(0); t1.stop(d); t2.stop(d); return c.startRendering(); },
+      hhc: function () { return metal(0.055, 0.34); },
+      pedal: function () { return metal(0.045, 0.24); },
+      hho: function () { return metal(0.40, 0.30); },
+      crash: function () { var d = 1.9, c = off(d), g = c.createGain(); eg(g, 0.5, 1.7, 0.006); g.connect(c.destination); var a = nz(c, d, 'highpass', 5000); var b = nz(c, d, 'bandpass', 7200, 0.6); a.out.connect(g); b.out.connect(g); a.s.start(0); b.s.start(0); a.s.stop(d); b.s.stop(d); metalOsc(c, g, d, 0.12); return c.startRendering(); },
+      ride: function () { var d = 1.2, c = off(d), g = c.createGain(); eg(g, 0.36, 1.0, 0.005); g.connect(c.destination); var a = nz(c, d, 'bandpass', 7000, 3); a.out.connect(g); a.s.start(0); a.s.stop(d); var pg = c.createGain(); eg(pg, 0.3, 0.5); pg.connect(c.destination); metalOsc(c, pg, 0.5, 1); return c.startRendering(); },
+      tom1: function () { return tom(210, 120, 0.42); },
+      tom2: function () { return tom(165, 95, 0.5); },
+      floor: function () { return tom(120, 66, 0.62); }
+    };
+    Object.keys(R).forEach(function (id) { R[id]().then(function (b) { kitBuf[id] = b; }).catch(function () {}); });
+    R.crash().then(function (b) { kitBuf.crash2 = b; }).catch(function () {});   // 크래시2 = 크래시
+  }
   function playPad(padId) {
     var ac = audio(); if (!ac) return;
+    var b = kitBuf[padId];
+    if (b) { var s = ac.createBufferSource(); s.buffer = b; var vg = ac.createGain(); vg.gain.value = 0.9; s.connect(vg); vg.connect(ac.destination); s.start(); return; }
     var t = ac.currentTime, g = ac.createGain(); g.connect(ac.destination);
     function env(gain, peak, dur) { gain.gain.setValueAtTime(0.0001, t); gain.gain.exponentialRampToValueAtTime(peak, t + 0.0012); gain.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
     function osc(type, f0, f1, dur) { var o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.85); o.connect(g); o.start(t); o.stop(t + dur + 0.05); }
