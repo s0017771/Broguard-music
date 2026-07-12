@@ -452,3 +452,46 @@ test('expandLoop: 씨앗(4마디)을 전체 곡 구성으로 채운다', () => {
   const verse2Idx = out.plan.sections.map((s, i) => s.name === '벌스' ? i : -1).filter(i => i >= 0)[1];
   assert.notEqual(secAt(1), secAt(verse2Idx), '벌스1 ≠ 벌스2(변주)');
 });
+
+// ── 작곡가 스타일(통계 학습) 멜로디 ──
+function barChordsOf(plan) {   // 섹션·마디를 펼쳐 마디별 코드 심볼
+  const arr = [];
+  plan.sections.forEach(s => { for (let b = 0; b < s.bars; b++) arr.push(s.chords[b % s.chords.length]); });
+  return arr;
+}
+test('genMelodyStyle: 3작곡가 · 온음계 · 음역 · 강박 코드톤', () => {
+  assert.deepEqual(StudioCore.COMPOSERS, ['바흐', '모차르트', '쇼팽'], '작곡가 3인');
+  const CMAJ = new Set([0, 2, 4, 5, 7, 9, 11]);
+  const bars = barChordsOf(PLAN);
+  for (let ci = 0; ci < 3; ci++) {
+    const lane = StudioCore.genMelodyStyle(PLAN, { composer: ci, seed: 42 });
+    assert.ok(lane.length > 8, StudioCore.COMPOSERS[ci] + ' 음 수: ' + lane.length);
+    lane.forEach(n => {
+      assert.ok(n.midi >= 62 && n.midi <= 86, '음역(62~86): ' + n.midi);
+      assert.ok(CMAJ.has(((n.midi % 12) + 12) % 12), '온음계(C장조): ' + n.midi);
+    });
+    // 강박(마디 4분박 시작)은 그 마디 코드톤이어야
+    lane.filter(n => n.start % PPQ === 0).forEach(n => {
+      const chord = StudioCore.parseChord(bars[Math.floor(n.start / BAR)]);
+      const tones = new Set([chord.root, chord.third, chord.fifth]);
+      assert.ok(tones.has(((n.midi % 12) + 12) % 12), StudioCore.COMPOSERS[ci] + ' 강박 코드톤: ' + n.midi);
+    });
+  }
+});
+test('genMelodyStyle: 시드 재현성 · 작곡가별 상이', () => {
+  const bach1 = StudioCore.genMelodyStyle(PLAN, { composer: 0, seed: 7 });
+  const bach2 = StudioCore.genMelodyStyle(PLAN, { composer: 0, seed: 7 });
+  assert.deepEqual(bach1.map(n => [n.midi, n.start, n.dur]), bach2.map(n => [n.midi, n.start, n.dur]), '같은 시드=같은 멜로디');
+  const chopin = StudioCore.genMelodyStyle(PLAN, { composer: 2, seed: 7 });
+  const key = l => l.map(n => n.midi + ':' + n.dur).join(',');
+  assert.notEqual(key(bach1), key(chopin), '바흐 ≠ 쇼팽(스타일 상이)');
+  // 쇼팽은 점리듬(점8분=360틱)이 등장, 코퍼스 특성 반영
+  assert.ok(chopin.some(n => n.dur === (PPQ / 4) * 3), '쇼팽 점8분 리듬 존재');
+});
+test('genMelodyStyle: 단조 플랜은 a단조 음계로', () => {
+  const minorPlan = SongCore.planSong({ title: '슬픔', mood: 'sad', genre: 'ballad', seed: 3 });
+  assert.ok(minorPlan.minor, '단조 플랜');
+  const AMIN = new Set([9, 11, 0, 2, 4, 5, 7]); // a단조 자연단음계 pcs
+  const lane = StudioCore.genMelodyStyle(minorPlan, { composer: 1, seed: 9 });
+  lane.forEach(n => assert.ok(AMIN.has(((n.midi % 12) + 12) % 12), 'a단조 음계: ' + n.midi));
+});

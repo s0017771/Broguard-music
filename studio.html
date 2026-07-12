@@ -152,6 +152,7 @@
     <h2>🎵 멜로디 트랙 (보컬 리드)</h2>
     <p class="sub">곡의 얼굴. 코드 진행 위에 노래 멜로디를 만듭니다. 마음에 들 때까지 <b>다시 생성</b>하세요.</p>
     <div class="row" style="margin-top:0">
+      <label class="fld">작곡 방식<select id="melodyComposer"></select></label>
       <label class="fld">멜로디 성격<select id="melodyStyle"></select></label>
       <label class="fld">소리(악기)<select id="melodyVoice"></select></label>
       <button id="btnGenMelody">🎵 멜로디 생성</button>
@@ -571,6 +572,98 @@ var StudioCore = (function () {
     return lane;
   }
 
+  // ── 작곡가 스타일 멜로디(퍼블릭 도메인 코퍼스 통계 학습 · 마르코프) ──
+  //   원리: 퍼블릭 도메인 작곡가의 대표 선율을 [음정, 리듬]으로 인코딩 → "이 음정 다음
+  //   어떤 음정이 오는지" 확률표(2차 마르코프) + 리듬 확률표(1차)를 만들어 새 멜로디를 뽑는다.
+  //   음정은 '다이어토닉 계단수'라 조성 무관 → 스튜디오 키(C장조/a단조)로 매핑. 강박은 코드톤으로 스냅.
+  //   음표: [계단수(0=으뜸음), 길이(16분음표 단위)]. 길이 2=8분,3=점8분,4=4분,6=점4분,8=2분,1=16분.
+  var COMPOSERS = ['바흐', '모차르트', '쇼팽'];
+  var MEL_CORPUS = {
+    '바흐': [ // 꾸준한 8·16분음표, 순차진행 + 삼화음 분산
+      [[4,4],[0,2],[1,2],[2,2],[3,2],[4,4],[2,2],[3,2],[4,2],[5,2],[4,8]],
+      [[0,2],[2,2],[4,2],[7,2],[9,2],[7,2],[4,2],[2,2],[0,2],[2,2],[4,2],[7,2],[9,2],[7,2],[4,2],[2,2]],
+      [[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1],[7,1],[6,1],[5,1],[4,1],[3,1],[2,1],[1,1],[0,1]],
+      [[0,4],[4,2],[2,2],[0,4],[4,2],[2,2],[0,2],[1,2],[2,2],[3,2],[4,8]]
+    ],
+    '모차르트': [ // 정갈한 8분음표, 음계·삼화음, 균형잡힌 선율
+      [[0,2],[0,2],[4,2],[4,2],[5,2],[5,2],[4,4],[3,2],[3,2],[2,2],[2,2],[1,2],[1,2],[0,4]],
+      [[0,2],[4,2],[0,2],[4,2],[0,2],[2,2],[4,2],[7,4]],
+      [[0,4],[2,4],[4,4],[6,2],[5,2],[4,2],[2,2],[0,4]],
+      [[0,2],[1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[7,2],[7,2],[6,2],[7,2],[5,2],[4,8]]
+    ],
+    '쇼팽': [ // 점리듬, 서정적 도약(6도), 표현적
+      [[2,3],[3,1],[4,4],[3,3],[4,1],[5,4],[4,3],[5,1],[6,3],[4,1],[5,8]],
+      [[0,4],[5,4],[4,2],[5,2],[7,6],[6,2],[4,3],[3,1],[2,4]],
+      [[7,6],[6,2],[5,4],[4,6],[3,2],[2,4],[0,8]],
+      [[0,2],[4,4],[4,2],[2,4],[7,2],[4,4],[5,2],[4,8]]
+    ]
+  };
+  function melAdd(map, k, v) { (map[k] = map[k] || {})[v] = (map[k][v] || 0) + 1; }
+  function buildMelModel(themes) {
+    var t1 = {}, t2 = {}, d1 = {}, dStart = {}, iStart = {};
+    themes.forEach(function (theme) {
+      var degs = theme.map(function (n) { return n[0]; }), durs = theme.map(function (n) { return n[1]; });
+      var ints = []; for (var i = 1; i < degs.length; i++) ints.push(degs[i] - degs[i - 1]);
+      if (ints.length) iStart[ints[0]] = (iStart[ints[0]] || 0) + 1;
+      for (var i = 1; i < ints.length; i++) melAdd(t1, ints[i - 1], ints[i]);
+      for (var i = 2; i < ints.length; i++) melAdd(t2, ints[i - 2] + ',' + ints[i - 1], ints[i]);
+      if (durs.length) dStart[durs[0]] = (dStart[durs[0]] || 0) + 1;
+      for (var i = 0; i < durs.length; i++) melAdd(d1, '*', durs[i]);
+      for (var i = 1; i < durs.length; i++) melAdd(d1, durs[i - 1], durs[i]);
+    });
+    return { t1: t1, t2: t2, d1: d1, dStart: dStart, iStart: iStart };
+  }
+  var MEL_MODELS = null;
+  function melModels() { if (!MEL_MODELS) { MEL_MODELS = {}; COMPOSERS.forEach(function (c) { MEL_MODELS[c] = buildMelModel(MEL_CORPUS[c]); }); } return MEL_MODELS; }
+  function melSample(m, rnd) { if (!m) return null; var tot = 0, k; for (k in m) tot += m[k]; if (!tot) return null; var r = rnd() * tot; for (k in m) { r -= m[k]; if (r <= 0) return k; } return k; }
+  function genMelodyStyle(plan, opts) {
+    opts = opts || {};
+    var comp = (typeof opts.composer === 'number') ? COMPOSERS[opts.composer] : (opts.composer || COMPOSERS[0]);
+    var model = melModels()[comp] || melModels()[COMPOSERS[0]];
+    var gm = comp + ':' + (plan.genreKey || 'pop') + ':' + (plan.moodKey || 'bright');
+    var gh = 2166136261; for (var ci = 0; ci < gm.length; ci++) { gh ^= gm.charCodeAt(ci); gh = Math.imul(gh, 16777619); }
+    var rnd = rng((((opts.seed != null ? opts.seed : (plan.seed || 1)) >>> 0) ^ (gh >>> 0)) >>> 0);
+    var minor = !!plan.minor, scale = minor ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11], tonic = minor ? 57 : 60;
+    var lo = 62, hi = 86, unit = PPQ / 4, barU = 16, barTicks = PPQ * 4;
+    function degToMidi(d) { var oct = Math.floor(d / 7), sd = ((d % 7) + 7) % 7; return tonic + scale[sd] + 12 * oct; }
+    function midiToDeg(m) {
+      var rel = m - tonic, oct = Math.floor(rel / 12), semi = ((rel % 12) + 12) % 12, sd = scale.indexOf(semi);
+      if (sd < 0) { var bd = 99, bs = 0; for (var s = 0; s < 7; s++) { var dd = Math.abs(scale[s] - semi); if (dd < bd) { bd = dd; bs = s; } } sd = bs; }
+      return oct * 7 + sd;
+    }
+    function fold(m) { while (m > hi) m -= 12; while (m < lo) m += 12; return m; }
+    function nextInterval(i1, i2) {
+      var m = (i1 != null && i2 != null) ? model.t2[i2 + ',' + i1] : null;
+      if (!m && i1 != null) m = model.t1[i1];
+      if (!m) m = model.iStart;
+      var v = melSample(m, rnd); return v == null ? 0 : +v;
+    }
+    var lane = [], bar = 0, curDeg = 7, i1 = null, i2 = null, first = true;
+    plan.sections.forEach(function (sec) {
+      for (var b = 0; b < sec.bars; b++) {
+        var chord = parseChord(sec.chords[b % sec.chords.length]), barStart = bar * barTicks, pos = 0, pd = null;
+        var durs = [], sum = 0;
+        while (sum < barU) {
+          var nd = +(melSample(pd == null ? (model.dStart || model.d1['*']) : (model.d1[pd] || model.d1['*']), rnd));
+          if (!nd || nd < 1) nd = 2;
+          if (sum + nd > barU) nd = barU - sum;
+          durs.push(nd); sum += nd; pd = nd;
+        }
+        for (var k = 0; k < durs.length; k++) {
+          var len = durs[k], strong = (pos % 4 === 0);
+          if (first) { first = false; } else { var iv = nextInterval(i1, i2); curDeg += iv; i2 = i1; i1 = iv; }
+          var midi = fold(degToMidi(curDeg));
+          if (strong) midi = chordToneNear(chord, midi, lo, hi);
+          curDeg = midiToDeg(midi);                                    // 실제 소리난 음으로 선율 이어가기
+          lane.push({ midi: midi, start: barStart + pos * unit, dur: len * unit, vel: strong ? 100 : 88 });
+          pos += len;
+        }
+        bar++;
+      }
+    });
+    return lane;
+  }
+
   // ── 직접 입력(박자 패턴) 파서 ──
   // 베이스: r근음 t3음 f5음 a높은5음(옥타브 위 5음) z쉼표 + 길이(8분음표 단위). 대문자=한 옥타브 위. 마디는 | 구분, 마디 합=8.
   function parseBassPattern(str) {
@@ -984,7 +1077,7 @@ var StudioCore = (function () {
   return { PPQ: PPQ, DRUM_STYLES: DRUM_STYLES, BASS_PATTERNS: BASS_PATTERNS, PIANO_PATTERNS: PIANO_PATTERNS,
            GUITAR_PATTERNS: GUITAR_PATTERNS, MELODY_STYLES: MELODY_STYLES, MELODY_VOICES: MELODY_VOICES,
            TRACK_META: TRACK_META, DRUM_LETTER: DRUM_LETTER,
-           parseChord: parseChord, genDrums: genDrums, genBass: genBass, genPiano: genPiano, genGuitar: genGuitar, genMelody: genMelody, combine: combine,
+           parseChord: parseChord, genDrums: genDrums, genBass: genBass, genPiano: genPiano, genGuitar: genGuitar, genMelody: genMelody, genMelodyStyle: genMelodyStyle, COMPOSERS: COMPOSERS, combine: combine,
            sectionRanges: sectionRanges, filterBySections: filterBySections, genTrackSections: genTrackSections,
            importMelody: importMelody, importMelodyAbc: importMelodyAbc, parseAbcMelody: parseAbcMelody,
            analyzeMelody: analyzeMelody, laneToAbc: laneToAbc, expandLoop: expandLoop, detectKey: detectKey,
@@ -1027,6 +1120,8 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
   refreshDrumSel(); refreshBassSel();
   StudioCore.PIANO_PATTERNS.forEach(function (s, i) { var o = document.createElement('option'); o.value = i; o.textContent = s; $('pianoPattern').appendChild(o); });
   StudioCore.GUITAR_PATTERNS.forEach(function (s, i) { var o = document.createElement('option'); o.value = i; o.textContent = s; $('guitarPattern').appendChild(o); });
+  var oDesign = document.createElement('option'); oDesign.value = ''; oDesign.textContent = '설계(기본)'; $('melodyComposer').appendChild(oDesign);
+  StudioCore.COMPOSERS.forEach(function (c, i) { var o = document.createElement('option'); o.value = i; o.textContent = '🎼 ' + c + ' 스타일'; $('melodyComposer').appendChild(o); });
   StudioCore.MELODY_STYLES.forEach(function (s, i) { var o = document.createElement('option'); o.value = i; o.textContent = s; $('melodyStyle').appendChild(o); });
   $('melodyStyle').value = '1';
   StudioCore.MELODY_VOICES.forEach(function (v, i) { var o = document.createElement('option'); o.value = i; o.textContent = v.name; $('melodyVoice').appendChild(o); });
@@ -1057,7 +1152,8 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
   function setMelodyImported(on) {
     melodyImported = on;
     $('btnGenMelody').disabled = on; $('btnRegenMelody').disabled = on;
-    $('melodyStyle').disabled = on;
+    $('melodyStyle').disabled = on || ($('melodyComposer').value !== '');
+    $('melodyComposer').disabled = on;
     document.querySelector('#melodyCard .sub').innerHTML = on
       ? '🎵 <b>불러온 내 멜로디</b>를 사용 중입니다 — 소리(악기)만 고르세요. (다른 곡을 설계하면 자동 멜로디로 돌아갑니다)'
       : '곡의 얼굴. 코드 진행 위에 노래 멜로디를 만듭니다. 마음에 들 때까지 <b>다시 생성</b>하세요.';
@@ -1240,13 +1336,23 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
   function makeMelody(regen) {
     if (!plan) { $('melodyStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
     if (regen || !tracks.melody.seedSet) { tracks.melody.seed = regen ? ((Math.random() * 1e9) | 0) : (plan.seed || 1); tracks.melody.seedSet = true; }
-    tracks.melody.lane = StudioCore.genMelody(plan, { style: +$('melodyStyle').value, seed: tracks.melody.seed });
+    var comp = $('melodyComposer').value;
+    if (comp !== '') {
+      tracks.melody.lane = StudioCore.genMelodyStyle(plan, { composer: +comp, seed: tracks.melody.seed });
+      $('melodyStatus').innerHTML = '<span class="ok">✓ 멜로디 ' + tracks.melody.lane.length + '음 · 🎼 ' + StudioCore.COMPOSERS[+comp] + ' 스타일 · 시드 ' + tracks.melody.seed + '</span>';
+    } else {
+      tracks.melody.lane = StudioCore.genMelody(plan, { style: +$('melodyStyle').value, seed: tracks.melody.seed });
+      $('melodyStatus').innerHTML = '<span class="ok">✓ 멜로디 ' + tracks.melody.lane.length + '음 · ' + StudioCore.MELODY_STYLES[+$('melodyStyle').value] + ' · 시드 ' + tracks.melody.seed + '</span>';
+    }
     ['btnRegenMelody', 'btnSoloMelody', 'melodyOn', 'btnMelodyToLab', 'btnExpand'].forEach(function (id) { $(id).disabled = false; });
-    $('melodyStatus').innerHTML = '<span class="ok">✓ 멜로디 ' + tracks.melody.lane.length + '음 · ' + StudioCore.MELODY_STYLES[+$('melodyStyle').value] + ' · 시드 ' + tracks.melody.seed + '</span>';
   }
   $('btnGenMelody').addEventListener('click', function () { makeMelody(false); });
   $('btnRegenMelody').addEventListener('click', function () { makeMelody(true); });
   $('melodyStyle').addEventListener('change', function () { if (tracks.melody.lane) makeMelody(false); });
+  $('melodyComposer').addEventListener('change', function () {
+    $('melodyStyle').disabled = (this.value !== '');   // 작곡가 스타일이면 성격(리듬 프리셋)은 스타일이 대신함
+    if (tracks.melody.lane) makeMelody(false);
+  });
 
   // ── 멜로디 소리(악기·허밍) — 남성 보컬은 한 옥타브 아래 ──
   function melodyVoice() { return StudioCore.MELODY_VOICES[+$('melodyVoice').value] || StudioCore.MELODY_VOICES[0]; }
