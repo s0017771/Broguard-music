@@ -1667,7 +1667,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       var tag = plan[m];
       var tones = chordToneIdxs(tonic, c.chordDegs[m]);
       var notes = [];
-      if (tag === "CAD" || m === c.bars - 1) {
+      if (!c.noCad && (tag === "CAD" || m === c.bars - 1)) {         // noCad=완성곡 중간 섹션: 종지 없이 흘려보냄
         var half = beatsOf(c.meter) / 2;
         var lead = snapToColor(tonic + (Math.random() < 0.5 ? 1 : -1), curColor()); /* 종지 앞음도 색채 적용 */
         notes.push({ idx: lead, len: half });
@@ -1995,11 +1995,12 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     var BANK = K.minor ? PROG_MIN : PROG_MAJ;
     var tempo = (mood0 === "calm" || mood0 === "ballad") ? randInt(76, 100) : randInt(100, 132);
     var allChordDegs = [], allMelody = [], allRhythms = [], sectionMarks = {}, cache = {}, barCursor = 0;
-    POP_FORM.forEach(function (sec) {
+    POP_FORM.forEach(function (sec, si) {
+      var isLast = (si === POP_FORM.length - 1);               // 마지막(아웃트로)만 종지, 나머지는 흘려보냄
       if (!cache[sec.label]) {
         var base = BANK[sec.prog % BANK.length].slice();
         var scur = {
-          keyName: keyName, meter: meter, bars: sec.bars, mood: sec.mood, rhythmLocked: false,
+          keyName: keyName, meter: meter, bars: sec.bars, mood: sec.mood, rhythmLocked: false, noCad: !isLast,
           chordBase: base, chordDegs: expandChords(base, sec.bars), rhythms: genRhythms(meter, sec.bars, sec.mood)
         };
         scur.melodyBars = genMelody(scur);        // 모티프 엔진(자연스러운 멜로디)
