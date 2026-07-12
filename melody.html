@@ -142,6 +142,12 @@
       <button class="primary" id="goSong" style="flex:1;background:var(--z-jeon)">🎼 기승전결 한번에</button>
     </div>
     <p class="mode-desc">「기승전결 한번에」는 위 코드 진행을 반복해 <b>기·승·전·결 각 16마디(총 64마디)</b>를 한 흐름으로 이어붙인 완성곡을 만듭니다. 기(낮고 성김) → 승(상승) → 전(클라이맥스·촘촘) → 결(하강·으뜸음 종지)의 곡선을 자동으로 따릅니다.</p>
+    <div class="row" style="align-items:stretch">
+      <div style="flex:1"><label for="popKey">조성(완성곡)</label>
+        <select id="popKey"><option value="major">장조(밝음)</option><option value="minor">단조(감성)</option></select></div>
+      <button class="primary" id="goPop" style="flex:2;background:var(--z-jeon)">🎶 완성곡(팝 구성) 만들기</button>
+    </div>
+    <p class="mode-desc">「완성곡(팝 구성)」은 <b>인트로·벌스·프리코러스·코러스·간주·브릿지·아웃트로</b>를 섹션마다 코드·에너지·리듬·종지를 달리해 한 곡으로 만듭니다(약 60마디). 코러스는 반복해도 같은 후렴, 아웃트로는 으뜸화음으로 착지합니다. 조성(장조/단조)만 고르면 코드 진행은 자동입니다.</p>
     <p class="meta" id="meta"></p>
   </div>
 
@@ -626,7 +632,67 @@ function generateSong(chordStr, opts = {}) {
   };
 }
 
-if (typeof module !== 'undefined') module.exports = { generate, generateSong };
+// ---------------- 팝 구성 완성곡 (인트로·벌스·코러스·간주·아웃트로) ----------------
+// 스튜디오처럼 섹션마다 코드·에너지(음역·리듬 밀도)·종지를 달리해 전체 곡 흐름을 만든다.
+// 에너지 존(기승전결)을 팝 섹션에 매핑: 인트로=기(차분) 벌스/프리/간주/브릿지=승(상승) 코러스=전(클라이맥스) 아웃트로=결(하강 종지).
+const POP_FORM = [
+  { role: 'intro', label: '인트로', zone: 'ki', bars: 4 },
+  { role: 'verse', label: '벌스', zone: 'seung', bars: 8 },
+  { role: 'pre', label: '프리코러스', zone: 'seung', bars: 4 },
+  { role: 'chorus', label: '코러스', zone: 'jeon', bars: 8 },
+  { role: 'interlude', label: '간주', zone: 'seung', bars: 4 },
+  { role: 'verse', label: '벌스', zone: 'seung', bars: 8 },
+  { role: 'chorus', label: '코러스', zone: 'jeon', bars: 8 },
+  { role: 'bridge', label: '브릿지', zone: 'seung', bars: 4 },
+  { role: 'chorus', label: '코러스', zone: 'jeon', bars: 8 },
+  { role: 'outro', label: '아웃트로', zone: 'gyeol', bars: 4 }
+];
+const POP_PROG_MAJOR = {
+  intro: ['C', 'G', 'Am', 'F'], verse: ['C', 'G', 'Am', 'F'], pre: ['F', 'G', 'Em', 'Am'],
+  chorus: ['C', 'G', 'Am', 'F'], interlude: ['C', 'Am', 'F', 'G'], bridge: ['Am', 'F', 'C', 'G'], outro: ['F', 'C', 'G', 'C']
+};
+const POP_PROG_MINOR = {
+  intro: ['Am', 'F', 'C', 'G'], verse: ['Am', 'F', 'C', 'G'], pre: ['Dm', 'G', 'C', 'Am'],
+  chorus: ['Am', 'F', 'C', 'G'], interlude: ['Am', 'Dm', 'E', 'Am'], bridge: ['F', 'G', 'Am', 'Am'], outro: ['Dm', 'E', 'Am', 'Am']
+};
+function popSongToAbc(sections, tempo, minor) {
+  const totalBars = sections.reduce((s, x) => s + x.bars.length, 0);
+  let body = '';
+  sections.forEach((sec, si) => {
+    body += (si > 0 ? '\n' : '') + '% ── ' + sec.label + ' ──\n';
+    sec.bars.forEach((b, i) => {
+      const last = (si === sections.length - 1) && (i === sec.bars.length - 1);
+      body += `"${b.chord}"`;
+      let onset = 0;
+      b.notes.forEach((n, k) => { const d = b.rhythm[k]; if (k > 0 && onset === 4) body += ' '; body += midiToAbc(n) + (d === 0.5 ? '/' : d > 1 ? d : ''); onset += d; });
+      body += last ? ' |]' : ' | ';
+      if ((i + 1) % 4 === 0 && i !== sec.bars.length - 1) body += '\n';
+    });
+  });
+  return `X:1\nT:완성곡 · 팝 구성 (${totalBars}마디)\nM:4/4\nL:1/8\nQ:1/4=${tempo}\nK:${minor ? 'Am' : 'C'}\n${body}`;
+}
+function generatePopSong(opts = {}) {
+  const tempo = opts.tempo || 90;
+  const minor = opts.key === 'minor';
+  const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
+  const rnd = rngFactory(seed);
+  const BANK = minor ? POP_PROG_MINOR : POP_PROG_MAJOR, tonicSym = minor ? 'Am' : 'C', tonicPc = minor ? 9 : 0;
+  const cache = {}, sections = [];
+  for (const f of POP_FORM) {
+    if (!cache[f.role]) {                                    // 같은 역할(반복 코러스·벌스)은 동일 멜로디 → 후렴 일관성
+      const prog = BANK[f.role], chords = [];
+      for (let i = 0; i < f.bars; i++) chords.push(parseChord(prog[i % prog.length]));
+      if (f.role === 'outro' && chords[chords.length - 1].pcs[0] !== tonicPc) chords[chords.length - 1] = parseChord(tonicSym);
+      const cand = bestSection(chords, f.zone, rnd, !!opts.sixteenth);
+      if (!cand) return { error: f.label + ' 섹션을 만들지 못했습니다. 시드를 바꿔 다시 시도해 주세요.' };
+      cache[f.role] = cand;
+    }
+    sections.push({ label: f.label, zone: f.zone, bars: cache[f.role].bars });
+  }
+  return { seed, tempo, minor, sections, totalBars: sections.reduce((s, x) => s + x.bars.length, 0), abc: popSongToAbc(sections, tempo, minor) };
+}
+
+if (typeof module !== 'undefined') module.exports = { generate, generateSong, generatePopSong };
 
 </script>
 
@@ -662,6 +728,7 @@ document.querySelectorAll('#modes .mode-chip').forEach(c =>
 
 $('go').addEventListener('click', run);
 $('goSong').addEventListener('click', runSong);
+$('goPop').addEventListener('click', runPopSong);
 
 function zoneClass(i, n, m) {
   const z = (m === 'full') ? zoneOf(i, n) : m;
@@ -709,6 +776,75 @@ function runSong() {
     }
     btn.disabled = false; btn.textContent = '🎼 기승전결 한번에';
   }, 30);
+}
+
+function runPopSong() {
+  stopPlay();
+  const btn = $('goPop');
+  btn.disabled = true; btn.textContent = '작곡 중…';
+  setTimeout(() => {
+    try {
+      const seedRaw = $('seed').value.trim();
+      const out = generatePopSong({
+        key: $('popKey').value,
+        tempo: Math.max(40, Math.min(200, parseInt($('tempo').value) || 90)),
+        seed: seedRaw ? (parseInt(seedRaw) || 1) : undefined,
+        sixteenth
+      });
+      renderPopSong(out);
+    } catch (e) {
+      $('results').innerHTML = '<p class="err">오류: ' + e.message + '</p>';
+    }
+    btn.disabled = false; btn.textContent = '🎶 완성곡(팝 구성) 만들기';
+  }, 30);
+}
+
+function renderPopSong(out) {
+  const box = $('results');
+  if (out.error) { box.innerHTML = '<p class="err">' + out.error + '</p>'; $('meta').textContent = ''; return; }
+  $('meta').textContent = `[완성곡 · 팝 구성 · ${out.minor ? '단조' : '장조'}${sixteenth ? ' · 16분음표' : ''}] 총 ${out.totalBars}마디 · ${out.sections.length}개 섹션 · 시드 ${out.seed}`;
+  box.innerHTML = '';
+  const zcls = { ki: 'z-ki', seung: 'z-seung', jeon: 'z-jeon', gyeol: 'z-gyeol' };
+  let zb = '', labels = '';
+  out.sections.forEach(sec => {
+    sec.bars.forEach(() => { zb += `<span class="${zcls[sec.zone]}"></span>`; });
+    labels += `<span style="flex:${sec.bars.length}">${sec.label}</span>`;
+  });
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="zonebar">${zb}</div>
+    <div style="display:flex;gap:2px;font-size:.62rem;color:var(--muted);margin:2px 0 8px;text-align:center">${labels}</div>
+    <div class="card-head">
+      <div><span class="card-title">🎶 완성곡 · 팝 구성 (${out.minor ? '단조' : '장조'})</span> <span class="score">${out.totalBars}마디</span></div>
+      <div class="btns">
+        <button data-act="play">▶ 재생</button>
+        <button data-act="stop">■ 정지</button>
+        <button data-act="copy">ABC 복사</button>
+        <button data-act="drum">🥁 드럼 얹기</button>
+      </div>
+    </div>
+    <div class="sheet" id="sheet-pop"></div>
+    <div class="abc-box"><textarea id="abc-pop" readonly>${out.abc}</textarea></div>`;
+  box.appendChild(card);
+
+  let visual = null;
+  if (window.ABCJS) {
+    try { visual = ABCJS.renderAbc('sheet-pop', out.abc, { responsive: 'resize', add_classes: true })[0]; }
+    catch (e) { $('sheet-pop').innerHTML = '<p class="meta">악보 렌더링 실패 — ABC 텍스트를 이용해 주세요.</p>'; }
+  } else {
+    $('sheet-pop').innerHTML = '<p class="meta">악보 라이브러리(abcjs)를 불러오지 못했습니다. ABC 텍스트 복사는 정상 동작합니다.</p>';
+  }
+  card.querySelector('[data-act=copy]').addEventListener('click', ev => {
+    const ta = $('abc-pop'); ta.select();
+    navigator.clipboard.writeText(ta.value).then(() => { ev.target.textContent = '복사됨 ✓'; setTimeout(() => ev.target.textContent = 'ABC 복사', 1500); }).catch(() => { document.execCommand('copy'); ev.target.textContent = '복사됨 ✓'; });
+  });
+  card.querySelector('[data-act=play]').addEventListener('click', () => playVisual(visual));
+  card.querySelector('[data-act=stop]').addEventListener('click', stopPlay);
+  card.querySelector('[data-act=drum]').addEventListener('click', () => {
+    try { localStorage.setItem('broguard_drum_abc', $('abc-pop').value); } catch (e) {}
+    window.open('merge.html', '_blank');
+  });
 }
 
 function renderSong(out) {
