@@ -90,6 +90,11 @@
         <option value="wait">🐢 한 박씩 (칠 때까지 대기)</option>
         <option value="demo">👀 시범 (자동 연주)</option>
       </select>
+      <select id="lessonSpeed" title="연습 속도">
+        <option value="1">🐇 보통 속도</option>
+        <option value="0.8">🚶 조금 느리게 0.8×</option>
+        <option value="0.6">🐢 느리게 0.6×</option>
+      </select>
       <button id="btnLesson" class="alt">▶ 시작</button>
       <button id="btnLessonStop" class="alt" disabled>■ 정지</button>
       <span id="lessonStatus" class="note"></span>
@@ -107,6 +112,11 @@
       <select id="songMode" title="연습 방식">
         <option value="along">🥁 따라치기 (드럼은 내가)</option>
         <option value="demo">👀 시범 (드럼도 자동)</option>
+      </select>
+      <select id="songSpeed" title="연습 속도">
+        <option value="1">🐇 원곡 속도</option>
+        <option value="0.8">🚶 조금 느리게 0.8×</option>
+        <option value="0.6">🐢 느리게 0.6×</option>
       </select>
       <button id="btnSong" class="brass">▶ 연습 시작 (반복)</button>
       <button id="btnSongStop" class="alt" disabled>■ 정지</button>
@@ -602,25 +612,44 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
     }
     var silent = (mode === 'along');           // 🥁 따라치기 = 드럼 무음(내가 침) / 👀 시범 = 자동 연주
     var bpm = Math.max(40, Math.min(220, +$('bpm').value || 100));
-    var eighthMs = 60000 / bpm / 2;
-    $('lessonStatus').innerHTML = silent
+    var speed = parseFloat($('lessonSpeed').value) || 1;
+    var eighthMs = 60000 / bpm / 2 / speed;
+    var doneMsg = silent
       ? '<span class="ok">🥁 따라치기 — 딸깍(메트로놈)에 맞춰 불 들어온 패드를 치세요</span>'
       : '<span class="ok">👀 시범 — 소리와 불을 따라 익히세요</span>';
-    lessonTimer = setInterval(function () {
-      clearGuides();
-      if (silent && lessonStep % 2 === 0) tick(lessonStep === 0);   // 따라치기: 4분박마다 메트로놈
-      lessonData.steps.filter(function (s) { return s.step === lessonStep; }).forEach(function (s) {
-        s.padIds.forEach(function (id) {
-          var el = $('pad-' + id); if (el) el.classList.add('guide');
-          if (!silent) playPad(id);
+    function run() {
+      $('lessonStatus').innerHTML = doneMsg;
+      lessonTimer = setInterval(function () {
+        clearGuides();
+        if (silent && lessonStep % 2 === 0) tick(lessonStep === 0);   // 따라치기: 4분박마다 메트로놈
+        lessonData.steps.filter(function (s) { return s.step === lessonStep; }).forEach(function (s) {
+          s.padIds.forEach(function (id) {
+            var el = $('pad-' + id); if (el) el.classList.add('guide');
+            if (!silent) playPad(id);
+          });
         });
-      });
-      renderLessonSteps(lessonStep);
-      lessonStep = (lessonStep + 1) % lessonData.totalSteps;
-    }, eighthMs);
+        renderLessonSteps(lessonStep);
+        lessonStep = (lessonStep + 1) % lessonData.totalSteps;
+      }, eighthMs);
+    }
+    countIn(eighthMs * 2, $('lessonStatus'), run);   // 4박 카운트인 후 시작
+  }
+  // ── 카운트인: 시작 전 4박(하나 둘 셋 넷) 딸깍 후 콜백 ──
+  var countTimer = null;
+  function countIn(beatMs, statusEl, done) {
+    if (countTimer) { clearTimeout(countTimer); countTimer = null; }
+    var n = 4;
+    (function step() {
+      if (n <= 0) { countTimer = null; done(); return; }
+      tick(n === 4);
+      if (statusEl) statusEl.innerHTML = '<span class="ok">🥁 카운트인… ' + n + '</span>';
+      n--;
+      countTimer = setTimeout(step, beatMs);
+    })();
   }
   function stopLesson() {
     if (lessonTimer) { clearInterval(lessonTimer); lessonTimer = null; }
+    if (countTimer) { clearTimeout(countTimer); countTimer = null; }
     waitState = null;
     clearGuides();
     $('btnLessonStop').disabled = true; $('lessonStatus').textContent = '';
@@ -672,24 +701,30 @@ if (typeof window !== 'undefined') window.BkdCore = BkdCore;
     songGuide = BkdCore.patternToSteps(beat.pattern);
     songStep = 0;
     var bpm = song.bpm || 100; $('bpm').value = bpm;
-    var eighthSec = 60 / bpm / 2;
+    var speed = parseFloat($('songSpeed').value) || 1;
+    var eighthSec = 60 / bpm / 2 / speed;
     var silent = ($('songMode').value !== 'demo');   // 따라치기(기본) = 드럼 무음, 시범 = 드럼도 자동
     $('btnSongStop').disabled = false;
-    $('songStatus').innerHTML = '<span class="ok">▶ ' + song.name + ' · ' + bpm + ' BPM — '
-      + (silent ? '드럼은 직접! 불 따라 치세요' : '시범(드럼도 자동)') + '</span>';
-    songTimer = setInterval(function () {
-      var n = songMel[songStep];
-      if (n) playTone(n.midi, n.len * eighthSec);
-      document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); });
-      var gs = songStep % songGuide.totalSteps;
-      songGuide.steps.filter(function (s) { return s.step === gs; }).forEach(function (s) {
-        s.padIds.forEach(function (id) { var el = $('pad-' + id); if (el) el.classList.add('guide'); if (!silent) playPad(id); });
-      });
-      songStep = (songStep + 1) % songTotal;
-    }, eighthSec * 1000);
+    var doneMsg = '<span class="ok">▶ ' + song.name + ' · ' + Math.round(bpm * speed) + ' BPM'
+      + (speed !== 1 ? '(' + speed + '×)' : '') + ' — ' + (silent ? '드럼은 직접! 불 따라 치세요' : '시범(드럼도 자동)') + '</span>';
+    function run() {
+      $('songStatus').innerHTML = doneMsg;
+      songTimer = setInterval(function () {
+        var n = songMel[songStep];
+        if (n) playTone(n.midi, n.len * eighthSec);
+        document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); });
+        var gs = songStep % songGuide.totalSteps;
+        songGuide.steps.filter(function (s) { return s.step === gs; }).forEach(function (s) {
+          s.padIds.forEach(function (id) { var el = $('pad-' + id); if (el) el.classList.add('guide'); if (!silent) playPad(id); });
+        });
+        songStep = (songStep + 1) % songTotal;
+      }, eighthSec * 1000);
+    }
+    countIn(eighthSec * 2 * 1000, $('songStatus'), run);   // 4박 카운트인 후 시작
   }
   function stopSong() {
     if (songTimer) { clearInterval(songTimer); songTimer = null; }
+    if (countTimer) { clearTimeout(countTimer); countTimer = null; }
     document.querySelectorAll('.pad.guide').forEach(function (el) { el.classList.remove('guide'); });
     $('btnSongStop').disabled = true; $('songStatus').textContent = '';
   }
