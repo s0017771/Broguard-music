@@ -184,6 +184,7 @@
     <div class="row" style="margin-top:0">
       <button id="btnMix" class="brass">▶ 합쳐 재생 만들기</button>
       <button id="btnSaveMix" class="alt" disabled>⬇ .mid 저장</button>
+      <button id="btnSaveWav" class="alt" disabled>⬇ .wav 저장 (ACE용)</button>
       <button id="btnToSongmaker" class="alt" disabled>🎬 송메이커로 (커버·가라오케)</button>
       <span id="mixStatus" class="note" style="margin:0"></span>
     </div>
@@ -195,8 +196,8 @@
       <summary>🎙️ 내 반주 위에 ACE-Step 보컬 얹기 (audio2audio 안내)</summary>
       <p class="note" style="line-height:1.8">
         <b>목표:</b> AI가 반주를 새로 만들지 않고, <b>이 스튜디오에서 만든 반주 그대로</b> 위에 노래만 부르게 하기.<br>
-        <b>① .mid → .wav 변환</b> — 무료 <b>VLC</b>로: 미디어 → 변환/저장 → .mid 추가 → 변환 → 프로파일 Audio-CD(WAV) → 시작.
-        (또는 이 페이지에서 재생하며 Windows 녹음기로 녹음해도 됩니다.)<br>
+        <b>① .wav 만들기</b> — 위 <b>「⬇ .wav 저장 (ACE용)」</b> 버튼을 누르면 변환·VLC 없이 바로 .wav가 저장됩니다(권장).
+        (또는 무료 VLC로 .mid→.wav 변환, 또는 재생하며 Windows 녹음기로 녹음.)<br>
         <b>② ACE-Step</b> — <b>Audio2Audio 탭</b> → Ref Audio에 변환한 .wav 업로드 → <b>ref strength 0.5~0.7</b>(높을수록 내 반주 유지) →
         Lyrics에 가사, Tags에 위 「ACE-Step 브리프」 붙여넣고 Generate.<br>
         <b>③ 완성 wav</b> — 송메이커 「완성 노래 가져오기」로 불러오면 커버·가라오케와 함께 재생됩니다.<br>
@@ -1147,7 +1148,7 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     if (tracks.bass.lane) makeBass(false);
     if (tracks.piano.lane) $('btnGenPiano').click();
     if (tracks.guitar.lane) $('btnGenGuitar').click();
-    mixMidi = null; $('btnSaveMix').disabled = true;
+    mixMidi = null; $('btnSaveMix').disabled = true; $('btnSaveWav').disabled = true;
   }
   function setMelodyImported(on) {
     melodyImported = on;
@@ -1226,7 +1227,7 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     tracks.piano.lane = StudioCore.genPiano(plan, { pattern: +$('pianoPattern').value });
     if (tracks.guitar.lane) tracks.guitar.lane = StudioCore.genGuitar(plan, { pattern: +$('guitarPattern').value });
     ['btnRegenDrum', 'btnSoloDrum', 'drumOn', 'btnRegenBass', 'btnSoloBass', 'bassOn', 'btnSoloPiano', 'pianoOn'].forEach(function (id) { $(id).disabled = false; });
-    mixMidi = null; $('btnSaveMix').disabled = true;
+    mixMidi = null; $('btnSaveMix').disabled = true; $('btnSaveWav').disabled = true;
     $('melodyStatus').innerHTML = '<span class="ok">✓ 확장된 멜로디 ' + tracks.melody.lane.length + '음 · 소리를 고르세요</span>';
     $('importStatus').innerHTML = '<span class="ok">✓ 전체 곡으로 확장 · ' + plan.sections.length + '섹션 · ' + plan.totalBars + '마디 — 「합쳐 재생 만들기」를 누르세요</span>';
   });
@@ -1468,7 +1469,7 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     if (mixUrl) URL.revokeObjectURL(mixUrl); mixUrl = URL.createObjectURL(blob);
     $('mixPlayerWrap').style.display = ''; bigViz('mixViz');
     try { $('mixPlayer').src = mixUrl; } catch (e) {}
-    $('btnSaveMix').disabled = false;
+    $('btnSaveMix').disabled = false; $('btnSaveWav').disabled = false;
     var names = out.tracks.map(function (k) { return StudioCore.TRACK_META[k].name; }).join(' + ');
     $('mixStatus').innerHTML = (playerReady() ? '' : '<span class="err">(재생기는 인터넷 연결 시) </span>') +
       '<span class="ok">✓ 합주 완성 · ' + names + ' · ' + plan.tempo + ' BPM</span>';
@@ -1481,6 +1482,104 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
   });
+
+  /* ── .wav 저장: 반주를 브라우저에서 직접 오디오로 렌더 → WAV (VLC·변환 불필요, ACE-Step Ref용) ── */
+  function offlineNoise(ctx, sec) {
+    var b = ctx.createBuffer(1, Math.max(1, (sec * ctx.sampleRate) | 0), ctx.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  function synthNote(ctx, dest, nb, midi, t0, dur, vel, prog) {
+    var freq = 440 * Math.pow(2, (midi - 69) / 12), peak = Math.max(0.004, (vel / 127) * 0.2);
+    var type = 'triangle';
+    if (prog >= 32 && prog <= 39) type = 'sine';            // 베이스
+    else if (prog >= 24 && prog <= 31) type = 'sawtooth';   // 기타
+    else if (prog >= 40 && prog <= 47) type = 'sawtooth';   // 현악(바이올린)
+    else if (prog >= 80) type = 'square';                   // 신스 리드
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    var a = 0.006, rel = Math.min(0.25, dur * 0.4);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + a);
+    g.gain.setValueAtTime(peak * 0.85, t0 + Math.max(a, dur - rel));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.03);
+    o.connect(g); g.connect(dest); o.start(t0); o.stop(t0 + dur + 0.06);
+  }
+  function noiseHit(ctx, dest, nb, t0, dur, amp, ftype, freq, q) {
+    var s = ctx.createBufferSource(); s.buffer = nb;
+    var f = ctx.createBiquadFilter(); f.type = ftype; f.frequency.value = freq; if (q) f.Q.value = q;
+    var g = ctx.createGain(); g.gain.setValueAtTime(amp, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    s.connect(f); f.connect(g); g.connect(dest); s.start(t0); s.stop(t0 + dur + 0.03);
+  }
+  function drumHit(ctx, dest, nb, note, t0, vel) {
+    var v = vel / 127;
+    if (note === 36 || note === 35) {                       // 킥
+      var o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine';
+      o.frequency.setValueAtTime(150, t0); o.frequency.exponentialRampToValueAtTime(48, t0 + 0.12);
+      g.gain.setValueAtTime(0.9 * v, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+      o.connect(g); g.connect(dest); o.start(t0); o.stop(t0 + 0.34);
+    } else if (note === 38 || note === 40) {                // 스네어
+      noiseHit(ctx, dest, nb, t0, 0.2, 0.5 * v, 'highpass', 1500);
+      var o2 = ctx.createOscillator(), g2 = ctx.createGain(); o2.type = 'triangle';
+      o2.frequency.setValueAtTime(210, t0); o2.frequency.exponentialRampToValueAtTime(150, t0 + 0.12);
+      g2.gain.setValueAtTime(0.28 * v, t0); g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+      o2.connect(g2); g2.connect(dest); o2.start(t0); o2.stop(t0 + 0.2);
+    } else if (note === 42 || note === 44) noiseHit(ctx, dest, nb, t0, 0.05, 0.22 * v, 'highpass', 8000);
+    else if (note === 46) noiseHit(ctx, dest, nb, t0, 0.3, 0.22 * v, 'highpass', 7500);
+    else if (note === 49 || note === 57 || note === 55) noiseHit(ctx, dest, nb, t0, 1.1, 0.3 * v, 'highpass', 6000);
+    else if (note === 51 || note === 59) noiseHit(ctx, dest, nb, t0, 0.4, 0.2 * v, 'bandpass', 6000, 2);
+    else {                                                  // 탐 등
+      var o3 = ctx.createOscillator(), g3 = ctx.createGain(); o3.type = 'sine';
+      var f0 = note >= 45 ? 190 : 130; o3.frequency.setValueAtTime(f0, t0); o3.frequency.exponentialRampToValueAtTime(f0 * 0.6, t0 + 0.2);
+      g3.gain.setValueAtTime(0.6 * v, t0); g3.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.4);
+      o3.connect(g3); g3.connect(dest); o3.start(t0); o3.stop(t0 + 0.44);
+    }
+  }
+  function bufferToWav(buf) {
+    var sr = buf.sampleRate, data = buf.getChannelData(0), n = data.length;
+    var ab = new ArrayBuffer(44 + n * 2), dv = new DataView(ab);
+    function ws(off, s) { for (var i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); }
+    ws(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    ws(36, 'data'); dv.setUint32(40, n * 2, true);
+    var off = 44;
+    for (var i = 0; i < n; i++) { var x = Math.max(-1, Math.min(1, data[i])); dv.setInt16(off, x < 0 ? x * 0x8000 : x * 0x7fff, true); off += 2; }
+    return new Blob([ab], { type: 'audio/wav' });
+  }
+  function renderMixWav() {
+    if (!plan) { $('mixStatus').innerHTML = '<span class="err">먼저 곡을 설계하세요.</span>'; return; }
+    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OAC) { $('mixStatus').innerHTML = '<span class="err">이 브라우저는 wav 저장을 지원하지 않습니다.</span>'; return; }
+    var m = buildMix();
+    if (!m.count) { $('mixStatus').innerHTML = '<span class="err">먼저 트랙을 하나 이상 생성하세요.</span>'; return; }
+    var tempo = plan.tempo || 100, secPerTick = 60 / (tempo * StudioCore.PPQ), sr = 44100, end = 0;
+    Object.keys(m.lanes).forEach(function (k) { m.lanes[k].forEach(function (nn) { end = Math.max(end, (nn.start + nn.dur) * secPerTick); }); });
+    var total = end + 1.5;
+    $('btnSaveWav').disabled = true; $('mixStatus').innerHTML = '<span class="note">🎧 wav 만드는 중… (곡이 길면 몇 초 걸릴 수 있어요)</span>';
+    var ctx = new OAC(1, Math.ceil(sr * total), sr);
+    var master = ctx.createGain(); master.gain.value = 0.85; master.connect(ctx.destination);
+    var nb = offlineNoise(ctx, 1.3);
+    Object.keys(m.lanes).forEach(function (key) {
+      var lane = m.lanes[key], vol = (m.vol[key] != null ? m.vol[key] : 1);
+      var prog = (m.progs[key] != null ? m.progs[key] : (StudioCore.TRACK_META[key] || {}).prog) || 0;
+      var tg = ctx.createGain(); tg.gain.value = vol; tg.connect(master);
+      if (key === 'drums') lane.forEach(function (nn) { drumHit(ctx, tg, nb, nn.midi, nn.start * secPerTick, nn.vel); });
+      else lane.forEach(function (nn) { synthNote(ctx, tg, nb, nn.midi, nn.start * secPerTick, Math.max(0.05, nn.dur * secPerTick), nn.vel, prog); });
+    });
+    ctx.startRendering().then(function (rendered) {
+      var blob = bufferToWav(rendered);
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = ((plan && plan.title) || 'studio').replace(/[\\/:*?"<>|]/g, '_') + '-반주.wav';
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+      $('btnSaveWav').disabled = false;
+      $('mixStatus').innerHTML = '<span class="ok">✓ .wav 저장 완료 — ACE-Step Audio2Audio의 Ref Audio에 올리세요 (' + Math.round(total) + '초)</span>';
+    }).catch(function (e) {
+      $('btnSaveWav').disabled = false; $('mixStatus').innerHTML = '<span class="err">wav 생성 실패: ' + e.message + '</span>';
+    });
+  }
+  $('btnSaveWav').addEventListener('click', renderMixWav);
 
   /* ── ACE-Step 브리프(반주 스타일 태그·instrumental) ── */
   var STYLE_TAGS = {
