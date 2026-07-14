@@ -189,6 +189,7 @@
       <span id="mixStatus" class="note" style="margin:0"></span>
     </div>
     <div class="row">
+      <label class="note" style="margin:0">보컬 <select id="aceVocal"><option value="female">여성</option><option value="male">남성</option></select></label>
       <button id="btnAceBrief" class="alt" disabled>🎤 ACE-Step 브리프 복사</button>
       <span id="aceStatus" class="note" style="margin:0"></span>
     </div>
@@ -198,8 +199,10 @@
         <b>목표:</b> AI가 반주를 새로 만들지 않고, <b>이 스튜디오에서 만든 반주 그대로</b> 위에 노래만 부르게 하기.<br>
         <b>① .wav 만들기</b> — 위 <b>「⬇ .wav 저장 (ACE용)」</b> 버튼을 누르면 변환·VLC 없이 바로 .wav가 저장됩니다(권장).
         (또는 무료 VLC로 .mid→.wav 변환, 또는 재생하며 Windows 녹음기로 녹음.)<br>
-        <b>② ACE-Step</b> — <b>Audio2Audio 탭</b> → Ref Audio에 변환한 .wav 업로드 → <b>ref strength 0.5~0.7</b>(높을수록 내 반주 유지) →
-        Lyrics에 가사, Tags에 위 「ACE-Step 브리프」 붙여넣고 Generate.<br>
+        <b>② ACE-Step</b> — <b>Audio2Audio 탭</b> → Ref Audio에 변환한 .wav 업로드 →
+        <b>Lyrics에 가사 꼭 입력</b>(비우면 연주곡이 됩니다) → Tags에 위 「ACE-Step 브리프」 붙여넣고 Generate.<br>
+        <b>❗ 보컬이 안 나올 때</b>: ① Lyrics가 비었는지 확인 ② Tags에 <b>instrumental이 있으면 삭제</b>(브리프엔 없음)
+        ③ <b>ref strength를 0.4~0.55로 낮추기</b> — 너무 높으면(0.8+) 반주만 그대로 복제되어 보컬이 안 생깁니다.<br>
         <b>③ 완성 wav</b> — 송메이커 「완성 노래 가져오기」로 불러오면 커버·가라오케와 함께 재생됩니다.<br>
         ※ 팁: 처음엔 30초로 테스트 → 마음에 들면 전체 길이로.
       </p>
@@ -1601,13 +1604,19 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     synthwave: 'synthwave, retrowave, 80s synth, arpeggio, neon, driving bass',
     acoustic: 'acoustic pop, cozy, acoustic guitar, soft vocals, claps'
   };
+  // 보컬을 확실히 얹기 위한 태그 — 'instrumental'은 절대 넣지 않는다(연주곡이 되어버림).
+  var VOCAL_TAG = {
+    female: 'korean female vocal, clear lead vocals, expressive singing',
+    male: 'korean male vocal, warm lead vocals, expressive singing'
+  };
   $('btnAceBrief').addEventListener('click', function () {
     if (!plan) return;
     var tags = STYLE_TAGS[plan.genreKey] || STYLE_TAGS.pop;
     var key = plan.minor ? 'A minor' : 'C major';
-    var brief = tags + ', ' + plan.tempo + ' BPM, ' + key + ', instrumental backing kept, korean vocal on top';
-    var self = this;
-    function done() { $('aceStatus').innerHTML = '<span class="ok">✓ 복사됨 — ACE-Step Tags 칸에 붙여넣으세요 (아래 audio2audio 안내 참고)</span>'; }
+    var v = ($('aceVocal') && $('aceVocal').value) || 'female';
+    // 보컬 태그를 맨 앞에(우선순위) · 끝에 'vocal-driven, singing' 강조 · instrumental 없음
+    var brief = VOCAL_TAG[v] + ', ' + tags + ', ' + plan.tempo + ' BPM, ' + key + ', song with lead vocals, vocal-driven, singing';
+    function done() { $('aceStatus').innerHTML = '<span class="ok">✓ 복사됨 — ACE-Step Tags에 붙여넣기 · <b>가사(Lyrics)도 꼭 채우세요</b> · 보컬 안 나오면 ref strength 0.4~0.55로 낮추기</span>'; }
     if (navigator.clipboard) navigator.clipboard.writeText(brief).then(done, done); else done();
   });
 

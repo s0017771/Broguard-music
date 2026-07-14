@@ -155,8 +155,16 @@ await (async () => { try {
   await page.click('#btnAceBrief');
   await page.waitForFunction(() => /복사됨/.test(document.getElementById('aceStatus').textContent), undefined, { timeout: 3000 });
   const clip = await page.evaluate(() => navigator.clipboard.readText());
-  assert.ok(/BPM/.test(clip) && /instrumental/.test(clip) && !/[가-힣]/.test(clip), 'ACE 브리프(영어·instrumental): ' + clip);
-  ok('ACE-Step 브리프 복사');
+  // 보컬 우선 · 'instrumental' 없음(있으면 연주곡이 되어버림) · 영어 태그
+  assert.ok(/BPM/.test(clip) && /vocal/i.test(clip) && !/instrumental/i.test(clip) && !/[가-힣]/.test(clip),
+    'ACE 브리프(보컬 우선·instrumental 없음): ' + clip);
+  // 보컬 성별 선택이 반영된다
+  await page.selectOption('#aceVocal', 'male');
+  await page.click('#btnAceBrief');
+  await page.waitForFunction(() => /복사됨/.test(document.getElementById('aceStatus').textContent), undefined, { timeout: 3000 });
+  const clipMale = await page.evaluate(() => navigator.clipboard.readText());
+  assert.ok(/male vocal/i.test(clipMale), '남성 보컬 태그 반영: ' + clipMale);
+  ok('ACE-Step 브리프 복사(보컬 우선)');
 } catch (e) { bad('ACE 브리프', e); } })();
 
 await (async () => { try {
