@@ -265,3 +265,13 @@ test('generateHook: 강박=코드톤, 훅 끝 으뜸음, 시드 재현성', () =
   const a = generateHook({ key: 'major', hookBars: 4, seed: 3 });
   assert.equal(a.abc, out.abc, '같은 시드 → 동일');
 });
+
+test('generateHook: 확장된 훅 통계 — 시드마다 다양한 리듬/윤곽(3종 초과)', () => {
+  const sigs = new Set();
+  for (let s = 1; s <= 30; s++) {
+    const out = generateHook({ key: 'major', hookBars: 8, seed: s });
+    const hb = out.sections[1].bars;
+    sigs.add(hb[0].rhythm.join(',') + '|' + hb[1].rhythm.join(',')); // 2마디 리듬 시그니처
+  }
+  assert.ok(sigs.size > 3, '리듬 셀 다양성(>3종): 실제 ' + sigs.size);
+});
