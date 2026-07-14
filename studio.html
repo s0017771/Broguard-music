@@ -1489,13 +1489,14 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     return b;
   }
-  function synthNote(ctx, dest, nb, midi, t0, dur, vel, prog) {
+  function synthNote(ctx, dest, nb, midi, t0, dur, vel, prog, isLead) {
     var freq = 440 * Math.pow(2, (midi - 69) / 12), peak = Math.max(0.004, (vel / 127) * 0.2);
     var type = 'triangle';
     if (prog >= 32 && prog <= 39) type = 'sine';            // 베이스
     else if (prog >= 24 && prog <= 31) type = 'sawtooth';   // 기타
     else if (prog >= 40 && prog <= 47) type = 'sawtooth';   // 현악(바이올린)
     else if (prog >= 80) type = 'square';                   // 신스 리드
+    if (isLead) { type = 'sawtooth'; peak *= 1.35; }        // 리드(멜로디)는 밝고 크게 → 반주 위로 도드라지게
     var o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type; o.frequency.value = freq;
     var a = 0.006, rel = Math.min(0.25, dur * 0.4);
@@ -1558,14 +1559,17 @@ if (typeof window !== 'undefined') window.StudioCore = StudioCore;
     var total = end + 1.5;
     $('btnSaveWav').disabled = true; $('mixStatus').innerHTML = '<span class="note">🎧 wav 만드는 중… (곡이 길면 몇 초 걸릴 수 있어요)</span>';
     var ctx = new OAC(1, Math.ceil(sr * total), sr);
-    var master = ctx.createGain(); master.gain.value = 0.85; master.connect(ctx.destination);
+    var master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
     var nb = offlineNoise(ctx, 1.3);
+    // 트랙별 믹스 레벨 — 드럼이 리드를 덮지 않게 균형(리드 멜로디가 위로 오도록)
+    var LEVEL = { drums: 0.5, bass: 0.8, piano: 0.7, guitar: 0.7, melody: 1.2 };
     Object.keys(m.lanes).forEach(function (key) {
-      var lane = m.lanes[key], vol = (m.vol[key] != null ? m.vol[key] : 1);
+      var lane = m.lanes[key], vol = (m.vol[key] != null ? m.vol[key] : 1) * (LEVEL[key] || 0.8);
       var prog = (m.progs[key] != null ? m.progs[key] : (StudioCore.TRACK_META[key] || {}).prog) || 0;
+      var isLead = (key === 'melody');
       var tg = ctx.createGain(); tg.gain.value = vol; tg.connect(master);
       if (key === 'drums') lane.forEach(function (nn) { drumHit(ctx, tg, nb, nn.midi, nn.start * secPerTick, nn.vel); });
-      else lane.forEach(function (nn) { synthNote(ctx, tg, nb, nn.midi, nn.start * secPerTick, Math.max(0.05, nn.dur * secPerTick), nn.vel, prog); });
+      else lane.forEach(function (nn) { synthNote(ctx, tg, nb, nn.midi, nn.start * secPerTick, Math.max(0.05, nn.dur * secPerTick), nn.vel, prog, isLead); });
     });
     ctx.startRendering().then(function (rendered) {
       var blob = bufferToWav(rendered);
