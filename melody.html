@@ -148,6 +148,12 @@
       <button class="primary" id="goPop" style="flex:2;background:var(--z-jeon)">🎶 완성곡(팝 구성) 만들기</button>
     </div>
     <p class="mode-desc">「완성곡(팝 구성)」은 <b>인트로·벌스·프리코러스·코러스·간주·브릿지·아웃트로</b>를 섹션마다 코드·에너지·리듬·종지를 달리해 한 곡으로 만듭니다(약 60마디). 코러스는 반복해도 같은 후렴, 아웃트로는 으뜸화음으로 착지합니다. 조성(장조/단조)만 고르면 코드 진행은 자동입니다.</p>
+    <div class="row" style="align-items:stretch">
+      <div style="flex:1"><label for="hookBars">훅 길이</label>
+        <select id="hookBars"><option value="4">4마디</option><option value="8">8마디</option></select></div>
+      <button class="primary" id="goHook" style="flex:2;background:var(--z-jeon)">🎣 훅(후렴) 만들기</button>
+    </div>
+    <p class="mode-desc">「훅(후렴)」은 <b>도입(무난 4마디) → 훅(반복 각인 4·8마디) → 마무리(무난 4마디)</b>를 만듭니다. 훅은 짧은 모티프를 <b>리듬·윤곽 그대로 반복</b>하고 <b>당김음 + 정점음(길게 끄는 높은 음)</b>으로 귀에 박히게 합니다(조성은 위 완성곡 조성 사용).</p>
     <p class="meta" id="meta"></p>
   </div>
 
@@ -692,7 +698,88 @@ function generatePopSong(opts = {}) {
   return { seed, tempo, minor, sections, totalBars: sections.reduce((s, x) => s + x.bars.length, 0), abc: popSongToAbc(sections, tempo, minor) };
 }
 
-if (typeof module !== 'undefined') module.exports = { generate, generateSong, generatePopSong };
+// ---------------- 훅(후렴) 엔진: 반복 모티프 + 당김음 + 정점음(귀에 박히는 후렴) ----------------
+// 밋밋함(가곡·동요)의 원인은 '매번 다른 순차진행'. 훅은 반대로: 짧은 2마디 모티프를
+// 리듬·윤곽 그대로 반복(각 블록 같은 시작음·같은 델타)하고, 정점(긴 음)을 각인점으로 둔다.
+const PENTA = [0, 2, 4, 7, 9];                 // C장조 5음계(부르기 쉬운 음)
+const HOOK_RHY = [                             // 2마디 훅 리듬(8분음표 단위, 마디합=8). 끝에 긴 정점음.
+  [[2, 2, 4], [1, 1, 2, 4]],
+  [[1, 1, 2, 4], [2, 2, 4]],
+  [[2, 1, 1, 4], [2, 2, 4]],
+  [[3, 1, 4], [2, 2, 4]]                       // 점4분+8분 당김 → 정점(half)
+];
+function pentaSnap(midi) {
+  let best = midi, bd = 99;
+  for (let d = 0; d <= 6; d++) for (const c of [midi - d, midi + d]) {
+    if (c < 57 || c > 83) continue;
+    if (PENTA.includes(((c % 12) + 12) % 12) && d < bd) { bd = d; best = c; }
+  }
+  return best;
+}
+function makeHookMotif(rnd) {
+  const rh = pick(HOOK_RHY, rnd);
+  const flat = []; rh.forEach(p => p.forEach(d => flat.push(d)));
+  const longPos = flat.indexOf(Math.max.apply(null, flat));   // 정점(가장 긴 음) 위치
+  const deltas = [0];
+  for (let i = 1; i < flat.length; i++) deltas.push(i <= longPos ? pick([2, 2, 3, 2], rnd) : -pick([2, 2, 3], rnd));
+  return { rh, deltas };
+}
+function hookSection(chords, hookBars, rnd, minor) {
+  const lo = 64, hi = 81, anchor = 74, tonicPc = minor ? 9 : 0;
+  const m = makeHookMotif(rnd);
+  const nBlocks = Math.max(1, Math.round(hookBars / 2)), bars = [];
+  for (let blk = 0; blk < nBlocks; blk++) {
+    const resolve = (blk === nBlocks - 1);
+    let cur = anchor, ni = 0;
+    for (let bar = 0; bar < 2; bar++) {
+      const ch = chords[(blk * 2 + bar) % chords.length], pat = m.rh[bar], notes = [];
+      let onset = 0;
+      for (let i = 0; i < pat.length; i++, ni++) {
+        if (ni === 0) cur = snapToChordTone(anchor, ch);
+        else {
+          cur = Math.max(lo, Math.min(hi, cur + (m.deltas[ni] || 0)));
+          cur = (onset % 4 === 0) ? snapToChordTone(cur, ch) : pentaSnap(cur);   // 강박=코드톤, 사이=5음계
+          cur = Math.max(lo, Math.min(hi, cur));
+        }
+        notes.push(cur);
+        onset += pat[i];
+      }
+      if (resolve && bar === 1) {                                   // 훅 끝 → 으뜸음 착지
+        let t = notes[notes.length - 1]; t -= ((((t % 12) - tonicPc) % 12) + 12) % 12; if (t < lo) t += 12;
+        notes[notes.length - 1] = t;
+      }
+      bars.push({ chord: ch.sym, notes: notes, rhythm: pat });
+    }
+  }
+  return bars;
+}
+// 도입(무난) → 훅(반복 각인) → 마무리(무난)  — 후렴에 바로 쓰는 훅 블록
+function generateHook(opts = {}) {
+  const tempo = opts.tempo || 96;
+  const minor = opts.key === 'minor';
+  const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
+  const hookBars = (opts.hookBars === 8) ? 8 : 4;
+  const rnd = rngFactory(seed);
+  const BANK = minor ? POP_PROG_MINOR : POP_PROG_MAJOR;
+  const tile = (prog, n) => { const a = []; for (let i = 0; i < n; i++) a.push(parseChord(prog[i % prog.length])); return a; };
+  const pre = bestSection(tile(BANK.verse, 4), 'seung', rnd, !!opts.sixteenth);
+  if (!pre) return { error: '도입 생성 실패 — 다시 시도해 주세요.' };
+  const hook = hookSection(tile(BANK.chorus, hookBars), hookBars, rnd, minor);
+  const post = bestSection(tile(BANK.outro || BANK.verse, 4), 'gyeol', rnd, !!opts.sixteenth);
+  if (!post) return { error: '마무리 생성 실패 — 다시 시도해 주세요.' };
+  const sections = [
+    { label: '도입(무난)', zone: 'seung', bars: pre.bars },
+    { label: '훅(후렴)', zone: 'jeon', bars: hook },
+    { label: '마무리(무난)', zone: 'gyeol', bars: post.bars }
+  ];
+  return {
+    kind: '훅(후렴) 블록', seed, tempo, minor, hookBars, sections,
+    totalBars: sections.reduce((s, x) => s + x.bars.length, 0),
+    abc: popSongToAbc(sections, tempo, minor)
+  };
+}
+
+if (typeof module !== 'undefined') module.exports = { generate, generateSong, generatePopSong, generateHook };
 
 </script>
 
@@ -729,6 +816,7 @@ document.querySelectorAll('#modes .mode-chip').forEach(c =>
 $('go').addEventListener('click', run);
 $('goSong').addEventListener('click', runSong);
 $('goPop').addEventListener('click', runPopSong);
+$('goHook').addEventListener('click', runHook);
 
 function zoneClass(i, n, m) {
   const z = (m === 'full') ? zoneOf(i, n) : m;
@@ -799,10 +887,33 @@ function runPopSong() {
   }, 30);
 }
 
+function runHook() {
+  stopPlay();
+  const btn = $('goHook');
+  btn.disabled = true; btn.textContent = '작곡 중…';
+  setTimeout(() => {
+    try {
+      const seedRaw = $('seed').value.trim();
+      const out = generateHook({
+        key: $('popKey').value,
+        hookBars: parseInt($('hookBars').value, 10) || 4,
+        tempo: Math.max(40, Math.min(200, parseInt($('tempo').value) || 96)),
+        seed: seedRaw ? (parseInt(seedRaw) || 1) : undefined,
+        sixteenth
+      });
+      renderPopSong(out);
+    } catch (e) {
+      $('results').innerHTML = '<p class="err">오류: ' + e.message + '</p>';
+    }
+    btn.disabled = false; btn.textContent = '🎣 훅(후렴) 만들기';
+  }, 30);
+}
+
 function renderPopSong(out) {
   const box = $('results');
   if (out.error) { box.innerHTML = '<p class="err">' + out.error + '</p>'; $('meta').textContent = ''; return; }
-  $('meta').textContent = `[완성곡 · 팝 구성 · ${out.minor ? '단조' : '장조'}${sixteenth ? ' · 16분음표' : ''}] 총 ${out.totalBars}마디 · ${out.sections.length}개 섹션 · 시드 ${out.seed}`;
+  const kind = out.kind || '완성곡 · 팝 구성';
+  $('meta').textContent = `[${kind} · ${out.minor ? '단조' : '장조'}${sixteenth ? ' · 16분음표' : ''}] 총 ${out.totalBars}마디 · ${out.sections.length}개 섹션 · 시드 ${out.seed}`;
   box.innerHTML = '';
   const zcls = { ki: 'z-ki', seung: 'z-seung', jeon: 'z-jeon', gyeol: 'z-gyeol' };
   let zb = '', labels = '';
@@ -816,7 +927,7 @@ function renderPopSong(out) {
     <div class="zonebar">${zb}</div>
     <div style="display:flex;gap:2px;font-size:.62rem;color:var(--muted);margin:2px 0 8px;text-align:center">${labels}</div>
     <div class="card-head">
-      <div><span class="card-title">🎶 완성곡 · 팝 구성 (${out.minor ? '단조' : '장조'})</span> <span class="score">${out.totalBars}마디</span></div>
+      <div><span class="card-title">🎶 ${kind} (${out.minor ? '단조' : '장조'})</span> <span class="score">${out.totalBars}마디</span></div>
       <div class="btns">
         <button data-act="play">▶ 재생</button>
         <button data-act="stop">■ 정지</button>
