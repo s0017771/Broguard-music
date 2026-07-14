@@ -153,7 +153,7 @@
         <select id="hookBars"><option value="4">4마디</option><option value="8">8마디</option></select></div>
       <button class="primary" id="goHook" style="flex:2;background:var(--z-jeon)">🎣 훅(후렴) 만들기</button>
     </div>
-    <p class="mode-desc">「훅(후렴)」은 <b>도입(무난 4마디) → 훅(반복 각인 4·8마디) → 마무리(무난 4마디)</b>를 만듭니다. 훅은 짧은 모티프를 <b>리듬·윤곽 그대로 반복</b>하고 <b>당김음 + 정점음(길게 끄는 높은 음)</b>으로 귀에 박히게 합니다(조성은 위 완성곡 조성 사용).</p>
+    <p class="mode-desc">「훅(후렴)」은 <b>도입(무난 4마디) → 훅(반복 각인 4·8마디) → 마무리(무난 4마디)</b>를 만듭니다. 훅은 <b>14종 리듬 셀 × 6종 윤곽(정점·하강·상승·진자·반복도약·문답)</b>을 훅 통계 프로파일로 뽑아, 짧은 모티프를 <b>반복 + 당김음 + 정점음</b>으로 각인합니다. 시드를 바꾸면 매번 다른 훅이 나옵니다(조성은 위 완성곡 조성 사용).</p>
     <p class="meta" id="meta"></p>
   </div>
 
@@ -702,11 +702,24 @@ function generatePopSong(opts = {}) {
 // 밋밋함(가곡·동요)의 원인은 '매번 다른 순차진행'. 훅은 반대로: 짧은 2마디 모티프를
 // 리듬·윤곽 그대로 반복(각 블록 같은 시작음·같은 델타)하고, 정점(긴 음)을 각인점으로 둔다.
 const PENTA = [0, 2, 4, 7, 9];                 // C장조 5음계(부르기 쉬운 음)
-const HOOK_RHY = [                             // 2마디 훅 리듬(8분음표 단위, 마디합=8). 끝에 긴 정점음.
-  [[2, 2, 4], [1, 1, 2, 4]],
-  [[1, 1, 2, 4], [2, 2, 4]],
-  [[2, 1, 1, 4], [2, 2, 4]],
-  [[3, 1, 4], [2, 2, 4]]                       // 점4분+8분 당김 → 정점(half)
+// 훅 셀 = 2마디 리듬 + 윤곽(shape) + 빈도 가중(w) + 반복 시 이조(seq, 반음).
+//   리듬(관용적 당김음)과 퍼블릭 도메인/전통 훅의 통계적 윤곽 특성을 반영 — 저작권 있는 곡을 복제하지 않음.
+//   shape: arch(정점형) descend(하강 캐스케이드) ascend(상승) pendulum(진자) repeatLeap(반복후 도약) callResp(문답형)
+const HOOK_CELLS = [
+  { rhy: [[1, 1, 2, 4], [2, 2, 4]], shape: 'arch', w: 3 },
+  { rhy: [[2, 2, 4], [1, 1, 2, 4]], shape: 'descend', w: 3 },
+  { rhy: [[3, 1, 4], [2, 2, 4]], shape: 'repeatLeap', w: 3 },
+  { rhy: [[2, 1, 1, 4], [4, 4]], shape: 'callResp', w: 3 },
+  { rhy: [[4, 4], [2, 2, 2, 2]], shape: 'repeatLeap', w: 2 },
+  { rhy: [[2, 2, 2, 2], [2, 2, 4]], shape: 'arch', w: 2 },
+  { rhy: [[1, 1, 1, 1, 4], [2, 2, 4]], shape: 'descend', w: 2 },
+  { rhy: [[3, 3, 2], [2, 2, 4]], shape: 'pendulum', w: 1, seq: -2 },
+  { rhy: [[2, 2, 2, 2], [4, 4]], shape: 'callResp', w: 2 },
+  { rhy: [[1, 3, 4], [2, 2, 4]], shape: 'arch', w: 2 },       // 8분+점4분 당김
+  { rhy: [[2, 4, 2], [2, 2, 4]], shape: 'pendulum', w: 1 },   // 중간 당김(2박 강조)
+  { rhy: [[4, 2, 2], [1, 1, 2, 4]], shape: 'descend', w: 1 },
+  { rhy: [[2, 2, 1, 1, 2], [4, 4]], shape: 'ascend', w: 1, seq: 2 },
+  { rhy: [[1, 1, 2, 2, 2], [2, 2, 4]], shape: 'ascend', w: 2, seq: 2 }
 ];
 function pentaSnap(midi) {
   let best = midi, bd = 99;
@@ -716,26 +729,47 @@ function pentaSnap(midi) {
   }
   return best;
 }
+function pickWeighted(cells, rnd) {
+  let tot = 0; cells.forEach(c => tot += (c.w || 1));
+  let r = rnd() * tot;
+  for (const c of cells) { r -= (c.w || 1); if (r <= 0) return c; }
+  return cells[cells.length - 1];
+}
+function buildHookDeltas(shape, flat, rnd) {                    // 윤곽 유형별 반음 델타
+  const N = flat.length, longPos = flat.indexOf(Math.max.apply(null, flat)), d = [0];
+  const up = () => pick([2, 2, 3, 2], rnd), dn = () => -pick([2, 2, 3], rnd);
+  for (let i = 1; i < N; i++) {
+    switch (shape) {
+      case 'descend': d.push(dn()); break;
+      case 'ascend': d.push(up()); break;
+      case 'pendulum': d.push(i % 2 ? up() : dn()); break;
+      case 'repeatLeap': d.push(i < longPos ? 0 : (i === longPos ? pick([5, 7, 5], rnd) : dn())); break;
+      case 'callResp': d.push(i <= longPos ? up() : (i === longPos + 1 ? -pick([4, 5], rnd) : dn())); break;
+      case 'arch': default: d.push(i <= longPos ? up() : dn());
+    }
+  }
+  return d;
+}
 function makeHookMotif(rnd) {
-  const rh = pick(HOOK_RHY, rnd);
-  const flat = []; rh.forEach(p => p.forEach(d => flat.push(d)));
-  const longPos = flat.indexOf(Math.max.apply(null, flat));   // 정점(가장 긴 음) 위치
-  const deltas = [0];
-  for (let i = 1; i < flat.length; i++) deltas.push(i <= longPos ? pick([2, 2, 3, 2], rnd) : -pick([2, 2, 3], rnd));
-  return { rh, deltas };
+  const cell = pickWeighted(HOOK_CELLS, rnd);
+  const flat = []; cell.rhy.forEach(p => p.forEach(x => flat.push(x)));
+  return { rh: cell.rhy, deltas: buildHookDeltas(cell.shape, flat, rnd), seq: cell.seq || 0, shape: cell.shape };
 }
 function hookSection(chords, hookBars, rnd, minor) {
-  const lo = 64, hi = 81, anchor = 74, tonicPc = minor ? 9 : 0;
+  const lo = 64, hi = 81, anchor = 74, tonicChord = parseChord(minor ? 'Am' : 'C'), tonicPc = minor ? 9 : 0;
   const m = makeHookMotif(rnd);
   const nBlocks = Math.max(1, Math.round(hookBars / 2)), bars = [];
   for (let blk = 0; blk < nBlocks; blk++) {
     const resolve = (blk === nBlocks - 1);
-    let cur = anchor, ni = 0;
+    const base = Math.max(lo, Math.min(hi, anchor + m.seq * blk));   // 시퀀스: 블록마다 이조(상승/하강 훅)
+    let cur = base, ni = 0;
     for (let bar = 0; bar < 2; bar++) {
-      const ch = chords[(blk * 2 + bar) % chords.length], pat = m.rh[bar], notes = [];
+      // 훅 마지막 마디는 으뜸화음 위에서 해결 → 으뜸음 착지가 자연스럽게 협화
+      const ch = (resolve && bar === 1) ? tonicChord : chords[(blk * 2 + bar) % chords.length];
+      const pat = m.rh[bar], notes = [];
       let onset = 0;
       for (let i = 0; i < pat.length; i++, ni++) {
-        if (ni === 0) cur = snapToChordTone(anchor, ch);
+        if (ni === 0) cur = snapToChordTone(base, ch);
         else {
           cur = Math.max(lo, Math.min(hi, cur + (m.deltas[ni] || 0)));
           cur = (onset % 4 === 0) ? snapToChordTone(cur, ch) : pentaSnap(cur);   // 강박=코드톤, 사이=5음계
