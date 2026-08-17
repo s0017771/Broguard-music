@@ -51,10 +51,17 @@
     border-radius: 7px; background: #fffdf7; color: var(--ink);
   }
   pre#tabOut {
-    font-family: 'D2Coding', Consolas, Menlo, monospace; font-size: .8rem; line-height: 1.35;
-    background: #10202e; color: #e8e2d2; border-radius: 10px; padding: 14px;
+    font-family: 'D2Coding', Consolas, Menlo, monospace; font-size: .82rem; line-height: 1.5;
+    background: linear-gradient(160deg, #14283a, #0c1824); color: #3f5a6b;   /* 기본색 = 현(줄) 대시 */
+    border: 1px solid #26485f; border-radius: 12px; padding: 16px 14px;
     overflow-x: auto; white-space: pre; min-height: 120px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), inset 0 0 44px rgba(0,0,0,.4);
   }
+  pre#tabOut .tab-head { color: #9fb3c0; font-weight: 700; }
+  pre#tabOut .tab-chord { color: #ffb347; font-weight: 800; letter-spacing: .02em; }
+  pre#tabOut .tab-lbl { color: #7fd4c8; font-weight: 800; }
+  pre#tabOut .tab-fret { color: #ffd75e; font-weight: 800; text-shadow: 0 0 8px rgba(255,215,94,.25); }
+  pre#tabOut .tab-bar { color: #5b8296; }
   #warnBox { display: none; margin-top: 10px; font-size: .78rem; color: var(--warn);
     background: #fbf1ec; border: 1px solid #eccfc4; border-radius: 9px; padding: 9px 11px; line-height: 1.6; }
   #metaLine { font-size: .76rem; color: var(--ink-soft); margin-top: 8px; line-height: 1.6; }
@@ -941,6 +948,22 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
     if ([].some.call(sel.options, function (o) { return o.value === keep; })) sel.value = keep;
   }
 
+  // ASCII 타브 → 색입힌 HTML(프렛=금색, 줄이름=청록, 코드=주황, 현=흐린 대시). 정렬은 그대로.
+  function prettifyTab(text) {
+    var esc = function (s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+    function colorBody(b) {
+      return esc(b).replace(/([0-9]+|\|)/g, function (m) {
+        return m === '|' ? '<span class="tab-bar">|</span>' : '<span class="tab-fret">' + m + '</span>';
+      });
+    }
+    var past = false;
+    return text.split('\n').map(function (line) {
+      if (/^[eBGDAE]\|/.test(line)) return '<span class="tab-str"><span class="tab-lbl">' + line.charAt(0) + '</span>' + colorBody(line.slice(1)) + '</span>';
+      if (line.trim() === '') { past = true; return ''; }
+      if (!past) return '<span class="tab-head">' + esc(line) + '</span>';
+      return '<span class="tab-chord">' + esc(line) + '</span>';
+    }).join('\n');
+  }
   function convertNow() {
     var text = abcIn.value.trim();
     if (!text) {
@@ -960,10 +983,10 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
     lastResult = res;
     refreshVoiceList(res.song);
     if (res.ok) {
-      tabOut.textContent = res.tab;
+      tabOut.innerHTML = prettifyTab(res.tab);
       metaLine.textContent = '보이스 ' + res.voiceUsed +
         (res.shift ? ' · 옥타브 자동보정 ' + (res.shift > 0 ? '+' : '') + (res.shift / 12) : '') +
-        (res.bassApplied ? ' · 쿵짝 베이스 ON(낮은 줄)' : '') +
+        (res.bassApplied ? (res.bassMode === 'arp' ? ' · 아르페지오 풀코드 ON' : ' · 쿵짝 베이스 ON(낮은 줄)') : '') +
         (res.autoChordApplied ? ' · 자동 코드: ' + res.autoChords.join(' ') : '') +
         ' · 튜닝 EADGBE';
       $('btnCopy').disabled = $('btnSave').disabled = false;
