@@ -255,11 +255,13 @@ test('convert: 높은 피아노 멜로디 자동 옥타브 하향', () => {
 
 // ==================== 쿵짝 베이스 반주 ====================
 test('parseChordRoot: 루트·5도·슬래시 베이스', () => {
-  assert.deepEqual(TabCore.parseChordRoot('C'), { rootPc: 0, fifthPc: 7, bassPc: 0 });
-  assert.deepEqual(TabCore.parseChordRoot('G7'), { rootPc: 7, fifthPc: 2, bassPc: 7 });
-  assert.deepEqual(TabCore.parseChordRoot('Am'), { rootPc: 9, fifthPc: 4, bassPc: 9 });
-  assert.deepEqual(TabCore.parseChordRoot('F#m'), { rootPc: 6, fifthPc: 1, bassPc: 6 });
-  assert.deepEqual(TabCore.parseChordRoot('Bb'), { rootPc: 10, fifthPc: 5, bassPc: 10 });
+  assert.deepEqual(TabCore.parseChordRoot('C'), { rootPc: 0, fifthPc: 7, bassPc: 0, thirdPc: 4 });
+  assert.deepEqual(TabCore.parseChordRoot('G7'), { rootPc: 7, fifthPc: 2, bassPc: 7, thirdPc: 11 });
+  assert.deepEqual(TabCore.parseChordRoot('Am'), { rootPc: 9, fifthPc: 4, bassPc: 9, thirdPc: 0 });
+  assert.deepEqual(TabCore.parseChordRoot('F#m'), { rootPc: 6, fifthPc: 1, bassPc: 6, thirdPc: 9 });
+  assert.deepEqual(TabCore.parseChordRoot('Bb'), { rootPc: 10, fifthPc: 5, bassPc: 10, thirdPc: 2 });
+  assert.equal(TabCore.parseChordRoot('Cm7').thirdPc, 3);   // 단3도
+  assert.equal(TabCore.parseChordRoot('Cmaj7').thirdPc, 4); // maj는 장3도
   assert.equal(TabCore.parseChordRoot('C/E').bassPc, 4);   // 슬래시 코드: 베이스 E
   assert.equal(TabCore.parseChordRoot('Ddim').fifthPc, 8); // 감5도
   assert.equal(TabCore.parseChordRoot(''), null);
@@ -273,6 +275,30 @@ test('bassOnsets: 박자별 쿵짝 위치', () => {
   assert.deepEqual(TabCore.bassOnsets(6, 2), [{ time: 0, degree: 'root' }]);
   // 2/4 → 두 박 모두
   assert.deepEqual(TabCore.bassOnsets(4, 2), [{ time: 0, degree: 'root' }, { time: 2, degree: 'fifth' }]);
+});
+
+test('arpOnsets: 매 박 루트→5도→3도→5도(풀코드 아르페지오)', () => {
+  // 4/4, L=1/8 → measureLen 8, beatLen 2
+  assert.deepEqual(TabCore.arpOnsets(8, 2), [
+    { time: 0, degree: 'root' }, { time: 2, degree: 'fifth' }, { time: 4, degree: 'third' }, { time: 6, degree: 'fifth' }]);
+  // 3/4 왈츠 → 루트·3도·5도
+  assert.deepEqual(TabCore.arpOnsets(6, 2), [
+    { time: 0, degree: 'root' }, { time: 2, degree: 'third' }, { time: 4, degree: 'fifth' }]);
+});
+
+test('convert+arp: 멜로디 유지 + 삼화음(루트·3도·5도)이 낮은 줄에 실린다', () => {
+  const res = TabCore.convert('X:1\nM:4/4\nL:1/8\nK:C\n"C"G2 G2 G2 G2 |', { bass: 'arp' });
+  assert.ok(res.ok && res.bassApplied && res.bassMode === 'arp');
+  const degs = new Set();
+  let bassCount = 0;
+  for (const ev of res.events) {
+    if (ev.type === 'note' && ev.bass) { bassCount++; degs.add(ev.bass.degree); ev.frets.filter(f => f.string <= 2).length; }
+  }
+  assert.ok(bassCount >= 3, '삼화음 반주가 실제로 추가되어야 함');
+  assert.ok(degs.has('root') && degs.has('third') && degs.has('fifth'), '루트·3도·5도가 모두 등장: ' + [...degs].join(','));
+  // C코드의 3도 = E(pc 4)가 반주에 존재
+  const hasE = res.events.some(ev => ev.type === 'note' && ev.bass && ev.bass.degree === 'third' && (ev.bass.pitchClass % 12) === 4);
+  assert.ok(hasE, 'C코드 3도 = E(pc4)가 반주에 있어야 함');
 });
 
 test('convert+bass: 멜로디는 유지되고 낮은 줄에 베이스가 추가된다', () => {
