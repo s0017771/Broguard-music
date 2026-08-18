@@ -27,6 +27,10 @@
   #indexBar { display:flex; flex-wrap:wrap; gap:5px; }
   #indexBar a { text-decoration:none; font-size:.82rem; font-weight:800; color:var(--brass-deep); background:#f3ecda; border:1px solid var(--line); border-radius:8px; padding:4px 10px; cursor:pointer; }
   #indexBar a.empty { color:#cfc6b2; background:transparent; cursor:default; pointer-events:none; }
+  /* 분류 필터 */
+  #catBar button { font-size:.8rem; font-weight:800; background:#fff; color:var(--ink-soft); border:1px solid var(--line); border-radius:999px; padding:5px 12px; }
+  #catBar button.on { background:var(--teal); color:#fff; border-color:var(--teal); }
+  .cat-badge { font-size:.68rem; font-weight:800; color:var(--brass-deep); background:#f3ecda; border:1px solid var(--line); border-radius:6px; padding:1px 7px; margin-right:2px; }
   /* 목록 */
   .grp { margin-top:4px; }
   .grp-head { position:sticky; top:0; background:var(--paper); font-size:1.05rem; font-weight:900; color:var(--teal); padding:8px 2px 4px; border-bottom:2px solid var(--line); }
@@ -46,13 +50,16 @@
 <body>
 <header>
   <h1>📚 내 악보집</h1>
-  <p>내가 가진 악보를 ABC로 저장해 언제든 꺼내 봅니다 · 가나다 색인 · 브라우저에 보관(백업 권장)</p>
+  <p>내 악보를 ABC로 저장해 언제든 꺼내 봅니다 · 분류 · 가나다 색인 · <b>개인 소장용</b>(공유·배포 금지) · 브라우저 보관(백업 권장)</p>
 </header>
 <main>
   <div class="card">
     <h2 id="formTitle">➕ 새 악보 추가</h2>
     <div class="row" style="flex-direction:column; align-items:stretch; gap:10px">
-      <label class="fld">제목 <input type="text" id="title" placeholder="예: 나비야, Amazing Grace, 학교종"></label>
+      <div class="row" style="gap:10px">
+        <label class="fld" style="flex:2; min-width:180px">제목 <input type="text" id="title" placeholder="예: 나비야, Amazing Grace, 학교종"></label>
+        <label class="fld" style="flex:1; min-width:130px">분류 <select id="cat" style="font:inherit; font-size:.88rem; padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:#fffdf8"></select></label>
+      </div>
       <label class="fld">ABC 악보 <textarea id="abc" placeholder="X:1&#10;T:나비야&#10;M:4/4&#10;L:1/4&#10;K:C&#10;G E E2 | F D D2 | C D E F | G G G2 |"></textarea></label>
       <div class="row">
         <button id="btnSave" class="brass">💾 저장</button>
@@ -69,16 +76,19 @@
       <h2 style="margin:0">📖 목록 <span id="count" class="count"></span></h2>
       <div class="backup">
         <input type="text" id="search" placeholder="🔎 제목 검색" style="width:150px; font-size:.82rem; padding:6px 10px">
+        <button id="btnImportAbc" class="ghost">🎼 ABC 불러오기</button>
         <button id="btnExport" class="ghost">⬇ 백업</button>
-        <button id="btnImport" class="ghost">⬆ 불러오기</button>
+        <button id="btnImport" class="ghost">⬆ 백업 불러오기</button>
         <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+        <input type="file" id="importAbcFile" accept=".abc,.txt,text/plain" multiple style="display:none">
       </div>
     </div>
-    <div id="indexBar" style="margin:10px 0 6px"></div>
+    <div id="catBar" style="margin:10px 0 8px; display:flex; flex-wrap:wrap; gap:6px"></div>
+    <div id="indexBar" style="margin:2px 0 6px"></div>
     <div id="list"></div>
   </div>
 </main>
-<footer>Broguard Music Lab · 내 악보집 · 악보는 이 브라우저에 저장됩니다(정기 백업 권장)</footer>
+<footer>Broguard Music Lab · 내 악보집 · 개인 소장용(공유 금지) · 악보는 이 브라우저에 저장됩니다(정기 백업 권장)</footer>
 
 <script id="library-core">
 var LibraryCore = (function () {
@@ -116,7 +126,29 @@ var LibraryCore = (function () {
     try { var o = JSON.parse(json); if (o && Array.isArray(o.entries)) return o.entries; if (Array.isArray(o)) return o; } catch (e) {}
     return null;
   }
-  return { indexKey: indexKey, sortEntries: sortEntries, indexOrder: indexOrder, group: group, serialize: serialize, parse: parse, BASE: BASE };
+  var CATS = ['클래식', '뮤지컬', '영화음악', 'K-가요', '애니메이션', '팝', '재즈', '컨트리·포크', '록', '기타'];
+  function normCat(c) { return CATS.indexOf(c) >= 0 ? c : '기타'; }
+  // ABC 파일 → 곡 배열. 여러 곡(X: 블록)이면 각각 분리, T:를 제목으로(없으면 파일명)
+  function splitAbcTunes(text, fallbackName) {
+    text = String(text || '').replace(/\r\n?/g, '\n');
+    var blocks = [], cur = null;
+    text.split('\n').forEach(function (ln) {
+      if (/^X:\s*/.test(ln)) { if (cur) blocks.push(cur); cur = []; }
+      if (cur) cur.push(ln);
+    });
+    if (cur) blocks.push(cur);
+    if (!blocks.length) {
+      var body = text.trim(); if (!body) return [];
+      return [{ title: fallbackName || '(제목 없음)', abc: /^X:/m.test(body) ? body : 'X:1\n' + body }];
+    }
+    return blocks.map(function (b, i) {
+      var abc = b.join('\n').trim();
+      var tm = abc.match(/^T:\s*(.+)$/m);
+      var title = tm ? tm[1].trim() : ((fallbackName || '악보') + (blocks.length > 1 ? ' ' + (i + 1) : ''));
+      return { title: title, abc: abc };
+    });
+  }
+  return { indexKey: indexKey, sortEntries: sortEntries, indexOrder: indexOrder, group: group, serialize: serialize, parse: parse, BASE: BASE, CATS: CATS, normCat: normCat, splitAbcTunes: splitAbcTunes };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = LibraryCore;
 if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
@@ -127,7 +159,10 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
   var $ = function (id) { return document.getElementById(id); };
   var KEY = 'broguard_library';
   var entries = load();
-  var editingId = null, synth = null;
+  var editingId = null, synth = null, activeCat = null;
+  // 분류 선택 채우기
+  LibraryCore.CATS.forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = c; $('cat').appendChild(o); });
+  $('cat').value = 'K-가요';
 
   function load() { try { var e = LibraryCore.parse(localStorage.getItem(KEY) || ''); return e || []; } catch (x) { return []; } }
   function save() { try { localStorage.setItem(KEY, LibraryCore.serialize(entries)); } catch (x) { setStatus('저장 공간이 부족하거나 차단되었습니다. 백업으로 보관하세요.', true); } }
@@ -151,11 +186,23 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
     } catch (e) { alert('재생 실패(사운드폰트 로드 문제일 수 있습니다).'); }
   }
 
+  // ── 분류 필터 바 ──
+  function renderCatBar() {
+    var cnt = {}; entries.forEach(function (e) { var c = LibraryCore.normCat(e.cat); cnt[c] = (cnt[c] || 0) + 1; });
+    var html = '<button data-cat="" class="' + (activeCat ? '' : 'on') + '">전체 ' + entries.length + '</button>';
+    LibraryCore.CATS.forEach(function (c) { if (cnt[c]) html += '<button data-cat="' + c + '" class="' + (activeCat === c ? 'on' : '') + '">' + c + ' ' + cnt[c] + '</button>'; });
+    $('catBar').innerHTML = html;
+  }
   // ── 목록 렌더 ──
   function render() {
+    renderCatBar();
     var q = ($('search').value || '').trim().toLowerCase();
-    var shown = q ? entries.filter(function (e) { return String(e.title).toLowerCase().indexOf(q) >= 0; }) : entries;
-    $('count').textContent = '(' + entries.length + '곡' + (q ? ' · 검색 ' + shown.length : '') + ')';
+    var shown = entries.filter(function (e) {
+      if (activeCat && LibraryCore.normCat(e.cat) !== activeCat) return false;
+      if (q && String(e.title).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    $('count').textContent = '(' + entries.length + '곡' + (activeCat ? ' · ' + activeCat + ' ' + shown.length : (q ? ' · 검색 ' + shown.length : '')) + ')';
     var grouped = LibraryCore.group(shown);
     // 색인 바
     var order = LibraryCore.indexOrder(), present = {};
@@ -172,7 +219,7 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
       html += '<div class="grp" id="grp-' + k + '"><div class="grp-head">' + k + '</div>';
       arr.forEach(function (e) {
         html += '<div class="entry" data-id="' + e.id + '">' +
-          '<div class="entry-head"><span class="entry-title"></span><span class="entry-meta">' + fmtDate(e.added) + '</span><span class="note">▾</span></div>' +
+          '<div class="entry-head"><span class="cat-badge">' + LibraryCore.normCat(e.cat) + '</span><span class="entry-title"></span><span class="entry-meta">' + fmtDate(e.added) + '</span><span class="note">▾</span></div>' +
           '<div class="entry-body"><div class="sheet" id="sheet-' + e.id + '"></div>' +
           '<div class="row" style="margin-top:9px">' +
           '<button data-act="play" class="brass">▶ 재생</button>' +
@@ -204,7 +251,7 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
       if (act === 'play') { var v = renderAbcInto('sheet-' + id, e.abc); play(v); }
       else if (act === 'stop') stopPlay();
       else if (act === 'tab') { try { localStorage.setItem('broguard_tab_abc', e.abc); } catch (x) {} window.open('tab.html', '_blank'); }
-      else if (act === 'edit') { editingId = id; $('title').value = e.title; $('abc').value = e.abc; $('formTitle').textContent = '✎ 악보 수정'; $('btnSave').textContent = '💾 수정 저장'; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      else if (act === 'edit') { editingId = id; $('title').value = e.title; $('abc').value = e.abc; $('cat').value = LibraryCore.normCat(e.cat); $('formTitle').textContent = '✎ 악보 수정'; $('btnSave').textContent = '💾 수정 저장'; window.scrollTo({ top: 0, behavior: 'smooth' }); }
       else if (act === 'del') { if (confirm('「' + e.title + '」 악보를 삭제할까요?')) { entries = entries.filter(function (x) { return x.id !== id; }); save(); render(); } }
       return;
     }
@@ -217,19 +264,23 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
     var a = ev.target.closest('a[data-jump]'); if (!a) return;
     var t = $('grp-' + a.getAttribute('data-jump')); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+  $('catBar').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('button[data-cat]'); if (!btn) return;
+    activeCat = btn.getAttribute('data-cat') || null; render();
+  });
 
   // ── 폼 ──
   $('btnSave').addEventListener('click', function () {
-    var title = $('title').value.trim(), abc = $('abc').value.trim();
+    var title = $('title').value.trim(), abc = $('abc').value.trim(), cat = LibraryCore.normCat($('cat').value);
     if (!title) { setStatus('제목을 입력하세요.', true); return; }
     if (!abc) { setStatus('ABC 악보를 입력하세요.', true); return; }
     if (editingId) {
       var e = entries.filter(function (x) { return x.id === editingId; })[0];
-      if (e) { e.title = title; e.abc = abc; }
+      if (e) { e.title = title; e.abc = abc; e.cat = cat; }
       editingId = null; $('formTitle').textContent = '➕ 새 악보 추가'; $('btnSave').textContent = '💾 저장';
       setStatus('수정했습니다 ✓');
     } else {
-      entries.push({ id: newId(), title: title, abc: abc, added: Date.now() });
+      entries.push({ id: newId(), title: title, abc: abc, cat: cat, added: Date.now() });
       setStatus('저장했습니다 ✓ (' + entries.length + '곡)');
     }
     save(); render();
@@ -265,6 +316,23 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
       save(); render(); setStatus(added + '곡 불러왔습니다 ✓');
     };
     r.readAsText(f);
+  });
+  // ── ABC 파일 불러오기(여러 개 · 다중 곡 지원) ──
+  $('btnImportAbc').addEventListener('click', function () { $('importAbcFile').click(); });
+  $('importAbcFile').addEventListener('change', function () {
+    var files = [].slice.call(this.files || []); this.value = ''; if (!files.length) return;
+    var cat = LibraryCore.normCat($('cat').value), pending = files.length, total = 0;
+    files.forEach(function (f) {
+      var r = new FileReader();
+      r.onload = function () {
+        var name = (f.name || '악보').replace(/\.(abc|txt)$/i, '');
+        LibraryCore.splitAbcTunes(String(r.result), name).forEach(function (t) {
+          if (t.abc) { entries.push({ id: newId(), title: t.title, abc: t.abc, cat: cat, added: Date.now() }); total++; }
+        });
+        if (--pending === 0) { save(); render(); setStatus(total + '곡(ABC 파일) 불러왔습니다 ✓ · 분류는 「' + cat + '」로 지정됨(수정 가능)'); }
+      };
+      r.readAsText(f);
+    });
   });
 
   render();

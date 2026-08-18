@@ -62,6 +62,16 @@ try {
   const file = await dl;
   if (/\.json$/.test(file.suggestedFilename()) || file.suggestedFilename()) ok('백업 내보내기(JSON 다운로드)'); else bad('백업', new Error('no download'));
 
+  // 분류: 저장 시 선택한 분류가 배지로, 필터가 동작
+  await p.selectOption('#cat', '클래식');
+  await add('소나타', 'X:1\nK:C\nCEGc|');
+  const cats = await p.$$eval('#catBar button', els => els.map(e => e.textContent.trim()));
+  if (cats.some(c => /전체/.test(c)) && cats.some(c => /클래식/.test(c))) ok('분류 필터 칩'); else bad('분류 칩', new Error(cats.join('|')));
+  await p.click('#catBar button[data-cat="클래식"]'); await p.waitForTimeout(120);
+  const only = await p.$$eval('.entry-title', els => els.map(e => e.textContent));
+  if (JSON.stringify(only) === JSON.stringify(['소나타'])) ok('분류로 필터'); else bad('분류 필터', new Error(JSON.stringify(only)));
+  await p.click('#catBar button[data-cat=""]'); await p.waitForTimeout(80);
+
   if (!errs.length) ok('심각한 JS 오류 없음'); else bad('JS 오류', new Error(errs.slice(0, 2).join(' | ')));
 } catch (e) { bad('E2E', e); }
 
