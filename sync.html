@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>전체 동기화 · 브로가드 뮤직 랩</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root { --ink:#22303c; --ink-soft:#5c6b78; --brass:#b08a2e; --brass-deep:#8a6a1c; --paper:#faf7f0; --card:#fff; --line:#e5ddcc; --ok:#2f7d4f; --err:#a33c2e; --teal:#1f9aa8; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif; line-height:1.55; }
+  header { text-align:center; padding:22px 16px 6px; }
+  header h1 { margin:0; font-size:1.4rem; color:var(--brass-deep); }
+  header p { margin:5px 0 0; font-size:.82rem; color:var(--ink-soft); }
+  main { max-width:720px; margin:0 auto; padding:14px 16px 70px; display:flex; flex-direction:column; gap:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .card h2 { font-size:.98rem; font-weight:800; color:var(--brass-deep); margin:0 0 10px; }
+  .row { display:flex; flex-wrap:wrap; gap:9px; align-items:center; }
+  button { font:inherit; font-size:.84rem; font-weight:700; cursor:pointer; background:var(--ink); color:#f3efe4; border:0; border-radius:9px; padding:10px 16px; }
+  button.brass { background:var(--brass-deep); } button.alt { background:#eee7d6; color:var(--ink); } button.ghost { background:transparent; color:var(--ink-soft); border:1px solid var(--line); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .note { font-size:.8rem; color:var(--ink-soft); } .ok { color:var(--ok); font-weight:700; } .err { color:var(--err); font-weight:700; }
+  ul.items { list-style:none; margin:6px 0 0; padding:0; }
+  ul.items li { display:flex; justify-content:space-between; gap:8px; padding:7px 2px; border-bottom:1px dashed var(--line); font-size:.88rem; }
+  ul.items li b { font-weight:800; } .sz { color:var(--ink-soft); font-size:.78rem; font-variant-numeric:tabular-nums; }
+  a.back { color:var(--brass-deep); font-weight:700; text-decoration:none; font-size:.85rem; }
+  footer { text-align:center; font-size:.72rem; color:#b6ae9c; padding:16px; }
+  code { background:#f3ecda; border-radius:5px; padding:1px 5px; font-size:.85em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>☁️ 전체 동기화</h1>
+  <p>모든 도구의 저장 내용(악보집·스튜디오 패턴·연구소 등)을 <b>파일 하나</b>로 모든 기기에 공유합니다</p>
+  <p style="margin-top:6px"><a class="back" href="index.html">← 뮤직 랩으로</a></p>
+</header>
+<main>
+  <div class="card">
+    <h2>📦 이 기기에 저장된 내용</h2>
+    <ul class="items" id="summary"></ul>
+    <p class="note" id="summaryNote" style="margin-top:8px"></p>
+  </div>
+
+  <div class="card">
+    <h2>☁️ 구글 드라이브로 동기화</h2>
+    <div id="driveSetup" class="note" style="display:none">구글 로그인 설정이 필요합니다(관리자에게 문의).</div>
+    <div id="driveActions" class="row" style="display:none">
+      <button id="btnConnect" class="brass">🔗 구글 계정 연결</button>
+      <button id="btnSave" class="alt" disabled>⬆ 전체 저장</button>
+      <button id="btnLoad" class="alt" disabled>⬇ 전체 불러오기</button>
+      <span id="driveStatus" class="note"></span>
+    </div>
+    <p class="note" style="margin-top:10px">🔒 <b>drive.file</b> 권한 — 이 앱이 만든 <b>파일 하나(브로가드-뮤직랩.json)</b>만 접근합니다.<br>
+      ⬆ 저장 = 이 기기 내용을 드라이브에 올림 · ⬇ 불러오기 = <b>드라이브 내용으로 이 기기를 맞춤(덮어씀)</b></p>
+  </div>
+
+  <div class="card">
+    <h2>💾 파일로 백업(오프라인)</h2>
+    <div class="row">
+      <button id="btnExport" class="ghost">⬇ 파일로 저장</button>
+      <button id="btnImport" class="ghost">⬆ 파일에서 복원</button>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+      <span id="fileStatus" class="note"></span>
+    </div>
+  </div>
+</main>
+<footer>Broguard Music Lab · 전체 동기화 · 개인 소장용 · 파일 하나로 모든 기기 동기화</footer>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var DRIVE_CLIENT_ID = '689939121662-l559rk8ilf7qvcfrht1vscfso7mo52e2.apps.googleusercontent.com';
+  var DRIVE_FILE = '브로가드-뮤직랩.json', driveToken = null, tokenClient = null;
+  var LABELS = {
+    broguard_library: '📚 내 악보집', abclab_store_v4: '🎼 악보연구소 (스타일·베이스·코드)',
+    broguard_studio_pats_v1: '🎛️ 스튜디오 패턴', broguard_sm_plan: '🎬 송메이커 곡 설계',
+    broguard_sm_midi: '🎬 송메이커 반주(MIDI)', broguard_lab_abc: '🎼 연구소 작업물',
+    broguard_lab_lyrics: '✍️ 가사', broguard_drum_abc: '🥁 드럼 패턴', broguard_tab_abc: '🎸 타브 입력',
+    broguard_expand_seed: '🌱 확장 시드'
+  };
+  function fmtSize(s) { var n = (s || '').length; return n > 1024 ? (n / 1024).toFixed(1) + ' KB' : n + ' B'; }
+  function libraryCount() { try { var o = JSON.parse(localStorage.getItem('broguard_library') || ''); return (o && o.entries) ? o.entries.length : (Array.isArray(o) ? o.length : 0); } catch (e) { return 0; } }
+  function renderSummary() {
+    var box = $('summary'), keys = [];
+    for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+    keys.sort();
+    if (!keys.length) { box.innerHTML = '<li class="note">아직 저장된 내용이 없습니다.</li>'; $('summaryNote').textContent = ''; return; }
+    box.innerHTML = keys.map(function (k) {
+      var label = LABELS[k] || k;
+      if (k === 'broguard_library') label += ' <b>(' + libraryCount() + '곡)</b>';
+      return '<li><span>' + label + '</span><span class="sz">' + fmtSize(localStorage.getItem(k)) + '</span></li>';
+    }).join('');
+    $('summaryNote').textContent = '총 ' + keys.length + '개 항목 — 이 전부가 파일 하나로 동기화됩니다.';
+  }
+  // 전체 localStorage ↔ 객체
+  function collectAll() { var d = {}; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); d[k] = localStorage.getItem(k); } return { app: 'broguard-lab-sync', v: 1, data: d }; }
+  function restoreAll(obj) { if (!obj || !obj.data) return 0; var n = 0; Object.keys(obj.data).forEach(function (k) { try { localStorage.setItem(k, obj.data[k]); n++; } catch (e) {} }); return n; }
+  function payload() { return JSON.stringify(collectAll(), null, 2); }
+  function parsePayload(txt) { try { var o = JSON.parse(txt); if (o && o.data && typeof o.data === 'object') return o; } catch (e) {} return null; }
+
+  // ── 드라이브 ──
+  function setDrive(m, e) { $('driveStatus').innerHTML = m ? '<span class="' + (e ? 'err' : 'ok') + '">' + m + '</span>' : ''; }
+  function initDrive() {
+    if (!DRIVE_CLIENT_ID) { $('driveSetup').style.display = ''; return; }
+    var t = 0;
+    (function wait() {
+      if (window.google && google.accounts && google.accounts.oauth2) {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: DRIVE_CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.file',
+          callback: function (r) { if (r && r.access_token) { driveToken = r.access_token; $('btnSave').disabled = $('btnLoad').disabled = false; setDrive('연결됨 ✓', false); } else setDrive('연결이 취소되었습니다.', true); }
+        });
+        $('driveActions').style.display = '';
+      } else if (t++ < 40) setTimeout(wait, 150);
+      else { $('driveActions').style.display = ''; setDrive('구글 로그인 모듈을 불러오지 못했습니다.', true); }
+    })();
+  }
+  function connect() { if (!tokenClient) { setDrive('준비 중…', true); return; } tokenClient.requestAccessToken({ prompt: driveToken ? '' : 'consent' }); }
+  async function api(url, opts) { opts = opts || {}; opts.headers = opts.headers || {}; opts.headers['Authorization'] = 'Bearer ' + driveToken; var r = await fetch(url, opts); if (r.status === 401) { driveToken = null; $('btnSave').disabled = $('btnLoad').disabled = true; throw new Error('로그인이 만료되었습니다. 다시 연결하세요.'); } if (!r.ok) throw new Error('드라이브 오류(' + r.status + ')'); return r; }
+  async function findId() { var r = await api('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent("name='" + DRIVE_FILE + "' and trashed=false") + '&fields=files(id,name)'); var j = await r.json(); return (j.files && j.files[0]) ? j.files[0].id : null; }
+  async function driveSave() {
+    if (!driveToken) { connect(); return; }
+    try {
+      setDrive('전체 저장 중…', false);
+      var id = await findId(), body = payload();
+      if (id) await api('https://www.googleapis.com/upload/drive/v3/files/' + id + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: body });
+      else {
+        var bd = 'bnd' + (self.crypto && crypto.randomUUID ? crypto.randomUUID() : Math.floor(performance.now()));
+        var mp = '--' + bd + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name: DRIVE_FILE }) + '\r\n--' + bd + '\r\nContent-Type: application/json\r\n\r\n' + body + '\r\n--' + bd + '--';
+        await api('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + bd }, body: mp });
+      }
+      setDrive('드라이브에 전체 저장됨 ✓', false);
+    } catch (e) { setDrive('저장 실패: ' + e.message, true); }
+  }
+  async function driveLoad() {
+    if (!driveToken) { connect(); return; }
+    if (!confirm('드라이브 내용으로 이 기기를 맞춥니다. 이 기기의 같은 항목은 덮어써집니다. 계속할까요?')) return;
+    try {
+      setDrive('전체 불러오는 중…', false);
+      var id = await findId();
+      if (!id) { setDrive('드라이브에 저장된 백업이 없습니다. 먼저 "전체 저장"을 해보세요.', true); return; }
+      var r = await api('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media');
+      var obj = parsePayload(await r.text());
+      if (!obj) { setDrive('백업 파일을 읽을 수 없습니다.', true); return; }
+      var n = restoreAll(obj);
+      renderSummary();
+      setDrive(n + '개 항목을 불러왔습니다 ✓ · 각 도구를 새로고침하면 반영됩니다', false);
+    } catch (e) { setDrive('불러오기 실패: ' + e.message, true); }
+  }
+  $('btnConnect').addEventListener('click', connect);
+  $('btnSave').addEventListener('click', driveSave);
+  $('btnLoad').addEventListener('click', driveLoad);
+
+  // ── 파일 백업 ──
+  $('btnExport').addEventListener('click', function () {
+    var blob = new Blob([payload()], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = '브로가드-뮤직랩-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+    $('fileStatus').innerHTML = '<span class="ok">저장했습니다 ✓</span>';
+  });
+  $('btnImport').addEventListener('click', function () { $('importFile').click(); });
+  $('importFile').addEventListener('change', function () {
+    var f = this.files && this.files[0]; this.value = ''; if (!f) return;
+    if (!confirm('파일 내용으로 이 기기를 맞춥니다(같은 항목 덮어씀). 계속할까요?')) return;
+    var r = new FileReader();
+    r.onload = function () { var obj = parsePayload(String(r.result)); if (!obj) { $('fileStatus').innerHTML = '<span class="err">읽을 수 없는 파일입니다.</span>'; return; } var n = restoreAll(obj); renderSummary(); $('fileStatus').innerHTML = '<span class="ok">' + n + '개 항목 복원 ✓ (각 도구 새로고침)</span>'; };
+    r.readAsText(f);
+  });
+
+  renderSummary();
+  initDrive();
+})();
+</script>
+</body>
+</html>
