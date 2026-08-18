@@ -72,6 +72,18 @@
     </div>
   </div>
 
+  <div class="card" id="importReview" style="display:none; border-color:var(--teal)">
+    <h2 style="color:var(--teal)">🎼 불러올 악보 확인 <span id="importCount" class="note" style="font-weight:400"></span></h2>
+    <p class="note">아래 악보들을 불러옵니다. <b>분류를 확인/변경</b>한 뒤 「불러오기 확정」을 누르세요. 각 항목의 ✕로 뺄 수 있어요.</p>
+    <label class="fld" style="max-width:200px; margin:8px 0">분류 <select id="importCat" style="font:inherit; font-size:.88rem; padding:8px 10px; border:1px solid var(--line); border-radius:9px; background:#fffdf8"></select></label>
+    <ol id="importList" style="max-height:230px; overflow:auto; margin:6px 0; padding-left:20px; font-size:.88rem"></ol>
+    <div class="row">
+      <button id="btnImportConfirm" class="brass">✅ 불러오기 확정</button>
+      <button id="btnImportCancel" class="ghost">취소</button>
+      <span id="importStatus" class="note"></span>
+    </div>
+  </div>
+
   <div class="card">
     <div class="row" style="justify-content:space-between">
       <h2 style="margin:0">📖 목록 <span id="count" class="count"></span></h2>
@@ -244,14 +256,14 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
       html += '<div class="grp" id="grp-' + k + '"><div class="grp-head">' + k + '</div>';
       arr.forEach(function (e) {
         html += '<div class="entry" data-id="' + e.id + '">' +
-          '<div class="entry-head"><span class="cat-badge">' + LibraryCore.normCat(e.cat) + '</span><span class="entry-title"></span><span class="entry-meta">' + fmtDate(e.added) + '</span><span class="note">▾</span></div>' +
+          '<div class="entry-head"><span class="cat-badge">' + LibraryCore.normCat(e.cat) + '</span><span class="entry-title"></span><span class="entry-meta">' + fmtDate(e.added) + '</span>' +
+          '<button data-act="del" class="danger" style="padding:4px 9px" title="삭제">🗑</button><span class="note">▾</span></div>' +
           '<div class="entry-body"><div class="sheet" id="sheet-' + e.id + '"></div>' +
           '<div class="row" style="margin-top:9px">' +
           '<button data-act="play" class="brass">▶ 재생</button>' +
           '<button data-act="stop" class="alt">■ 정지</button>' +
           '<button data-act="tab" class="alt">🎸 타브로</button>' +
           '<button data-act="edit" class="ghost">✎ 수정</button>' +
-          '<button data-act="del" class="danger">🗑 삭제</button>' +
           '</div></div></div>';
       });
       html += '</div>';
@@ -342,22 +354,50 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
     };
     r.readAsText(f);
   });
-  // ── ABC 파일 불러오기(여러 개 · 다중 곡 지원) ──
+  // ── ABC 파일 불러오기(여러 개 · 다중 곡) → 확인 단계 후 저장 ──
+  var pendingImport = [];
+  LibraryCore.CATS.forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = c; $('importCat').appendChild(o); });
+  function renderImportReview() {
+    $('importCount').textContent = '(' + pendingImport.length + '곡)';
+    $('importList').innerHTML = pendingImport.map(function (t, i) {
+      return '<li style="margin:2px 0"><button data-rm="' + i + '" class="danger" style="padding:1px 7px; margin-right:6px" title="제외">✕</button><span></span></li>';
+    }).join('');
+    // 제목은 textContent로 이스케이프
+    Array.prototype.forEach.call($('importList').querySelectorAll('li > span'), function (s, i) { s.textContent = pendingImport[i].title || '(제목 없음)'; });
+    $('importReview').style.display = pendingImport.length ? '' : 'none';
+    if (!pendingImport.length) { $('importStatus').textContent = ''; }
+  }
   $('btnImportAbc').addEventListener('click', function () { $('importAbcFile').click(); });
   $('importAbcFile').addEventListener('change', function () {
     var files = [].slice.call(this.files || []); this.value = ''; if (!files.length) return;
-    var cat = LibraryCore.normCat($('cat').value), pending = files.length, total = 0;
+    var pending = files.length;
+    pendingImport = [];
     files.forEach(function (f) {
       var r = new FileReader();
       r.onload = function () {
         var name = (f.name || '악보').replace(/\.(abc|txt)$/i, '');
-        LibraryCore.splitAbcTunes(String(r.result), name).forEach(function (t) {
-          if (t.abc) { entries.push({ id: newId(), title: t.title, abc: t.abc, cat: cat, added: Date.now() }); total++; }
-        });
-        if (--pending === 0) { save(); render(); setStatus(total + '곡(ABC 파일) 불러왔습니다 ✓ · 분류는 「' + cat + '」로 지정됨(수정 가능)'); }
+        LibraryCore.splitAbcTunes(String(r.result), name).forEach(function (t) { if (t.abc) pendingImport.push(t); });
+        if (--pending === 0) {
+          if (!pendingImport.length) { setStatus('파일에서 악보를 찾지 못했습니다.', true); return; }
+          $('importCat').value = LibraryCore.normCat($('cat').value);
+          renderImportReview();
+          $('importReview').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
       };
       r.readAsText(f);
     });
+  });
+  $('importList').addEventListener('click', function (ev) {
+    var rm = ev.target.closest('button[data-rm]'); if (!rm) return;
+    pendingImport.splice(+rm.getAttribute('data-rm'), 1); renderImportReview();
+  });
+  $('btnImportCancel').addEventListener('click', function () { pendingImport = []; renderImportReview(); });
+  $('btnImportConfirm').addEventListener('click', function () {
+    if (!pendingImport.length) return;
+    var cat = LibraryCore.normCat($('importCat').value), n = 0;
+    pendingImport.forEach(function (t) { entries.push({ id: newId(), title: t.title, abc: t.abc, cat: cat, added: Date.now() }); n++; });
+    pendingImport = []; renderImportReview(); save(); render();
+    setStatus(n + '곡 불러와 저장했습니다 ✓ · 분류 「' + cat + '」');
   });
 
   // ── 구글 드라이브 동기화 (drive.appdata: 앱 전용 숨김 파일 1개) ──

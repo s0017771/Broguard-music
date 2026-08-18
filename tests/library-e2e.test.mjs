@@ -72,6 +72,26 @@ try {
   if (JSON.stringify(only) === JSON.stringify(['소나타'])) ok('분류로 필터'); else bad('분류 필터', new Error(JSON.stringify(only)));
   await p.click('#catBar button[data-cat=""]'); await p.waitForTimeout(80);
 
+  // ABC 파일 불러오기 → 확인 단계(바로 저장 안 됨) → 확정
+  const before = await p.$$eval('.entry-title', els => els.length);
+  await p.setInputFiles('#importAbcFile', { name: 'test.abc', mimeType: 'text/plain', buffer: Buffer.from('X:1\nT:재즈테스트\nK:C\nCDEF|') });
+  await p.waitForTimeout(200);
+  const reviewOn = await p.$eval('#importReview', e => getComputedStyle(e).display !== 'none');
+  const midCount = await p.$$eval('.entry-title', els => els.length);
+  if (reviewOn && midCount === before) ok('ABC 불러오기 확인 단계(즉시 저장 안 함)'); else bad('불러오기 확인단계', new Error('review=' + reviewOn + ' count=' + midCount + '/' + before));
+  await p.selectOption('#importCat', '재즈');
+  await p.click('#btnImportConfirm'); await p.waitForTimeout(200);
+  const afterCount = await p.$$eval('.entry-title', els => els.length);
+  const jazzBadge = await p.$$eval('.cat-badge', els => els.map(e => e.textContent).filter(t => t === '재즈').length);
+  if (afterCount === before + 1 && jazzBadge >= 1) ok('확정 후 저장 + 지정 분류(재즈)'); else bad('확정 저장', new Error('count=' + afterCount + ' jazz=' + jazzBadge));
+
+  // 목록 줄에서 바로 삭제(펼치지 않고)
+  p.once('dialog', d => d.accept());
+  await p.click('.entry[data-id] .entry-head button[data-act="del"]');
+  await p.waitForTimeout(150);
+  const afterDel = await p.$$eval('.entry-title', els => els.length);
+  if (afterDel === afterCount - 1) ok('목록 줄에서 바로 삭제'); else bad('줄 삭제', new Error('남은 ' + afterDel));
+
   if (!errs.length) ok('심각한 JS 오류 없음'); else bad('JS 오류', new Error(errs.slice(0, 2).join(' | ')));
 } catch (e) { bad('E2E', e); }
 
