@@ -689,6 +689,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       <button id="arrangeBtn2" class="btn-ink" type="button" title="레이어 버튼 활성화">&#127929; 재분석</button>
       <button id="expandBtn" class="btn-ghost" type="button" title="이 곡을 32마디로 확장 (확장실로 이동)">&#11088; 32마디로 확장 &rarr;</button>
       <button id="saveBtn" class="btn-ghost">.abc 저장</button>
+      <button id="saveLibBtn" class="btn-brass" type="button" title="이 곡을 내 악보집 목록에 저장">&#128218; 악보집에 저장</button>
       <button id="transDownBtn" class="btn-ghost" title="반음 내림">&#9837; &minus;1</button>
       <button id="transUpBtn" class="btn-ghost" title="반음 올림">&#9839; +1</button>
     </div>
@@ -2630,6 +2631,23 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       : "<span style='color:#a33c2e'>재생기(html-midi-player)를 불러오지 못했습니다 — 인터넷 연결 시 재생됩니다. '재생'(기본음)은 항상 동작합니다.</span>";
   });
   saveBtn.addEventListener("click", saveAbc);
+  // 📚 현재 악보를 '내 악보집' 목록에 저장(파일 하나로 관리 · 전체 동기화 대상)
+  $("saveLibBtn").addEventListener("click", function () {
+    var abc = input.value.trim();
+    if (!abc) { setStatus("저장할 악보가 없습니다.", true); return; }
+    var tm = abc.match(/^T:\s*(.+)$/m), def = tm ? tm[1].trim() : "";
+    var title = prompt("악보집에 저장할 제목:", def);
+    if (title === null) return;
+    title = (title || def || "무제").trim();
+    var K = "broguard_library", lib = null;
+    try { lib = JSON.parse(localStorage.getItem(K) || ""); } catch (e) {}
+    var entries = (lib && lib.entries) ? lib.entries : (Array.isArray(lib) ? lib : []);
+    entries.push({ id: "s" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), title: title, abc: abc, cat: "기타", added: Date.now() });
+    try {
+      localStorage.setItem(K, JSON.stringify({ app: "broguard-library", v: 1, entries: entries }));
+      setStatus("'" + title + "' 악보집에 저장됨 ✓ (총 " + entries.length + "곡 · 분류는 악보집에서 변경)");
+    } catch (e) { setStatus("저장 실패(저장공간 부족). 전체 동기화/백업을 확인하세요.", true); }
+  });
   genBtn.addEventListener("click", fullGenerate);
   $("genPopBtn").addEventListener("click", composePopSong);
   regenMelodyBtn.addEventListener("click", regenMelody);
