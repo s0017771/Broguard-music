@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 악보집 · 브로가드 뮤직 랩</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js"></script>
+<style>
+  :root { --ink:#22303c; --ink-soft:#5c6b78; --brass:#b08a2e; --brass-deep:#8a6a1c; --paper:#faf7f0; --card:#fff; --line:#e5ddcc; --ok:#2f7d4f; --err:#a33c2e; --teal:#1f9aa8; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif; line-height:1.55; }
+  header { text-align:center; padding:22px 16px 6px; }
+  header h1 { margin:0; font-size:1.4rem; color:var(--brass-deep); }
+  header p { margin:5px 0 0; font-size:.82rem; color:var(--ink-soft); }
+  main { max-width:860px; margin:0 auto; padding:14px 16px 70px; display:flex; flex-direction:column; gap:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .card h2 { font-size:.98rem; font-weight:800; color:var(--brass-deep); margin:0 0 10px; }
+  label.fld { display:flex; flex-direction:column; gap:4px; font-size:.76rem; font-weight:700; color:var(--ink-soft); }
+  input[type=text], textarea { font:inherit; font-size:.9rem; border:1px solid var(--line); border-radius:9px; padding:9px 11px; background:#fffdf8; color:var(--ink); width:100%; }
+  textarea { min-height:120px; font-family:'D2Coding',Consolas,monospace; font-size:.82rem; resize:vertical; white-space:pre; }
+  .row { display:flex; flex-wrap:wrap; gap:9px; align-items:center; }
+  button { font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; background:var(--ink); color:#f3efe4; border:0; border-radius:9px; padding:9px 15px; }
+  button.brass { background:var(--brass-deep); } button.alt { background:#eee7d6; color:var(--ink); } button.ghost { background:transparent; color:var(--ink-soft); border:1px solid var(--line); padding:6px 11px; }
+  button.danger { background:#f4e6e2; color:var(--err); } button:disabled { opacity:.5; cursor:not-allowed; }
+  .note { font-size:.78rem; color:var(--ink-soft); } .ok { color:var(--ok); font-weight:700; } .err { color:var(--err); font-weight:700; }
+  /* 색인 */
+  #indexBar { display:flex; flex-wrap:wrap; gap:5px; }
+  #indexBar a { text-decoration:none; font-size:.82rem; font-weight:800; color:var(--brass-deep); background:#f3ecda; border:1px solid var(--line); border-radius:8px; padding:4px 10px; cursor:pointer; }
+  #indexBar a.empty { color:#cfc6b2; background:transparent; cursor:default; pointer-events:none; }
+  /* 목록 */
+  .grp { margin-top:4px; }
+  .grp-head { position:sticky; top:0; background:var(--paper); font-size:1.05rem; font-weight:900; color:var(--teal); padding:8px 2px 4px; border-bottom:2px solid var(--line); }
+  .entry { border:1px solid var(--line); border-radius:11px; margin:8px 0; overflow:hidden; background:#fffdf8; }
+  .entry-head { display:flex; align-items:center; gap:10px; padding:11px 13px; cursor:pointer; }
+  .entry-title { font-weight:800; font-size:.98rem; flex:1; }
+  .entry-meta { font-size:.72rem; color:var(--ink-soft); }
+  .entry-body { display:none; padding:6px 13px 14px; border-top:1px dashed var(--line); }
+  .entry.open .entry-body { display:block; }
+  .sheet { background:#fff; border:1px solid var(--line); border-radius:9px; padding:6px; overflow-x:auto; }
+  .empty { text-align:center; color:var(--ink-soft); font-size:.86rem; padding:26px 0; }
+  .count { font-size:.76rem; color:var(--ink-soft); font-weight:700; }
+  footer { text-align:center; font-size:.72rem; color:#b6ae9c; padding:16px; }
+  .backup { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 내 악보집</h1>
+  <p>내가 가진 악보를 ABC로 저장해 언제든 꺼내 봅니다 · 가나다 색인 · 브라우저에 보관(백업 권장)</p>
+</header>
+<main>
+  <div class="card">
+    <h2 id="formTitle">➕ 새 악보 추가</h2>
+    <div class="row" style="flex-direction:column; align-items:stretch; gap:10px">
+      <label class="fld">제목 <input type="text" id="title" placeholder="예: 나비야, Amazing Grace, 학교종"></label>
+      <label class="fld">ABC 악보 <textarea id="abc" placeholder="X:1&#10;T:나비야&#10;M:4/4&#10;L:1/4&#10;K:C&#10;G E E2 | F D D2 | C D E F | G G G2 |"></textarea></label>
+      <div class="row">
+        <button id="btnSave" class="brass">💾 저장</button>
+        <button id="btnPreview" class="alt">👁 미리보기</button>
+        <button id="btnClear" class="ghost">지우기</button>
+        <span id="formStatus" class="note"></span>
+      </div>
+      <div id="previewSheet" class="sheet" style="display:none"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">📖 목록 <span id="count" class="count"></span></h2>
+      <div class="backup">
+        <input type="text" id="search" placeholder="🔎 제목 검색" style="width:150px; font-size:.82rem; padding:6px 10px">
+        <button id="btnExport" class="ghost">⬇ 백업</button>
+        <button id="btnImport" class="ghost">⬆ 불러오기</button>
+        <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+      </div>
+    </div>
+    <div id="indexBar" style="margin:10px 0 6px"></div>
+    <div id="list"></div>
+  </div>
+</main>
+<footer>Broguard Music Lab · 내 악보집 · 악보는 이 브라우저에 저장됩니다(정기 백업 권장)</footer>
+
+<script id="library-core">
+var LibraryCore = (function () {
+  var CHO = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+  var DBL = { 'ㄲ':'ㄱ', 'ㄸ':'ㄷ', 'ㅃ':'ㅂ', 'ㅆ':'ㅅ', 'ㅉ':'ㅈ' };
+  var BASE = ['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+  // 제목 첫 글자의 색인 키(초성/영문 대문자/기타는 '#')
+  function indexKey(title) {
+    var ch = String(title || '').trim().charAt(0);
+    if (!ch) return '#';
+    var code = ch.charCodeAt(0);
+    if (code >= 0xAC00 && code <= 0xD7A3) {           // 한글 음절 → 초성
+      var c = CHO[Math.floor((code - 0xAC00) / 588)];
+      return DBL[c] || c;
+    }
+    if (CHO.indexOf(ch) >= 0) return DBL[ch] || ch;   // 자음만 입력(ㄱ)
+    if (/[A-Za-z]/.test(ch)) return ch.toUpperCase();
+    return '#';
+  }
+  function sortEntries(list) {
+    return list.slice().sort(function (a, b) {
+      return String(a.title).localeCompare(String(b.title), 'ko', { numeric: true });
+    });
+  }
+  function indexOrder() {
+    return BASE.concat('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')).concat(['#']);
+  }
+  function group(list) {
+    var sorted = sortEntries(list), g = {};
+    sorted.forEach(function (e) { var k = indexKey(e.title); (g[k] = g[k] || []).push(e); });
+    return g;
+  }
+  function serialize(list) { return JSON.stringify({ app: 'broguard-library', v: 1, entries: list }, null, 2); }
+  function parse(json) {
+    try { var o = JSON.parse(json); if (o && Array.isArray(o.entries)) return o.entries; if (Array.isArray(o)) return o; } catch (e) {}
+    return null;
+  }
+  return { indexKey: indexKey, sortEntries: sortEntries, indexOrder: indexOrder, group: group, serialize: serialize, parse: parse, BASE: BASE };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = LibraryCore;
+if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
+</script>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY = 'broguard_library';
+  var entries = load();
+  var editingId = null, synth = null;
+
+  function load() { try { var e = LibraryCore.parse(localStorage.getItem(KEY) || ''); return e || []; } catch (x) { return []; } }
+  function save() { try { localStorage.setItem(KEY, LibraryCore.serialize(entries)); } catch (x) { setStatus('저장 공간이 부족하거나 차단되었습니다. 백업으로 보관하세요.', true); } }
+  function setStatus(msg, err) { $('formStatus').innerHTML = msg ? '<span class="' + (err ? 'err' : 'ok') + '">' + msg + '</span>' : ''; }
+  function newId() { return 's' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
+
+  function renderAbcInto(elId, abc) {
+    if (!window.ABCJS) { $(elId).innerHTML = '<p class="note">악보 라이브러리를 불러오지 못했습니다(인터넷 연결 필요). ABC 텍스트는 저장됩니다.</p>'; return null; }
+    try { return ABCJS.renderAbc(elId, abc, { responsive: 'resize', add_classes: true })[0]; }
+    catch (e) { $(elId).innerHTML = '<p class="err">악보를 그릴 수 없습니다: ' + e.message + '</p>'; return null; }
+  }
+  function stopPlay() { if (synth) { try { synth.stop(); } catch (e) {} synth = null; } }
+  async function play(visual) {
+    if (!window.ABCJS || !ABCJS.synth || !visual) { alert('이 환경에서는 재생을 지원하지 않습니다.'); return; }
+    stopPlay();
+    try {
+      var ac = new (window.AudioContext || window.webkitAudioContext)();
+      var s = new ABCJS.synth.CreateSynth();
+      await s.init({ audioContext: ac, visualObj: visual, millisecondsPerMeasure: visual.millisecondsPerMeasure() });
+      await s.prime(); s.start(); synth = s;
+    } catch (e) { alert('재생 실패(사운드폰트 로드 문제일 수 있습니다).'); }
+  }
+
+  // ── 목록 렌더 ──
+  function render() {
+    var q = ($('search').value || '').trim().toLowerCase();
+    var shown = q ? entries.filter(function (e) { return String(e.title).toLowerCase().indexOf(q) >= 0; }) : entries;
+    $('count').textContent = '(' + entries.length + '곡' + (q ? ' · 검색 ' + shown.length : '') + ')';
+    var grouped = LibraryCore.group(shown);
+    // 색인 바
+    var order = LibraryCore.indexOrder(), present = {};
+    Object.keys(grouped).forEach(function (k) { present[k] = 1; });
+    $('indexBar').innerHTML = LibraryCore.BASE.concat('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')).concat(['#'])
+      .filter(function (k) { return present[k] || LibraryCore.BASE.indexOf(k) >= 0; })
+      .map(function (k) { return present[k] ? '<a data-jump="' + k + '">' + k + '</a>' : '<a class="empty">' + k + '</a>'; }).join('');
+    // 그룹
+    var list = $('list');
+    if (!shown.length) { list.innerHTML = '<div class="empty">' + (entries.length ? '검색 결과가 없습니다.' : '아직 저장된 악보가 없습니다. 위에서 첫 악보를 추가해보세요! 🎼') + '</div>'; return; }
+    var html = '';
+    order.forEach(function (k) {
+      var arr = grouped[k]; if (!arr || !arr.length) return;
+      html += '<div class="grp" id="grp-' + k + '"><div class="grp-head">' + k + '</div>';
+      arr.forEach(function (e) {
+        html += '<div class="entry" data-id="' + e.id + '">' +
+          '<div class="entry-head"><span class="entry-title"></span><span class="entry-meta">' + fmtDate(e.added) + '</span><span class="note">▾</span></div>' +
+          '<div class="entry-body"><div class="sheet" id="sheet-' + e.id + '"></div>' +
+          '<div class="row" style="margin-top:9px">' +
+          '<button data-act="play" class="brass">▶ 재생</button>' +
+          '<button data-act="stop" class="alt">■ 정지</button>' +
+          '<button data-act="tab" class="alt">🎸 타브로</button>' +
+          '<button data-act="edit" class="ghost">✎ 수정</button>' +
+          '<button data-act="del" class="danger">🗑 삭제</button>' +
+          '</div></div></div>';
+      });
+      html += '</div>';
+    });
+    list.innerHTML = html;
+    // 제목은 textContent로(HTML 이스케이프)
+    shown.forEach(function (e) {
+      var el = list.querySelector('.entry[data-id="' + e.id + '"] .entry-title'); if (el) el.textContent = e.title || '(제목 없음)';
+    });
+  }
+  function fmtDate(ts) { if (!ts) return ''; try { var d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate(); } catch (e) { return ''; } }
+
+  // ── 이벤트 위임 ──
+  $('list').addEventListener('click', function (ev) {
+    var head = ev.target.closest('.entry-head');
+    var actBtn = ev.target.closest('button[data-act]');
+    var entryEl = ev.target.closest('.entry'); if (!entryEl) return;
+    var id = entryEl.getAttribute('data-id');
+    var e = entries.filter(function (x) { return x.id === id; })[0]; if (!e) return;
+    if (actBtn) {
+      var act = actBtn.getAttribute('data-act');
+      if (act === 'play') { var v = renderAbcInto('sheet-' + id, e.abc); play(v); }
+      else if (act === 'stop') stopPlay();
+      else if (act === 'tab') { try { localStorage.setItem('broguard_tab_abc', e.abc); } catch (x) {} window.open('tab.html', '_blank'); }
+      else if (act === 'edit') { editingId = id; $('title').value = e.title; $('abc').value = e.abc; $('formTitle').textContent = '✎ 악보 수정'; $('btnSave').textContent = '💾 수정 저장'; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      else if (act === 'del') { if (confirm('「' + e.title + '」 악보를 삭제할까요?')) { entries = entries.filter(function (x) { return x.id !== id; }); save(); render(); } }
+      return;
+    }
+    if (head) { // 펼치기/접기
+      entryEl.classList.toggle('open');
+      if (entryEl.classList.contains('open') && !entryEl.querySelector('#sheet-' + id + ' svg')) renderAbcInto('sheet-' + id, e.abc);
+    }
+  });
+  $('indexBar').addEventListener('click', function (ev) {
+    var a = ev.target.closest('a[data-jump]'); if (!a) return;
+    var t = $('grp-' + a.getAttribute('data-jump')); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // ── 폼 ──
+  $('btnSave').addEventListener('click', function () {
+    var title = $('title').value.trim(), abc = $('abc').value.trim();
+    if (!title) { setStatus('제목을 입력하세요.', true); return; }
+    if (!abc) { setStatus('ABC 악보를 입력하세요.', true); return; }
+    if (editingId) {
+      var e = entries.filter(function (x) { return x.id === editingId; })[0];
+      if (e) { e.title = title; e.abc = abc; }
+      editingId = null; $('formTitle').textContent = '➕ 새 악보 추가'; $('btnSave').textContent = '💾 저장';
+      setStatus('수정했습니다 ✓');
+    } else {
+      entries.push({ id: newId(), title: title, abc: abc, added: Date.now() });
+      setStatus('저장했습니다 ✓ (' + entries.length + '곡)');
+    }
+    save(); render();
+    $('title').value = ''; $('abc').value = ''; $('previewSheet').style.display = 'none';
+  });
+  $('btnPreview').addEventListener('click', function () {
+    var abc = $('abc').value.trim(); if (!abc) { setStatus('미리볼 ABC를 입력하세요.', true); return; }
+    $('previewSheet').style.display = ''; renderAbcInto('previewSheet', abc);
+  });
+  $('btnClear').addEventListener('click', function () {
+    editingId = null; $('title').value = ''; $('abc').value = ''; $('previewSheet').style.display = 'none';
+    $('formTitle').textContent = '➕ 새 악보 추가'; $('btnSave').textContent = '💾 저장'; setStatus('');
+  });
+  $('search').addEventListener('input', render);
+
+  // ── 백업/복원 ──
+  $('btnExport').addEventListener('click', function () {
+    var blob = new Blob([LibraryCore.serialize(entries)], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = '내악보집-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+  });
+  $('btnImport').addEventListener('click', function () { $('importFile').click(); });
+  $('importFile').addEventListener('change', function () {
+    var f = this.files && this.files[0]; this.value = ''; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      var incoming = LibraryCore.parse(String(r.result));
+      if (!incoming) { setStatus('불러올 수 없는 파일입니다.', true); return; }
+      var byId = {}; entries.forEach(function (e) { byId[e.id] = 1; });
+      var added = 0;
+      incoming.forEach(function (e) { if (e && e.title && e.abc) { if (!e.id || byId[e.id]) e.id = newId(); entries.push(e); added++; } });
+      save(); render(); setStatus(added + '곡 불러왔습니다 ✓');
+    };
+    r.readAsText(f);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
