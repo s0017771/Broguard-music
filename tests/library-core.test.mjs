@@ -68,3 +68,27 @@ test('serialize/parse: 왕복 보존 + 잘못된 입력 방어', () => {
   assert.equal(LibraryCore.parse('깨진문자열{'), null);
   assert.equal(LibraryCore.parse('{"foo":1}'), null);
 });
+
+test('CATS/normCat: 분류 목록과 정규화', () => {
+  assert.ok(LibraryCore.CATS.includes('클래식') && LibraryCore.CATS.includes('K-가요') && LibraryCore.CATS.includes('록'));
+  assert.equal(LibraryCore.normCat('재즈'), '재즈');
+  assert.equal(LibraryCore.normCat('없는분류'), '기타');
+  assert.equal(LibraryCore.normCat(undefined), '기타');   // 기존(분류없는) 항목
+});
+
+test('splitAbcTunes: 다중 곡(X: 블록) 분리 + T: 제목', () => {
+  const txt = 'X:1\nT:나비야\nK:C\nGEE2|\n\nX:2\nT:학교종\nK:C\nGGAA|';
+  const tunes = LibraryCore.splitAbcTunes(txt, 'file');
+  assert.equal(tunes.length, 2);
+  assert.deepEqual(tunes.map(t => t.title), ['나비야', '학교종']);
+  assert.ok(/GEE2/.test(tunes[0].abc) && /^X:1/m.test(tunes[0].abc));
+});
+
+test('splitAbcTunes: T: 없으면 파일명, X: 없으면 헤더 보강', () => {
+  const noTitle = LibraryCore.splitAbcTunes('X:1\nK:C\nCDEF|', '내파일');
+  assert.equal(noTitle[0].title, '내파일');
+  const noX = LibraryCore.splitAbcTunes('K:C\nCDEF|', '헤더없음');
+  assert.equal(noX.length, 1);
+  assert.ok(/^X:1/m.test(noX[0].abc), 'X: 헤더 보강');
+  assert.deepEqual(LibraryCore.splitAbcTunes('   ', 'x'), []);  // 빈 파일
+});
