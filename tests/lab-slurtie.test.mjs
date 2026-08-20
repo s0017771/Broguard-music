@@ -64,6 +64,24 @@ test('이미 붙임줄(-)이 있으면 중복 삽입 안 함', () => {
   assert.equal(T('(G2-G2)'), '(G2-G2)');
 });
 
+/* ── 한글 IME 전각 문자 대응(가장 흔한 실제 원인) ── */
+test('전각 괄호 （ ） 슬러도 붙임줄로 병합', () => {
+  assert.equal(T('X:1\nL:1/16\nK:C\n（G2 G2） |').split('\n').pop(), '(G2-G2) |');
+});
+
+test('전각 공백 　 이 들어간 전각 슬러도 병합', () => {
+  assert.equal(T('X:1\nL:1/16\nK:C\n（G2　G2） |').split('\n').pop(), '(G2-G2) |');
+});
+
+test('전각/유니코드 대시(－ — –)를 붙임줄 - 로 정규화', () => {
+  assert.equal(T('X:1\nL:1/16\nK:C\nG2－G2 |').split('\n').pop(), 'G2-G2 |');
+  assert.equal(T('X:1\nL:1/16\nK:C\nG2—G2 |').split('\n').pop(), 'G2-G2 |');
+});
+
+test('전각 괄호라도 서로 다른 음은 병합하지 않음', () => {
+  assert.equal(T('X:1\nL:1/16\nK:C\n（G2 A2） |').split('\n').pop(), '(G2 A2) |');
+});
+
 /* ── MIDI 경로(좋은 소리로 / 사운드폰트)도 한 음으로 이어져야 함 ── */
 const HEAD = 'X:1\nM:4/4\nL:1/16\nQ:1/4=120\nK:C\n';
 
