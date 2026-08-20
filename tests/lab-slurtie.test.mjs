@@ -63,3 +63,25 @@ test('헤더 줄(T:, K: 등)은 절대 변형하지 않음', () => {
 test('이미 붙임줄(-)이 있으면 중복 삽입 안 함', () => {
   assert.equal(T('(G2-G2)'), '(G2-G2)');
 });
+
+/* ── MIDI 경로(좋은 소리로 / 사운드폰트)도 한 음으로 이어져야 함 ── */
+const HEAD = 'X:1\nM:4/4\nL:1/16\nQ:1/4=120\nK:C\n';
+
+test('parseABC: 같은 음 슬러를 정규화하면 한 음(합산 길이)으로 병합', () => {
+  const merged = AbcMidi.parseABC(T(HEAD + '(G2 G2) |')).voices['1'].events.filter(e => e.type === 'note');
+  const single = AbcMidi.parseABC(HEAD + 'G4 |').voices['1'].events.filter(e => e.type === 'note');
+  assert.equal(merged.length, 1, '두 음이 하나로 병합');
+  assert.equal(merged[0].dur, single[0].dur, 'G4(한 음)와 같은 길이');
+});
+
+test('abcToMidi: 같은 음 슬러가 G4(한 음)와 동일한 MIDI를 만든다', () => {
+  const slur = AbcMidi.abcToMidi(HEAD + '(G2 G2) z8 |');
+  const one = AbcMidi.abcToMidi(HEAD + 'G4 z8 |');
+  assert.deepEqual([...slur], [...one], '슬러 병합 결과가 한 음 악보와 바이트까지 동일');
+});
+
+test('abcToMidi: 서로 다른 음의 슬러는 병합하지 않음(두 음 유지)', () => {
+  const twoDiff = AbcMidi.abcToMidi(HEAD + '(G2 A2) z8 |');
+  const oneNote = AbcMidi.abcToMidi(HEAD + 'G4 z8 |');
+  assert.notDeepEqual([...twoDiff], [...oneNote], '다른 음 슬러는 한 음이 되면 안 됨');
+});

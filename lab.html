@@ -215,7 +215,8 @@ var AbcMidi = (function () {
 
   function abcToMidi(text, opts) {
     opts = opts || {};
-    var song = parseABC(text);
+    var song = parseABC(slurSameToTie(text));   // 같은 음 슬러(이음줄)를 붙임줄로 정규화 → MIDI에서도 한 음으로 이어짐
+
     var Lq = (song.unit || 1 / 8) * 4;                 // L-단위 하나의 4분음표 길이
     var bpm = opts.tempoBpm || song.tempoBpm || 120;
     var voices = song.voiceOrder.length ? song.voiceOrder : ['1'];
