@@ -519,6 +519,19 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   .qe-actions { display: flex; gap: 8px; margin-top: 12px; }
   .qe-actions button { flex: 1; padding: 12px; font-size: .92rem; font-weight: 700;
     border-radius: 9px; cursor: pointer; border: none; font-family: inherit; }
+  .lib-search { width: 100%; padding: 10px 12px; font-size: .95rem; border: 2px solid var(--brass);
+    border-radius: 9px; background: var(--paper); color: var(--ink); margin-bottom: 10px; }
+  .lib-list { list-style: none; max-height: 46vh; overflow-y: auto; margin: 0; padding: 0;
+    border: 1px solid var(--line); border-radius: 10px; }
+  .lib-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 11px 13px; background: var(--card); border: none; border-bottom: 1px solid var(--line);
+    cursor: pointer; font-family: inherit; color: var(--ink); }
+  .lib-item:last-child { border-bottom: none; }
+  .lib-item:hover { background: #f3ead3; }
+  .lib-item .t { font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-item .c { font-size: .74rem; color: var(--brass-deep); background: var(--paper);
+    border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; flex: 0 0 auto; }
+  .lib-empty { padding: 22px 12px; text-align: center; color: var(--ink-soft); font-size: .9rem; }
 </style>
 </head>
 <body>
@@ -717,6 +730,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       <button id="expandBtn" class="btn-ghost" type="button" title="이 곡을 32마디로 확장 (확장실로 이동)">&#11088; 32마디로 확장 &rarr;</button>
       <button id="saveBtn" class="btn-ghost">.abc 저장</button>
       <button id="saveLibBtn" class="btn-brass" type="button" title="이 곡을 내 악보집 목록에 저장">&#128218; 악보집에 저장</button>
+      <button id="loadLibBtn" class="btn-ghost" type="button" title="내 악보집에 저장한 곡을 골라 불러오기">&#128218; 악보집에서 불러오기</button>
       <button id="transDownBtn" class="btn-ghost" title="반음 내림">&#9837; &minus;1</button>
       <button id="transUpBtn" class="btn-ghost" title="반음 올림">&#9839; +1</button>
     </div>
@@ -760,6 +774,18 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     <div class="qe-actions">
       <button type="button" id="qeCancel" class="btn-ghost">취소</button>
       <button type="button" id="qeOk" class="btn-brass">확인 &amp; 재생</button>
+    </div>
+  </div>
+</div>
+
+<div id="libModal" class="qe-overlay" style="display:none;">
+  <div class="qe-box" style="max-width:480px;">
+    <div class="qe-title">&#128218; 악보집에서 불러오기</div>
+    <p class="qe-hint">저장한 곡을 골라 악보연구소로 불러옵니다. 불러오면 지금 입력창의 내용이 바뀌니, 필요하면 먼저 저장해 두세요.</p>
+    <input type="text" id="libSearch" class="lib-search" placeholder="제목으로 검색…" spellcheck="false" autocomplete="off">
+    <ul id="libList" class="lib-list"></ul>
+    <div class="qe-actions">
+      <button type="button" id="libCancel" class="btn-ghost">닫기</button>
     </div>
   </div>
 </div>
@@ -2675,6 +2701,55 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       setStatus("'" + title + "' 악보집에 저장됨 ✓ (총 " + entries.length + "곡 · 분류는 악보집에서 변경)");
     } catch (e) { setStatus("저장 실패(저장공간 부족). 전체 동기화/백업을 확인하세요.", true); }
   });
+
+  // 📚 악보집에서 불러오기 — 저장한 곡을 골라 악보연구소로 가져오기
+  function libEntries() {
+    var lib = null;
+    try { lib = JSON.parse(localStorage.getItem("broguard_library") || ""); } catch (e) {}
+    return (lib && lib.entries) ? lib.entries : (Array.isArray(lib) ? lib : []);
+  }
+  function renderLibList(filter) {
+    var ul = $("libList"), entries = libEntries();
+    var q = (filter || "").trim().toLowerCase();
+    if (q) entries = entries.filter(function (e) { return String(e.title || "").toLowerCase().indexOf(q) >= 0; });
+    ul.innerHTML = "";
+    if (!entries.length) {
+      var li = document.createElement("li");
+      li.className = "lib-empty";
+      li.textContent = q ? "검색 결과가 없습니다." : "아직 저장된 악보가 없습니다. '악보집에 저장'으로 먼저 담아보세요.";
+      ul.appendChild(li);
+      return;
+    }
+    entries.slice().sort(function (a, b) { return (b.added || 0) - (a.added || 0); }).forEach(function (e) {
+      var li = document.createElement("li");
+      var btn = document.createElement("button");
+      btn.type = "button"; btn.className = "lib-item";
+      var t = document.createElement("span"); t.className = "t"; t.textContent = e.title || "무제";
+      var c = document.createElement("span"); c.className = "c"; c.textContent = e.cat || "기타";
+      btn.appendChild(t); btn.appendChild(c);
+      btn.addEventListener("click", function () { loadLibEntry(e); });
+      li.appendChild(btn); ul.appendChild(li);
+    });
+  }
+  function openLibPicker() {
+    $("libSearch").value = "";
+    renderLibList("");
+    $("libModal").style.display = "flex";
+    setTimeout(function () { try { $("libSearch").focus(); } catch (e) {} }, 30);
+  }
+  function closeLibPicker() { $("libModal").style.display = "none"; }
+  function loadLibEntry(e) {
+    if (!e || !e.abc) return;
+    input.value = e.abc;
+    closeLibPicker();
+    render();
+    setStatus("'" + (e.title || "무제") + "' 악보집에서 불러왔어요 ✓ — 미리듣기·수정·저장 모두 가능합니다.");
+  }
+  $("loadLibBtn").addEventListener("click", openLibPicker);
+  $("libCancel").addEventListener("click", closeLibPicker);
+  $("libSearch").addEventListener("input", function () { renderLibList(this.value); });
+  $("libModal").addEventListener("click", function (ev) { if (ev.target === this) closeLibPicker(); });
+
   genBtn.addEventListener("click", fullGenerate);
   $("genPopBtn").addEventListener("click", composePopSong);
   regenMelodyBtn.addEventListener("click", regenMelody);
