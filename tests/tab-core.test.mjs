@@ -433,8 +433,8 @@ test('convert+bass: 코드 없으면 자동 코드 삽입 후 베이스 생성',
   const bassNotes = res.events.filter(e => e.type === 'note' && e.bass);
   assert.ok(bassNotes.length > 0);
   for (const e of bassNotes) assert.ok(e.frets.some(f => f.string <= 2));
-  // 자동 코드 심볼이 타브 헤더에 표시됨
-  assert.ok(res.tab.includes('자동 코드'));
+  // 자동 코드 심볼이 타브 헤더에 표시됨(자동 추정 표기)
+  assert.ok(res.tab.includes('자동 추정'));
 });
 
 test('convert+bass: 코드가 이미 있으면 자동 코드로 덮어쓰지 않음', () => {
@@ -451,4 +451,74 @@ test('convert+bass: 자동 코드 + A단조 멜로디도 정상 동작', () => {
   assert.ok(res.ok && res.autoChordApplied);
   assert.equal(res.autoChords[0], 'Am'); // 첫 마디 A-C-E → Am
   for (const e of res.events) if (e.type === 'note') for (const f of e.frets) assert.ok(f.fret >= 0 && f.fret <= 15);
+});
+
+/* ===================== §2 자동 편곡(조옮김) + §5.3 코드 이동 ===================== */
+test('transposeChordSym: 루트만 이동하고 품질(7·m 등)은 유지', () => {
+  assert.equal(TabCore.transposeChordSym('C', 2, false), 'D');
+  assert.equal(TabCore.transposeChordSym('Am', 3, false), 'Cm');
+  assert.equal(TabCore.transposeChordSym('G7', 5, false), 'C7');
+  assert.equal(TabCore.transposeChordSym('Fmaj7', 2, false), 'Gmaj7');
+  assert.equal(TabCore.transposeChordSym('C', 0, false), 'C'); // 이동 0이면 그대로
+});
+
+test('transposeChordSym: 슬래시 베이스도 함께 이동', () => {
+  assert.equal(TabCore.transposeChordSym('D/F#', 2, false), 'E/G#');
+  assert.equal(TabCore.transposeChordSym('C/E', 5, false), 'F/A');
+});
+
+test('transposeChordSym: useFlats면 플랫 표기로 이동', () => {
+  assert.equal(TabCore.transposeChordSym('C', 1, true), 'Db');
+  assert.equal(TabCore.transposeChordSym('C', 1, false), 'C#');
+});
+
+test('scoreShift: 로우 포지션(55~69)에 들어오는 이동을 최고로 평가', () => {
+  const key = TabCore.parseKey('C');
+  const high = [79, 81, 83]; // 너무 높음
+  const good = TabCore.scoreShift(-24, high, key, 15); // -2옥타브 → 55,57,59
+  const bad = TabCore.scoreShift(0, high, key, 15);
+  assert.ok(good > bad, '창 안에 들어오는 이동 점수가 더 높아야 함');
+});
+
+test('chooseShift: 높은 멜로디를 연주 가능한 창으로 끌어내림', () => {
+  const key = TabCore.parseKey('C');
+  const midis = [79, 81, 83, 84]; // G5~C6, 표준 기타로는 높음
+  const sh = TabCore.chooseShift(midis, key, 15);
+  const lo = Math.min(...midis) + sh, hi = Math.max(...midis) + sh;
+  assert.ok(lo >= 55 && hi <= 71, `창 안: lo=${lo} hi=${hi}`);
+});
+
+test('convert(arrange=auto): 리포트에 조옮김·카포 정보와 이동된 코드 표기', () => {
+  const res = TabCore.convert('X:1\nM:4/4\nL:1/8\nK:Eb\n"Eb"e2 e2 f2 g2 | "Bb"b2 a2 g2 f2 |', { arrange: 'auto' });
+  assert.ok(res.ok);
+  assert.equal(res.arrange, true);
+  assert.ok(res.report, '리포트 객체 존재');
+  assert.equal(res.report.fromKey, 'Eb');
+  assert.ok(res.tab.includes('조옮김'), '헤더에 조옮김 표기');
+  assert.ok(res.tab.includes('카포'), '헤더에 카포 표기');
+  // 프렛은 카포 없이(개방 튜닝) 배치되므로 0~maxFret 범위
+  for (const e of res.events) if (e.type === 'note') for (const f of e.frets) assert.ok(f && f.fret >= 0 && f.fret <= 15);
+});
+
+test('convert(arrange=off): 조를 바꾸지 않고 코드도 그대로(원조 유지)', () => {
+  const res = TabCore.convert('X:1\nM:4/4\nL:1/8\nK:C\n"C"G2 G2 A2 A2 | "G7"G2 E2 D2 E2 |', { arrange: 'off' });
+  assert.ok(res.ok);
+  assert.ok(!res.arrange, 'arrange=off는 편곡 안 함');
+  // 코드 심볼이 원본 그대로 유지
+  const syms = res.events.filter(e => e.type === 'note' && e.chordSym).map(e => e.chordSym);
+  assert.ok(syms.includes('C') && syms.includes('G7'), '코드가 이동 없이 유지');
+});
+
+test('validateAndFix: 줄 충돌 시 해당 자리 베이스를 자동 생략', () => {
+  // 멜로디와 베이스가 같은 줄을 쓰도록 강제된 상황을 검증 함수에 직접 투입
+  const events = [{
+    type: 'note', frets: [
+      { string: 5, fret: 3 },            // 멜로디(1번줄)
+      { string: 5, fret: 0, isBass: true } // 베이스도 1번줄 → 충돌
+    ], bass: { pitchClass: 4 }
+  }];
+  const r = TabCore.validateAndFix(events);
+  assert.equal(r.fixed, 1);
+  assert.equal(events[0].bass, null, '충돌 베이스는 제거');
+  assert.ok(!events[0].frets.some(f => f.isBass), '베이스 프렛 제거');
 });

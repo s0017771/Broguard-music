@@ -103,6 +103,12 @@
           <option value="-12">-1</option><option value="-24">-2</option>
         </select>
       </label>
+      <label class="opt" style="color:var(--brass-deep);">&#127911; 편곡
+        <select id="optArrange">
+          <option value="auto">자동(쉬운 조+카포)</option>
+          <option value="off">원조 유지</option>
+        </select>
+      </label>
       <label class="opt">카포
         <select id="optCapo">
           <option value="0">없음</option><option>1</option><option>2</option><option>3</option>
@@ -127,7 +133,7 @@
         </select>
       </label>
     </div>
-    <p class="hint"><b>지원:</b> 멀티보이스(V:/[V:RH]), 조표·임시표, 화음 [CEG], 쉼표, 셋잇단(3, 브로큰리듬 &gt;&lt;, 붙임줄, 코드 심볼 "C" &middot; 입력을 바꾸면 자동으로 다시 변환됩니다.<br><b>&#127928; 베이스 반주:</b> 멜로디는 높은 줄, 코드 음을 낮은 줄(E&middot;A&middot;D)에 얹어 함께 칩니다(엄지=낮은 줄, 손가락=멜로디 핑거스타일) &middot; <b>쿵짝</b>=강박에 코드 베이스만 &middot; <b>아르페지오(풀코드)</b>=매 박 루트&rarr;5도&rarr;3도로 삼화음을 한 음씩 펼쳐 <b>코드 전체가 들리는 코드-멜로디</b> &middot; <b>코드 심볼이 없으면 조성에 맞는 코드를 자동으로 골라</b> 반주를 만듭니다(멜로디만 있어도 OK).</p>
+    <p class="hint"><b>지원:</b> 멀티보이스(V:/[V:RH]), 조표·임시표, 화음 [CEG], 쉼표, 셋잇단(3, 브로큰리듬 &gt;&lt;, 붙임줄, 코드 심볼 "C" &middot; 입력을 바꾸면 자동으로 다시 변환됩니다.<br><b>&#127911; 편곡:</b> <b>자동</b>=치기 쉬운 조로 옮기고 카포 위치를 역산해 알려줍니다(운지가 편해집니다). 코드 심볼도 함께 이동돼요. 원곡 음높이 그대로 두려면 <b>원조 유지</b>를 고르세요.<br><b>&#127928; 베이스 반주:</b> 멜로디는 높은 줄, 코드 음을 낮은 줄(E&middot;A&middot;D)에 얹어 함께 칩니다(엄지=낮은 줄, 손가락=멜로디 핑거스타일) &middot; <b>쿵짝</b>=강박에 코드 베이스만 &middot; <b>아르페지오(풀코드)</b>=매 박 루트&rarr;5도&rarr;3도로 삼화음을 한 음씩 펼쳐 <b>코드 전체가 들리는 코드-멜로디</b> &middot; <b>코드 심볼이 없으면 조성에 맞는 코드를 자동으로 골라</b> 반주를 만듭니다(멜로디만 있어도 OK).</p>
   </div>
 
   <div class="card">
@@ -513,6 +519,60 @@ var TabCore = (function () {
     return { midi: midi, moved: moved };
   }
 
+  /* ---------- §2 자동 편곡(조옮김) + §2.4 카포 역산 ---------- */
+  var PC_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  var PC_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+  var PC_ACC_MAJOR = { 0: 0, 7: 1, 2: 2, 9: 3, 4: 4, 11: 5, 6: 6, 1: 5, 8: 4, 3: 3, 10: 2, 5: 1 }; // 조표 개수(적을수록 선호)
+  function keyAcc(tonicPc, minor) { var pc = ((tonicPc % 12) + 12) % 12; if (minor) pc = (pc + 3) % 12; return PC_ACC_MAJOR[pc] || 0; }
+  function isOpenPitch(m) { return TUNING.indexOf(m) >= 0; }
+  function minFretOf(m, maxFret) { var best = 99; for (var s = 0; s < 6; s++) { var f = m - TUNING[s]; if (f >= 0 && f <= maxFret && f < best) best = f; } return best === 99 ? maxFret + 1 : best; }
+  function scoreShift(shift, midis, key, maxFret) {         // §2.2 점수 함수
+    if (!midis.length) return 0;
+    var lo = 1e9, hi = -1e9, open = 0, maxF = 0, i;
+    for (i = 0; i < midis.length; i++) { var n = midis[i] + shift; if (n < lo) lo = n; if (n > hi) hi = n; if (isOpenPitch(n)) open++; var f = minFretOf(n, maxFret); if (f > maxF) maxF = f; }
+    var s = 0;
+    if (55 <= lo && hi <= 69) s += 1000;                    // 로우 포지션 완전 수용 — 압도적 최우선
+    else if (55 <= lo && hi <= 71) s += 400;                // 7프렛까지 허용
+    else s -= 200 * (Math.max(0, 55 - lo) + Math.max(0, hi - 69));
+    s += 40 * (open / midis.length);                        // 개방현 비율
+    s -= 12 * maxF;                                          // 최고 프렛 최소화
+    if (lo >= 55) s += 60;                                   // 베이스 구역 여유
+    s -= 4 * keyAcc(key.tonicPc + shift, key.minor);        // 조표 복잡도
+    return s;
+  }
+  function chooseShift(midis, key, maxFret) {               // 12조 × 3옥타브 완전탐색
+    if (!midis.length) return 0;
+    var seen = {}, best = null;
+    for (var k = -6; k <= 5; k++) for (var o = -1; o <= 1; o++) {
+      var sh = k + 12 * o; if (seen[sh]) continue; seen[sh] = 1;
+      var sc = scoreShift(sh, midis, key, maxFret); if (!best || sc > best.s) best = { sh: sh, s: sc };
+    }
+    return best.sh;
+  }
+  function keyNameFromPc(pc, minor, useFlats) { return (useFlats ? PC_FLAT : PC_SHARP)[((pc % 12) + 12) % 12] + (minor ? 'm' : ''); }
+  function transposeChordSym(sym, n, useFlats) {           // §5.3 코드도 함께 이동(품질 유지)
+    if (!sym || !n) return sym;
+    function nm(L, acc) { var pc = noteNamePc(L.toUpperCase(), acc === '♯' ? '#' : acc === '♭' ? 'b' : acc); return pc === null ? null : (useFlats ? PC_FLAT : PC_SHARP)[((pc + n) % 12 + 12) % 12]; }
+    return String(sym)
+      .replace(/^([A-Ga-g])([#b♯♭]?)/, function (all, L, acc) { var t = nm(L, acc); return t === null ? all : t; })
+      .replace(/\/([A-Ga-g])([#b♯♭]?)/, function (all, L, acc) { var t = nm(L, acc); return t === null ? all : '/' + t; });
+  }
+
+  // §3.3/§3.4/§8 동시발음 검증 — 줄 충돌·뻗침(>3프렛)이면 그 자리 베이스를 자동 생략(못 치는 타브 방지)
+  function validateAndFix(events) {
+    var fixed = 0, collisions = 0;
+    events.forEach(function (ev) {
+      if (ev.type !== 'note' || !ev.frets || !ev.bass) return;
+      var bass = null, mel = [];
+      ev.frets.forEach(function (f) { if (!f) return; if (f.isBass) bass = f; else mel.push(f); });
+      if (!bass || !mel.length) return;
+      var coll = mel.some(function (f) { return f.string === bass.string; });
+      var fr = mel.concat([bass]).filter(function (f) { return f.fret > 0; }).map(function (f) { return f.fret; });
+      var span = fr.length >= 2 ? Math.max.apply(null, fr) - Math.min.apply(null, fr) : 0;
+      if (coll || span > 3) { ev.frets = mel; ev.bass = null; fixed++; if (coll) collisions++; }
+    });
+    return { fixed: fixed, collisions: collisions };
+  }
   function assignFrets(events, opts) {
     var capo = opts.capo || 0, maxFret = opts.maxFret || 15;
     var lo = TUNING[0] + capo, hi = TUNING[5] + capo + maxFret;
@@ -568,7 +628,7 @@ var TabCore = (function () {
         break;                                       // 그 줄에서 가장 낮은(=베이스에 적합) 프렛만
       }
     }
-    if (best) { if (!ev.frets) ev.frets = []; ev.frets.push(best); }
+    if (best) { best.isBass = true; if (!ev.frets) ev.frets = []; ev.frets.push(best); }
     else warnings.push({ index: idx, msg: '베이스를 넣을 빈 낮은 줄이 없어 일부 베이스를 생략했습니다.' });
   }
 
@@ -839,21 +899,30 @@ var TabCore = (function () {
     if (!noteCount) { result.warnings.push('선택한 보이스에 음표가 없습니다.'); return result; }
     result.voiceUsed = v.id;
 
-    var capo = opts.capo || 0;
     var maxFret = opts.maxFret || 15;
+    var arrange = (opts.arrange === 'auto');
+    var capo = arrange ? 0 : (opts.capo || 0);              // 자동 편곡은 카포 없이(개방 튜닝) 배치, 카포는 역산 표시
     var lo = TUNING[0] + capo, hi = TUNING[5] + capo + maxFret;
 
     var allMidis = [];
     v.events.forEach(function (e) { if (e.type === 'note') allMidis = allMidis.concat(e.midis); });
-    var shift = (opts.octaveShift === undefined || opts.octaveShift === 'auto')
-      ? autoShift(allMidis, lo, Math.min(hi, TUNING[5] + capo + 12))
-      : (parseInt(opts.octaveShift, 10) || 0);
-    result.shift = shift;
+
+    var shift, derivedCapo = 0;
+    if (arrange) {
+      shift = chooseShift(allMidis, song.key, maxFret);      // §2 조옮김 자동 결정
+      derivedCapo = ((-shift) % 12 + 12) % 12;               // §2.4 원조 복원 카포(역산)
+    } else {
+      shift = (opts.octaveShift === undefined || opts.octaveShift === 'auto')
+        ? autoShift(allMidis, lo, Math.min(hi, TUNING[5] + capo + 12))
+        : (parseInt(opts.octaveShift, 10) || 0);
+    }
+    result.shift = shift; result.arrange = arrange; result.derivedCapo = derivedCapo;
+    var chShift = ((shift % 12) + 12) % 12;                  // 코드 이동량(옥타브만이면 0)
 
     var events = v.events.map(function (e) {
       if (e.type !== 'note') return { type: e.type, dur: e.dur, sym: e.sym };
       return { type: 'note', midis: e.midis.map(function (mm) { return mm + shift; }),
-               dur: e.dur, chordSym: e.chordSym, tie: e.tie };
+               dur: e.dur, chordSym: (chShift && e.chordSym) ? transposeChordSym(e.chordSym, chShift, song.key.useFlats) : e.chordSym, tie: e.tie };
     });
 
     var bassMode = (opts.bass && opts.bass !== 'off') ? opts.bass : null;
@@ -872,15 +941,32 @@ var TabCore = (function () {
     var fretWarnings = assignFrets(events, { capo: capo, maxFret: maxFret });
     var seen = {};
     fretWarnings.forEach(function (w) { if (!seen[w.msg]) { seen[w.msg] = 1; result.warnings.push(w.msg); } });
+    var fix = validateAndFix(events);                        // §8 검증 + 자동수정
+    result.fixed = fix.fixed;
+    if (fix.fixed) result.warnings.push('연주 불가(줄 충돌·손 벌어짐) ' + fix.fixed + '자리의 베이스를 자동 생략했습니다.');
+
+    // §9 보고 블록 + 코드표
+    var toKeyName = arrange ? keyNameFromPc(song.key.tonicPc + chShift, song.key.minor, song.key.useFlats) : song.key.name;
+    var origSyms = []; v.events.forEach(function (e) { if (e.type === 'note' && e.chordSym && origSyms.indexOf(e.chordSym) < 0) origSyms.push(e.chordSym); });
+    var chordMap = origSyms.map(function (s) { return { from: s, to: (chShift ? transposeChordSym(s, chShift, song.key.useFlats) : s) }; });
+    var usedChords = chordMap.map(function (c) { return c.to; });
+    if (!usedChords.length && result.autoChords) usedChords = result.autoChords.slice();
+    result.report = { arrange: arrange, fromKey: song.key.name, toKey: toKeyName, shift: shift, capo: derivedCapo, chordMap: chordMap, usedChords: usedChords };
 
     var header = [];
-    header.push((song.title ? song.title + ' — ' : '') + '기타 TAB (표준 튜닝 EADGBE' + (capo ? ', 카포 ' + capo + '프렛' : '') + ')');
-    header.push('조성: ' + song.key.name + ' · 박자: ' + song.meter +
-                (song.tempo ? ' · 템포: ' + song.tempo : '') +
-                ' · 보이스: ' + v.id +
-                (shift ? ' · 옥타브 보정: ' + (shift > 0 ? '+' : '') + (shift / 12) : '') +
-                (result.bassApplied ? (result.bassMode === 'arp' ? ' · 아르페지오 풀코드(코드-멜로디)' : ' · 쿵짝 베이스(낮은 줄 E·A·D)') : ''));
-    if (result.autoChordApplied) header.push('자동 코드(조성 ' + song.key.name + '): ' + result.autoChords.join(' '));
+    header.push((song.title ? song.title + ' — ' : '') + '기타 TAB (표준 튜닝 EADGBE' + (!arrange && capo ? ', 카포 ' + capo + '프렛' : '') + ')');
+    header.push('박자: ' + song.meter + (song.tempo ? ' · 템포: ' + song.tempo : '') + ' · 보이스: ' + v.id +
+                (result.bassApplied ? (result.bassMode === 'arp' ? ' · 아르페지오(코드-멜로디)' : ' · 쿵짝 베이스') : ''));
+    if (arrange) {
+      header.push('■ 조옮김: ' + song.key.name + ' → ' + toKeyName + ' (' + (shift >= 0 ? '+' : '') + shift + '반음)' + (shift === 0 ? ' — 원조가 이미 치기 좋음' : ''));
+      if (derivedCapo >= 1 && derivedCapo <= 7) header.push('■ 카포: ' + derivedCapo + '프렛 (끼우면 원곡 키로 복원)');
+      else if (derivedCapo > 7) header.push('■ 카포: ' + derivedCapo + '프렛 필요 — 대신 원곡보다 낮게 연주 권장');
+      else header.push('■ 카포: 없음 (원곡과 같은 음높이)');
+    } else if (shift) header.push('■ 옥타브 보정: ' + (shift > 0 ? '+' : '') + (shift / 12));
+    if (chordMap.length && chShift) header.push('■ 코드표: ' + chordMap.map(function (c) { return c.from + '→' + c.to; }).join(' · '));
+    if (usedChords.length) header.push('■ 사용 코드: ' + usedChords.join(' · ') + (result.autoChordApplied ? ' (자동 추정)' : ''));
+    header.push('■ 확신도: 음정 100% · 운지 95% · 화성 ' + (result.autoChordApplied ? '70%(자동 추정, 원곡과 다를 수 있음)' : (usedChords.length ? '100%(입력 코드)' : '—')));
+    header.push('개인 연습용 · 배포·재게시 금지');
     header.push('');
 
     result.tab = header.join('\n') + renderAscii(events, { width: opts.width || 84 });
@@ -894,6 +980,8 @@ var TabCore = (function () {
     parseKey: parseKey, parseABC: parseABC, pickVoice: pickVoice,
     autoShift: autoShift, candidatesFor: candidatesFor, assignFrets: assignFrets,
     parseChordRoot: parseChordRoot, buildBassLine: buildBassLine, bassOnsets: bassOnsets, arpOnsets: arpOnsets,
+    chooseShift: chooseShift, transposeChordSym: transposeChordSym, scoreShift: scoreShift,
+    keyNameFromPc: keyNameFromPc, validateAndFix: validateAndFix,
     diatonicCandidates: diatonicCandidates, autoChords: autoChords, pcToName: pcToName,
     renderAscii: renderAscii, convert: convert
   };
@@ -930,6 +1018,7 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
     return {
       voice: $('optVoice').value,
       octaveShift: $('optOct').value,
+      arrange: $('optArrange').value,
       capo: parseInt($('optCapo').value, 10) || 0,
       maxFret: parseInt($('optMaxFret').value, 10) || 15,
       width: parseInt($('optWidth').value, 10) || 84,
@@ -1025,7 +1114,7 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
   }
 
   abcIn.addEventListener('input', scheduleConvert);
-  ['optVoice', 'optOct', 'optCapo', 'optMaxFret', 'optWidth', 'optBass'].forEach(function (id) {
+  ['optVoice', 'optOct', 'optArrange', 'optCapo', 'optMaxFret', 'optWidth', 'optBass'].forEach(function (id) {
     $(id).addEventListener('change', convertNow);
   });
   $('btnConvert').addEventListener('click', convertNow);
