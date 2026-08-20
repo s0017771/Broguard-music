@@ -389,39 +389,53 @@ var AbcMidi = (function () {
     return { abc: header + bodyClean + ' |]', tempoBpm: mid.tempoBpm, timeSig: ts, ppq: ppq, L: L, noteCount: notes.length };
   }
 
-  /* ── 같은 음 슬러(이음줄) → 붙임줄로 정규화 ──
-     사용자가 실제 악보의 이음줄 곡선을 괄호 ( )로 옮겨 적으면 abcjs는 슬러로 해석해
-     '두 번' 소리 냅니다. 같은 음을 잇는 슬러는 음악적으로 언제나 붙임줄(타이)이므로,
-     슬러 안에서 인접한 같은 음 사이의 공백 1칸을 '-'로 바꿔 소리를 하나로 이어줍니다.
-     길이(문자 수)를 보존해 하이라이트/커서 위치 매핑이 어긋나지 않게 합니다.
-     서로 다른 음의 슬러(프레이징)는 건드리지 않습니다. */
-  function tieSamePitchRun(inner) {
-    var noteRe = /[_^=]*[A-Ga-g][,']*[0-9]*\/*[0-9]*/g, toks = [], m;
-    while ((m = noteRe.exec(inner))) { if (m[0]) toks.push({ i: m.index, len: m[0].length, key: m[0].replace(/[0-9\/]+$/, '') }); }
-    if (toks.length < 2) return inner;
-    var out = '', prevEnd = 0, prev = null;
-    for (var k = 0; k < toks.length; k++) {
-      var t = toks[k], gap = inner.slice(prevEnd, t.i);
-      if (prev && prev.key === t.key && /^ +$/.test(gap)) out += '-' + gap.slice(1); // 공백 1칸만 '-'로(길이 보존)
-      else out += gap;
-      out += inner.slice(t.i, t.i + t.len);
-      prevEnd = t.i + t.len; prev = t;
-    }
-    return out + inner.slice(prevEnd);
-  }
-  // 한글 IME가 만드는 전각 문자(（ ） 　 －)를 반각으로 정규화 — abcjs가 슬러·붙임줄로 인식하게. 1:1 치환이라 길이 보존.
+  // 한글 IME가 만드는 전각 문자(（ ） 　 －)를 반각으로 정규화 — abcjs가 슬러·붙임줄로 인식하게. 1:1 치환.
   function normalizeAbcPunct(line) {
     return line
       .replace(/（/g, '(').replace(/）/g, ')')
       .replace(/　/g, ' ')                      // 전각 공백 → 반각
       .replace(/[‐-―−－]/g, '-'); // 각종 대시(－ — – 등) → 붙임줄 '-'
   }
+
+  /* ── 같은 음 슬러(이음줄) → 붙임줄로 정규화 ──
+     사용자가 실제 악보의 이음줄 곡선을 괄호 ( )로 옮겨 적으면 abcjs는 슬러로 해석해 '두 번' 소리 냅니다.
+     같은 음을 잇는 슬러는 음악적으로 언제나 붙임줄(타이)이므로, 슬러 안에서 인접한 '같은 음' 사이에
+     붙임줄 '-'를 넣어 소리를 하나로 이어줍니다. 마디선 · 코드기호("Em") · 줄바꿈 · 주석줄을 건너뛰어도
+     이어지며(예: "E2(G2 |\"Em\"G8)"), 쉼표(z)가 끼면 잇지 않습니다. 서로 다른 음의 슬러(프레이징)는 그대로 둡니다. */
   function slurSameToTie(abc) {
-    return String(abc).split('\n').map(function (line) {
-      if (/^[A-Za-z]:/.test(line) || /^%/.test(line)) return line;   // 헤더·지시문 제외
+    var lines = String(abc).split('\n');
+    var out = [];                 // 조각들을 담아 마지막에 join
+    var slurDepth = 0;            // 슬러 () 깊이 — 마디·주석·줄바꿈을 건너 유지
+    var prev = null;             // { key, insertAt } 직전 음(붙임줄 넣을 위치)
+    var noteRe = /^[_^=]*[A-Ga-g][,']*[0-9]*\/*[0-9]*/;
+    for (var li = 0; li < lines.length; li++) {
+      if (li > 0) out.push('\n');
+      var line = lines[li];
+      // 헤더(K:,T: 등)·주석(%)줄은 그대로 두고 슬러/음 파싱에서 제외(단, 슬러 상태·직전 음은 유지 → 주석 건너뛴 타이 허용)
+      if (/^[A-Za-z]:/.test(line) || /^\s*%/.test(line)) { out.push(line); continue; }
       line = normalizeAbcPunct(line);
-      return line.replace(/\((?!\d)([^()]*)\)/g, function (all, inner) { return '(' + tieSamePitchRun(inner) + ')'; });
-    }).join('\n');
+      var i = 0, n = line.length;
+      while (i < n) {
+        var c = line[i];
+        if (c === '"') { var j = line.indexOf('"', i + 1); if (j < 0) j = n - 1; out.push(line.slice(i, j + 1)); i = j + 1; continue; }   // 코드기호
+        if (c === '{') { var j2 = line.indexOf('}', i + 1); if (j2 < 0) j2 = n - 1; out.push(line.slice(i, j2 + 1)); i = j2 + 1; continue; } // 꾸밈음
+        if (c === '!' || c === '+') { var j3 = line.indexOf(c, i + 1); if (j3 < 0) j3 = n - 1; out.push(line.slice(i, j3 + 1)); i = j3 + 1; continue; } // 장식기호
+        if (c === '(') { if (!/\d/.test(line[i + 1] || '')) slurDepth++; out.push(c); i++; prev = null; continue; }   // 슬러 경계에선 직전 음 초기화(슬러 밖 음과 잇지 않기). ( + 숫자 = 셋잇단
+        if (c === ')') { if (slurDepth > 0) slurDepth--; out.push(c); i++; prev = null; continue; }
+        if (c === 'z' || c === 'x' || c === 'Z' || c === 'X') { out.push(c); i++; prev = null; continue; }                                  // 쉼표 → 타이 끊김
+        if (c === '-') { out.push(c); i++; prev = null; continue; }                                                                          // 이미 붙임줄 있음 → 중복 삽입 방지
+        var m = noteRe.exec(line.slice(i));
+        if (m && m[0]) {
+          var tok = m[0], key = tok.replace(/[0-9\/]+$/, '');
+          if (slurDepth > 0 && prev && prev.key === key) out.splice(prev.insertAt, 0, '-');   // 같은 음 슬러 → 직전 음 뒤에 붙임줄
+          out.push(tok);
+          prev = { key: key, insertAt: out.length };   // 다음 같은 음이 오면 여기에 '-' 삽입
+          i += tok.length; continue;
+        }
+        out.push(c); i++;   // 마디선(|)·공백 등 — 타이 사슬을 끊지 않음
+      }
+    }
+    return out.join('');
   }
 
   return { PPQ: PPQ, parseABC: parseABC, abcToMidi: abcToMidi, parseMidi: parseMidi, midiToAbc: midiToAbc, slurSameToTie: slurSameToTie };
@@ -875,6 +889,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   var renderTimer = null, litNotes = [];
   var snippetSynth = null, limitTimer = null;   // 4마디 미리듣기용
   var lastEventPos = null; /* 재생 중 마지막 음의 ABC 텍스트 위치 (퀵 편집용) */
+  var lastRenderedAbc = ""; /* 실제로 렌더/재생에 쓴 정규화 ABC (퀵 편집 좌표의 기준) */
   var cur = null; /* 현재 곡의 레이어 상태 */
 
   function setStatus(msg, isError) {
@@ -966,7 +981,8 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
       return;
     }
     try {
-      var tunes = ABCJS.renderAbc("score", AbcMidi.slurSameToTie(abc), {
+      lastRenderedAbc = AbcMidi.slurSameToTie(abc);   // 렌더·재생·퀵편집이 모두 이 정규화 문자열을 공유(좌표 일치)
+      var tunes = ABCJS.renderAbc("score", lastRenderedAbc, {
         responsive: "resize", add_classes: true, paddingleft: 8, paddingright: 8
       });
       visualObj = tunes && tunes[0] ? tunes[0] : null;
@@ -2525,7 +2541,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   var qeRange = null; /* 편집 중인 텍스트 범위 {start,end} */
   function openQuickEdit() {
     if (!lastEventPos) { setStatus("먼저 재생하다가 고치고 싶은 음에서 정지하세요.", true); return; }
-    var v = input.value;
+    var v = lastRenderedAbc || input.value;   // 하이라이트 좌표는 렌더에 쓴 정규화 문자열 기준
     var s = Math.max(0, lastEventPos.start), e = Math.min(v.length, lastEventPos.end);
     if (e <= s) { setStatus("이 위치는 수정할 수 없습니다. 입력창에서 직접 고쳐주세요.", true); return; }
     qeRange = { start: s, end: e };
@@ -2536,7 +2552,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   function closeQuickEdit() { $("qeModal").style.display = "none"; qeRange = null; }
   function applyQuickEdit() {
     if (!qeRange) { closeQuickEdit(); return; }
-    var v = input.value;
+    var v = lastRenderedAbc || input.value;   // openQuickEdit와 동일 기준 문자열
     var repl = $("qeInput").value;
     input.value = v.slice(0, qeRange.start) + repl + v.slice(qeRange.end);
     preset.value = "";
