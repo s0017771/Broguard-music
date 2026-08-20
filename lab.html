@@ -409,9 +409,17 @@ var AbcMidi = (function () {
     }
     return out + inner.slice(prevEnd);
   }
+  // 한글 IME가 만드는 전각 문자(（ ） 　 －)를 반각으로 정규화 — abcjs가 슬러·붙임줄로 인식하게. 1:1 치환이라 길이 보존.
+  function normalizeAbcPunct(line) {
+    return line
+      .replace(/（/g, '(').replace(/）/g, ')')
+      .replace(/　/g, ' ')                      // 전각 공백 → 반각
+      .replace(/[‐-―−－]/g, '-'); // 각종 대시(－ — – 등) → 붙임줄 '-'
+  }
   function slurSameToTie(abc) {
     return String(abc).split('\n').map(function (line) {
       if (/^[A-Za-z]:/.test(line) || /^%/.test(line)) return line;   // 헤더·지시문 제외
+      line = normalizeAbcPunct(line);
       return line.replace(/\((?!\d)([^()]*)\)/g, function (all, inner) { return '(' + tieSamePitchRun(inner) + ')'; });
     }).join('\n');
   }
