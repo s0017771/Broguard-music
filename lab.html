@@ -813,6 +813,21 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   </div>
 </div>
 
+<div id="saveModal" class="qe-overlay" style="display:none;">
+  <div class="qe-box" style="max-width:420px;">
+    <div class="qe-title">&#128218; 악보집에 저장</div>
+    <p class="qe-hint">제목과 분류(카테고리)를 정해 저장합니다. 분류는 나중에 악보집에서도 바꿀 수 있어요.</p>
+    <label style="display:block;font-size:.82rem;font-weight:700;color:var(--ink-soft,#46586b);margin-bottom:4px;">제목</label>
+    <input type="text" id="saveTitle" class="lib-search" spellcheck="false" autocomplete="off">
+    <label style="display:block;font-size:.82rem;font-weight:700;color:var(--ink-soft,#46586b);margin:10px 0 4px;">분류</label>
+    <select id="saveCat" class="lib-search"></select>
+    <div class="qe-actions">
+      <button type="button" id="saveCancel" class="btn-ghost">취소</button>
+      <button type="button" id="saveConfirm" class="btn-brass">저장</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   "use strict";
@@ -2710,22 +2725,37 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   });
   saveBtn.addEventListener("click", saveAbc);
   // 📚 현재 악보를 '내 악보집' 목록에 저장(파일 하나로 관리 · 전체 동기화 대상)
-  $("saveLibBtn").addEventListener("click", function () {
+  var LIB_CATS = ['클래식', '뮤지컬', '영화음악', 'K-가요', '애니메이션', '팝', '재즈', '컨트리·포크', '록', '기타'];
+  (function () { var sel = $("saveCat"); LIB_CATS.forEach(function (c) { var o = document.createElement("option"); o.value = c; o.textContent = c; sel.appendChild(o); }); })();
+  function openSaveModal() {
     var abc = input.value.trim();
     if (!abc) { setStatus("저장할 악보가 없습니다.", true); return; }
     var tm = abc.match(/^T:\s*(.+)$/m), def = tm ? tm[1].trim() : "";
-    var title = prompt("악보집에 저장할 제목:", def);
-    if (title === null) return;
-    title = (title || def || "무제").trim();
+    $("saveTitle").value = def || "";
+    $("saveModal").style.display = "flex";
+    setTimeout(function () { try { $("saveTitle").focus(); $("saveTitle").select(); } catch (e) {} }, 30);
+  }
+  function closeSaveModal() { $("saveModal").style.display = "none"; }
+  function doSave() {
+    var abc = input.value.trim();
+    if (!abc) { closeSaveModal(); return; }
+    var title = ($("saveTitle").value || "무제").trim();
+    var cat = $("saveCat").value || "기타";
     var K = "broguard_library", lib = null;
     try { lib = JSON.parse(localStorage.getItem(K) || ""); } catch (e) {}
     var entries = (lib && lib.entries) ? lib.entries : (Array.isArray(lib) ? lib : []);
-    entries.push({ id: "s" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), title: title, abc: abc, cat: "기타", added: Date.now() });
+    entries.push({ id: "s" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), title: title, abc: abc, cat: cat, added: Date.now() });
     try {
       localStorage.setItem(K, JSON.stringify({ app: "broguard-library", v: 1, entries: entries }));
-      setStatus("'" + title + "' 악보집에 저장됨 ✓ (총 " + entries.length + "곡 · 분류는 악보집에서 변경)");
+      closeSaveModal();
+      setStatus("'" + title + "' → [" + cat + "] 악보집에 저장됨 ✓ (총 " + entries.length + "곡)");
     } catch (e) { setStatus("저장 실패(저장공간 부족). 전체 동기화/백업을 확인하세요.", true); }
-  });
+  }
+  $("saveLibBtn").addEventListener("click", openSaveModal);
+  $("saveConfirm").addEventListener("click", doSave);
+  $("saveCancel").addEventListener("click", closeSaveModal);
+  $("saveModal").addEventListener("click", function (ev) { if (ev.target === this) closeSaveModal(); });
+  $("saveTitle").addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); doSave(); } });
 
   // 📚 악보집에서 불러오기 — 저장한 곡을 골라 악보연구소로 가져오기
   function libEntries() {

@@ -89,6 +89,47 @@ const LIB = {
   await page.close();
 }
 
+// 저장 시 카테고리 선택
+{
+  const page = await browser.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  try {
+    await page.goto(`${base}/lab.html`, { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => { localStorage.removeItem('broguard_library'); const t = document.getElementById('abcInput'); t.value = 'X:1\nT:테스트곡\nK:C\nC D E F|'; });
+
+    // 저장 버튼 → 모달(제목·분류) 표시
+    await page.click('#saveLibBtn');
+    await page.waitForSelector('#saveModal', { state: 'visible' });
+    assert.equal(await page.inputValue('#saveTitle'), '테스트곡', 'T:에서 제목 자동 채움');
+    const cats = await page.$$eval('#saveCat option', els => els.map(e => e.value));
+    assert.ok(cats.includes('클래식') && cats.includes('재즈') && cats.length === 10, '분류 10개 제공');
+    ok('저장하면 제목·분류를 고르는 창이 뜬다');
+
+    // 분류 선택 후 저장 → 해당 분류로 저장됨(기타 아님)
+    await page.selectOption('#saveCat', '클래식');
+    await page.click('#saveConfirm');
+    await page.waitForSelector('#saveModal', { state: 'hidden' });
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('broguard_library')).entries[0]);
+    assert.equal(saved.cat, '클래식', '선택한 분류로 저장');
+    assert.equal(saved.title, '테스트곡');
+    assert.ok(/클래식/.test(await page.textContent('#status')), '상태에 분류 표시');
+    ok('고른 분류로 저장된다(기타 고정 아님)');
+
+    // 취소하면 저장 안 됨
+    await page.click('#saveLibBtn');
+    await page.waitForSelector('#saveModal', { state: 'visible' });
+    await page.click('#saveCancel');
+    await page.waitForSelector('#saveModal', { state: 'hidden' });
+    const count = await page.evaluate(() => JSON.parse(localStorage.getItem('broguard_library')).entries.length);
+    assert.equal(count, 1, '취소 시 추가 저장 없음');
+    ok('취소하면 저장되지 않는다');
+
+    assert.equal(errors.length, 0, 'JS 오류 없음: ' + errors.join(' | '));
+    ok('페이지 JS 오류 없음(저장 분류)');
+  } catch (e) { bad('저장 카테고리', e); }
+  await page.close();
+}
+
 await browser.close();
 server.close();
 if (fail) { console.error(`\n${fail} test(s) failed`); process.exit(1); }
