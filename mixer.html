@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>곡 믹서 — 브로가드 뮤직 랩</title>
+<style>
+  :root {
+    --paper: #f3ecdd; --card: #fbf7ee; --ink: #1c2b3a; --ink-soft: #4a5a68;
+    --brass: #b5894e; --brass-deep: #8a6a3a; --line: #d8d2c4;
+    --a: #2f7d8c; --a-bg: #dcebee; --b: #b5824a; --b-bg: #f3e7d7;
+    --ok: #2e7d4f; --warn: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', '맑은 고딕', sans-serif; background: var(--paper); color: var(--ink); line-height: 1.5; }
+  header { position: relative; background: var(--ink); color: #f3efe4; padding: 24px 20px 20px; }
+  header .home { position: absolute; right: 16px; top: 16px; color: #c9c2b0; font-size: .78rem; text-decoration: none; }
+  header .home:hover { color: var(--brass); }
+  header h1 { margin: 0; font-size: 1.3rem; letter-spacing: .02em; }
+  header h1 .m { color: var(--brass); }
+  header p { margin: 5px 0 0; font-size: .82rem; color: #c9c2b0; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px 14px 60px; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .card h2 { margin: 0 0 10px; font-size: 1.02rem; }
+
+  .songs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 620px) { .songs { grid-template-columns: 1fr; } }
+  .song { border-radius: 12px; padding: 12px; border: 1px solid var(--line); }
+  .song.a { border-top: 4px solid var(--a); background: color-mix(in srgb, var(--a-bg) 55%, var(--card)); }
+  .song.b { border-top: 4px solid var(--b); background: color-mix(in srgb, var(--b-bg) 55%, var(--card)); }
+  .song .lab { font-weight: 800; font-size: .9rem; display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+  .song.a .lab { color: var(--a); } .song.b .lab { color: var(--b); }
+  .song .dot { width: 12px; height: 12px; border-radius: 3px; }
+  .song.a .dot { background: var(--a); } .song.b .dot { background: var(--b); }
+  select, textarea, input { font-family: inherit; }
+  .song select { width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; font-size: .86rem; background: #fff; color: var(--ink); margin-bottom: 7px; }
+  .song textarea { width: 100%; min-height: 96px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; font-family: 'Consolas', monospace; font-size: .82rem; background: #fffdf7; color: var(--ink); resize: vertical; }
+
+  .ratio-head { display: flex; justify-content: space-between; align-items: baseline; font-family: 'Consolas', monospace; font-weight: 700; margin-bottom: 6px; }
+  .ratio-head .pa { color: var(--a); } .ratio-head .pb { color: var(--b); }
+  .ratio-head b { font-size: 1.4rem; }
+  input[type=range] { width: 100%; height: 24px; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height: 11px; border-radius: 999px; background: linear-gradient(90deg, var(--a), var(--b)); }
+  input[type=range]::-moz-range-track { height: 11px; border-radius: 999px; background: linear-gradient(90deg, var(--a), var(--b)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); margin-top: -7px; }
+  input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .preset { font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; color: var(--ink-soft); }
+  .preset:hover { border-color: var(--brass); color: var(--brass-deep); }
+
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  button.act { padding: 11px 18px; font-size: .95rem; font-weight: 700; border-radius: 9px; border: none; cursor: pointer; font-family: inherit; }
+  .btn-go { background: var(--brass); color: #fff; } .btn-go:hover { background: var(--brass-deep); }
+  .btn-ink { background: var(--ink); color: #fff; } .btn-ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+  button.act:disabled { opacity: .5; cursor: default; }
+
+  .strip { display: flex; gap: 3px; height: 30px; margin: 4px 0 2px; }
+  .strip .bar { flex: 1; border-radius: 4px; display: grid; place-items: center; font-family: 'Consolas', monospace; font-size: .68rem; font-weight: 700; min-width: 10px; }
+  .strip .bar.A { background: var(--a-bg); color: var(--a); box-shadow: inset 0 0 0 1px var(--a); }
+  .strip .bar.B { background: var(--b-bg); color: var(--b); box-shadow: inset 0 0 0 1px var(--b); }
+  .legend { display: flex; gap: 14px; font-size: .78rem; color: var(--ink-soft); flex-wrap: wrap; margin-top: 6px; }
+  .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; vertical-align: -1px; margin-right: 4px; }
+  .legend .la { background: var(--a); } .legend .lb { background: var(--b); }
+  #resultAbc { white-space: pre-wrap; font-family: 'Consolas', monospace; font-size: .86rem; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 11px; min-height: 40px; margin-top: 10px; }
+  #staffBox { overflow-x: auto; margin-top: 10px; }
+  .warnbox { margin-top: 10px; border-radius: 8px; padding: 9px 11px; font-size: .85rem; }
+  .warnbox.ok { background: #e6f4ec; color: var(--ok); border: 1px solid #b8dcc6; }
+  .warnbox.bad { background: #fbe6e3; color: var(--warn); border: 1px solid #e8b8b0; }
+  .warnbox ul { margin: 5px 0 0; padding-left: 18px; }
+  .hint { font-size: .78rem; color: var(--ink-soft); line-height: 1.6; }
+  .hint b { color: var(--brass-deep); }
+  code { background: var(--paper); padding: 1px 5px; border-radius: 4px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="index.html">&larr; 랩 홈</a>
+  <h1>🎚️ 곡 <span class="m">믹서</span></h1>
+  <p>두 곡을 비율로 섞어 새 곡을 만들어요 · 조·박자·단위는 자동으로 A곡에 맞춥니다</p>
+</header>
+<main>
+  <div class="card">
+    <h2>1. 두 곡 고르기</h2>
+    <div class="songs">
+      <div class="song a">
+        <div class="lab"><span class="dot"></span>A 곡</div>
+        <select id="libA"><option value="">— 악보집에서 고르기 —</option></select>
+        <textarea id="abcA" placeholder="A곡 ABC 악보를 붙여넣거나 위에서 고르세요"></textarea>
+      </div>
+      <div class="song b">
+        <div class="lab"><span class="dot"></span>B 곡</div>
+        <select id="libB"><option value="">— 악보집에서 고르기 —</option></select>
+        <textarea id="abcB" placeholder="B곡 ABC 악보를 붙여넣거나 위에서 고르세요"></textarea>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:8px;">두 곡을 <b>같은 조·박자</b>로 자동 정렬한 뒤 마디를 엮어요. B곡은 A곡의 조로 옮겨집니다(코드도 함께).</p>
+  </div>
+
+  <div class="card">
+    <h2>2. 섞는 비율</h2>
+    <div class="ratio-head">
+      <span class="pa">A <b id="pa">30</b>%</span>
+      <span style="color:var(--ink-soft);font-weight:500;align-self:center;">A곡 ↔ B곡</span>
+      <span class="pb">B <b id="pb">70</b>%</span>
+    </div>
+    <input type="range" id="ratio" min="0" max="100" value="70" aria-label="섞는 비율">
+    <div class="presets">
+      <button class="preset" data-r="50">반반</button>
+      <button class="preset" data-r="70">A30·B70</button>
+      <button class="preset" data-r="30">A70·B30</button>
+    </div>
+    <div class="btn-row">
+      <button class="act btn-go" id="mixBtn">🎚️ 섞기</button>
+      <button class="act btn-ghost" id="sampleBtn">예시 채우기</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. 결과</h2>
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><i class="la"></i>A 곡 마디</span><span><i class="lb"></i>B 곡 마디</span>
+      <span style="margin-left:auto;" id="mixInfo"></span>
+    </div>
+    <div id="warn"></div>
+    <div id="resultAbc">먼저 두 곡을 넣고 ‘섞기’를 누르세요.</div>
+    <div id="staffBox"></div>
+    <div class="btn-row">
+      <button class="act btn-ink" id="copyBtn" disabled>📋 ABC 복사</button>
+      <button class="act btn-ghost" id="toLabBtn" disabled>🎼 악보연구소로 보내기</button>
+      <button class="act btn-ghost" id="toTabBtn" disabled>🎸 타브로 보내기</button>
+    </div>
+  </div>
+</main>
+
+<script id="mixer-core">
+/* MixerCore — 두 ABC 곡을 비율로 섞기 (조·박자·단위 정규화 + 마디 엮기) */
+var MixerCore = (function () {
+  "use strict";
+  var NOTE_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  var SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  var FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+  var SHARPS = ['F', 'C', 'G', 'D', 'A', 'E', 'B'], FLATS = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+  var CNT = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7, F: -1, Bb: -2, Eb: -3, Ab: -4, Db: -5, Gb: -6, Cb: -7,
+    Am: 0, Em: 1, Bm: 2, 'F#m': 3, 'C#m': 4, 'G#m': 5, 'D#m': 6, Dm: -1, Gm: -2, Cm: -3, Fm: -4, Bbm: -5, Ebm: -6 };
+
+  function keyName(str) { return String(str || 'C').trim().split(/\s+/)[0] || 'C'; }
+  function keyCount(k) { k = keyName(k); if (CNT[k] !== undefined) return CNT[k]; var b = k.replace(/(maj|major|min|minor)$/i, ''); return CNT[b] !== undefined ? CNT[b] : 0; }
+  function keyTonicPc(k) { k = keyName(k); var m = /^([A-G])([#b]?)/.exec(k); if (!m) return 0; var pc = (NOTE_PC[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + 12) % 12; if (/m(in)?$/i.test(k) && !/maj/i.test(k)) pc = (pc + 3) % 12; return pc; }
+  function keyUseFlats(k) { return keyCount(k) < 0; }
+  function keyAccMap(k) { var n = keyCount(k), map = {}, i; if (n > 0) for (i = 0; i < n; i++) map[SHARPS[i]] = 1; else for (i = 0; i < -n; i++) map[FLATS[i]] = -1; return map; }
+
+  function noteToMidi(acc, letter, oct, accMap) {
+    var up = letter === letter.toUpperCase(), L = letter.toUpperCase();
+    var midi = 60 + NOTE_PC[L] + (up ? 0 : 12);
+    midi += 12 * ((oct.match(/'/g) || []).length) - 12 * ((oct.match(/,/g) || []).length);
+    if (acc && !/=/.test(acc)) midi += (acc.match(/\^/g) || []).length - (acc.match(/_/g) || []).length;
+    else if (!acc) midi += (accMap[L] || 0);
+    return midi;
+  }
+  function midiToNote(midi, useFlats) {
+    var pc = ((midi % 12) + 12) % 12, nm = (useFlats ? FLAT : SHARP)[pc];
+    var letter = nm[0], accCh = nm.slice(1), relOct = Math.floor((midi - 60) / 12);
+    var prefix = accCh === '#' ? '^' : accCh === 'b' ? '_' : '';
+    return (relOct >= 1) ? prefix + letter.toLowerCase() + "'".repeat(relOct - 1) : prefix + letter + ",".repeat(-relOct);
+  }
+  function transposeChord(quoted, shift, useFlats) {
+    var inner = quoted.slice(1, -1);
+    function rep(all, L, ac) { var pc = (NOTE_PC[L] + (ac === '#' ? 1 : ac === 'b' ? -1 : 0) + shift) % 12; return (useFlats ? FLAT : SHARP)[((pc % 12) + 12) % 12]; }
+    inner = inner.replace(/^([A-G])([#b]?)/, function (m, L, ac) { return rep(m, L, ac); }).replace(/\/([A-G])([#b]?)/, function (m, L, ac) { return '/' + rep(m, L, ac); });
+    return '"' + inner + '"';
+  }
+  function lenValue(len) { if (!len) return 1; var m = /^(\d*)(\/*)(\d*)$/.exec(len); if (!m) return 1; var num = m[1] ? +m[1] : 1; var slashes = m[2].length; var den = m[3] ? +m[3] : (slashes ? Math.pow(2, slashes) : 1); return num / den; }
+  function lenToAbc(v) {
+    if (v === 1) return '';
+    if (Math.abs(v - Math.round(v)) < 1e-6 && v > 1) return '' + Math.round(v);
+    var den = 1, num = v;
+    for (var i = 0; i < 6 && Math.abs(num - Math.round(num)) > 1e-6; i++) { num *= 2; den *= 2; }
+    num = Math.round(num);
+    function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+    var g = gcd(num, den) || 1; num /= g; den /= g;
+    if (den === 1) return num === 1 ? '' : '' + num;
+    return (num === 1 ? '' : '' + num) + '/' + den;
+  }
+  function scaleLen(len, scale) { return lenToAbc(lenValue(len) * scale); }
+  function transposeBody(body, shift, srcKey, useFlats, lenScale) {
+    var accMap = keyAccMap(srcKey);
+    return body.replace(/"[^"]*"|![^!]*!|\{[^}]*\}|([_^=]*)([A-Ga-g])([,']*)([0-9]*\/*[0-9]*)/g,
+      function (m, acc, letter, oct, len) {
+        if (m[0] === '"') return transposeChord(m, shift, useFlats);
+        if (m[0] === '!' || m[0] === '{') return m;
+        var midi = noteToMidi(acc || '', letter, oct || '', accMap) + shift;
+        var newLen = (lenScale && lenScale !== 1) ? scaleLen(len || '', lenScale) : (len || '');
+        return midiToNote(midi, useFlats) + newLen;
+      });
+  }
+  function parseSong(abc) {
+    var lines = String(abc || '').replace(/\r/g, '').split('\n');
+    var head = { key: 'C', meter: '4/4', unit: null, tempo: '' }, bodyLines = [];
+    lines.forEach(function (ln) {
+      var h = /^([A-Za-z]):\s*(.*)$/.exec(ln);
+      if (h && /^[A-Za-z]$/.test(h[1])) {
+        if (h[1] === 'K') head.key = h[2].trim() || 'C';
+        else if (h[1] === 'M') head.meter = h[2].trim() || '4/4';
+        else if (h[1] === 'L') head.unit = h[2].trim();
+        else if (h[1] === 'Q') head.tempo = h[2].trim();
+        return;
+      }
+      if (/^\s*%/.test(ln)) return;
+      if (ln.trim()) bodyLines.push(ln);
+    });
+    var body = bodyLines.join(' ');
+    body = body.replace(/\|\s*:|:\s*\|/g, '|').replace(/\|\s*[12]/g, '|').replace(/\[[12]/g, '').replace(/::/g, '|').replace(/\|\]/g, '|').replace(/\|+/g, '|');
+    var bars = body.split('|').map(function (s) { return s.trim(); }).filter(function (s) { return s.length; });
+    if (!head.unit) head.unit = '1/8';
+    return { key: head.key, meter: head.meter, unit: head.unit, tempo: head.tempo, bars: bars };
+  }
+  function unitDen(u) { var m = /\/(\d+)/.exec(u || '1/8'); return m ? +m[1] : 8; }
+  function weave(total, aCount, phase) {
+    var out = [];
+    for (var i = 0; i < total; i++) { var k = ((i + (phase || 0)) % total + total) % total; out.push((Math.floor((k + 1) * aCount / total) > Math.floor(k * aCount / total)) ? 'A' : 'B'); }
+    return out;
+  }
+  function mix(abcA, abcB, opts) {
+    opts = opts || {};
+    var ratioB = (opts.ratioB != null) ? opts.ratioB : 70;
+    var A = parseSong(abcA), B = parseSong(abcB), warns = [];
+    if (!A.bars.length || !B.bars.length) return { ok: false, warns: ['두 곡 모두 악보 내용이 필요해요.'], abc: '' };
+    var tonicA = keyTonicPc(A.key), tonicB = keyTonicPc(B.key);
+    var shift = ((tonicA - tonicB + 12) % 12); if (shift > 6) shift -= 12;
+    var useFlats = keyUseFlats(A.key);
+    var lenScale = unitDen(B.unit) === unitDen(A.unit) ? 1 : (unitDen(B.unit) / unitDen(A.unit));
+    if (A.meter !== B.meter) warns.push('두 곡의 박자가 달라요(A ' + A.meter + ' / B ' + B.meter + ') — 마디 길이가 들쭉날쭉할 수 있어요. B곡 박자를 A곡에 맞추면 깔끔해요.');
+    var bBars = B.bars.map(function (bar) { return transposeBody(bar, shift, B.key, useFlats, lenScale); });
+    var aBars = A.bars.map(function (bar) { return transposeBody(bar, 0, A.key, useFlats, 1); });
+    var total = Math.max(aBars.length, bBars.length);
+    var aCount = Math.round(total * (100 - ratioB) / 100);
+    var pat = weave(total, aCount, 0), mixed = [];
+    for (var i = 0; i < total; i++) mixed.push((pat[i] === 'A') ? aBars[i % aBars.length] : bBars[i % bBars.length]);
+    var lines = [];
+    for (var j = 0; j < mixed.length; j += 4) lines.push(mixed.slice(j, j + 4).join(' | ') + ' |');
+    var out = lines.join('\n').replace(/\|$/, '|]');
+    var header = 'X:1\nT:곡 믹서 (A' + (100 - ratioB) + ' · B' + ratioB + ')\nM:' + A.meter + '\nL:' + A.unit + (A.tempo ? '\nQ:' + A.tempo : '') + '\nK:' + A.key + '\n';
+    return { ok: true, abc: header + out, pattern: pat, shift: shift, warns: warns, aCount: aCount, total: total, fromKey: B.key, toKey: A.key };
+  }
+  return { parseSong: parseSong, keyTonicPc: keyTonicPc, keyAccMap: keyAccMap, transposeBody: transposeBody, lenValue: lenValue, lenToAbc: lenToAbc, weave: weave, mix: mix };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = MixerCore;
+if (typeof window !== 'undefined') window.MixerCore = MixerCore;
+</script>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var last = null;
+
+  // 악보집 채우기
+  function libEntries() {
+    var lib = null;
+    try { lib = JSON.parse(localStorage.getItem('broguard_library') || ''); } catch (e) {}
+    return (lib && lib.entries) ? lib.entries : (Array.isArray(lib) ? lib : []);
+  }
+  function fillLib(sel) {
+    var entries = libEntries();
+    entries.slice().sort(function (a, b) { return (b.added || 0) - (a.added || 0); }).forEach(function (e) {
+      var o = document.createElement('option'); o.value = e.id; o.textContent = e.title || '무제'; o.dataset.abc = e.abc || ''; sel.appendChild(o);
+    });
+  }
+  fillLib($('libA')); fillLib($('libB'));
+  $('libA').addEventListener('change', function () { var o = this.selectedOptions[0]; if (o && o.dataset.abc) $('abcA').value = o.dataset.abc; });
+  $('libB').addEventListener('change', function () { var o = this.selectedOptions[0]; if (o && o.dataset.abc) $('abcB').value = o.dataset.abc; });
+
+  function setRatio() { var pB = +$('ratio').value; $('pa').textContent = 100 - pB; $('pb').textContent = pB; }
+  $('ratio').addEventListener('input', function () { setRatio(); if (last) doMix(); });
+  [].forEach.call(document.querySelectorAll('.preset'), function (b) { b.addEventListener('click', function () { $('ratio').value = b.getAttribute('data-r'); setRatio(); doMix(); }); });
+
+  function doMix() {
+    var res = MixerCore.mix($('abcA').value, $('abcB').value, { ratioB: +$('ratio').value });
+    var w = $('warn');
+    if (!res.ok) {
+      $('resultAbc').textContent = '두 곡을 모두 넣어주세요.';
+      w.className = 'warnbox bad'; w.innerHTML = (res.warns || []).join('<br>');
+      $('strip').innerHTML = ''; $('mixInfo').textContent = '';
+      $('copyBtn').disabled = $('toLabBtn').disabled = $('toTabBtn').disabled = true; last = null;
+      return;
+    }
+    last = res;
+    $('resultAbc').textContent = res.abc;
+    // 마디 띠
+    var strip = $('strip'); strip.innerHTML = '';
+    res.pattern.forEach(function (src) { var d = document.createElement('div'); d.className = 'bar ' + src; d.textContent = src; strip.appendChild(d); });
+    $('mixInfo').textContent = 'A ' + res.aCount + '마디 · B ' + (res.total - res.aCount) + '마디' + (res.shift ? ' · B곡 ' + (res.shift > 0 ? '+' : '') + res.shift + '반음 이조' : '');
+    if (res.warns.length) { w.className = 'warnbox bad'; w.innerHTML = res.warns.map(function (x) { return '<div>⚠ ' + x + '</div>'; }).join(''); }
+    else { w.className = 'warnbox ok'; w.innerHTML = '✅ ' + res.fromKey + ' → ' + res.toKey + '조로 맞춰 섞었어요.'; }
+    $('copyBtn').disabled = $('toLabBtn').disabled = $('toTabBtn').disabled = false;
+    renderStaff(res.abc);
+  }
+  $('mixBtn').addEventListener('click', doMix);
+
+  $('sampleBtn').addEventListener('click', function () {
+    $('abcA').value = 'X:1\nT:A 잔잔한 곡\nM:4/4\nL:1/8\nQ:1/4=84\nK:C\n"C"C2 E2 G2 c2 | "Am"A2 c2 e2 A2 | "F"F2 A2 c2 f2 | "G"G2 B2 d2 G2 |';
+    $('abcB').value = 'X:1\nT:B 신나는 곡\nM:4/4\nL:1/8\nK:G\n"G"G2 B2 d2 g2 | "D"D2 ^F2 A2 d2 | "Em"E2 G2 B2 e2 | "C"c2 e2 G2 c2 |';
+    setRatio(); doMix();
+  });
+
+  $('copyBtn').addEventListener('click', function () {
+    if (!last) return; var self = this;
+    navigator.clipboard.writeText(last.abc).then(function () { self.textContent = '✅ 복사됨!'; setTimeout(function () { self.textContent = '📋 ABC 복사'; }, 1400); }, function () {});
+  });
+  $('toLabBtn').addEventListener('click', function () { if (!last) return; try { localStorage.setItem('broguard_lab_abc', last.abc); } catch (e) {} window.open('lab.html', '_blank'); });
+  $('toTabBtn').addEventListener('click', function () { if (!last) return; try { localStorage.setItem('broguard_tab_abc', last.abc); } catch (e) {} window.open('tab.html', '_blank'); });
+
+  // abcjs 미리보기(있으면)
+  function renderStaff(abc) {
+    var box = $('staffBox');
+    if (typeof ABCJS === 'undefined') { box.innerHTML = ''; return; }
+    try { ABCJS.renderAbc(box, abc, { responsive: 'resize', staffwidth: 860 }); } catch (e) { box.innerHTML = ''; }
+  }
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js';
+  s.onload = function () { if (last) renderStaff(last.abc); };
+  document.head.appendChild(s);
+
+  setRatio();
+  if (/[?&]autotest=1/.test(location.search)) { $('sampleBtn').click(); window.__autotestDone = true; }
+})();
+</script>
+</body>
+</html>
