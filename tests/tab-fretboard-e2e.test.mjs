@@ -168,6 +168,28 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
   await page.close();
 }
 
+// ── 악보집 → '🎸 타브로' 곡 넘겨받기 ──
+{
+  const page = await browser.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  try {
+    await page.goto(`${base}/tab.html`, { waitUntil: 'domcontentloaded' });
+    // 악보집이 하는 것과 동일: broguard_tab_abc 에 곡을 담고 tab.html 다시 열기
+    await page.evaluate(() => localStorage.setItem('broguard_tab_abc', 'X:1\nT:넘겨온곡\nM:4/4\nL:1/8\nK:C\n"C"C2 E2 G2 c2 | "G"G2 E2 C4 |'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(400);
+
+    assert.ok((await page.inputValue('#abcIn')).includes('넘겨온곡'), '넘겨온 곡이 입력창에 로드');
+    assert.ok(/넘겨온곡/.test(await page.textContent('#tabOut')), '자동 변환되어 타브 표시');
+    assert.equal(await page.evaluate(() => localStorage.getItem('broguard_tab_abc')), null, '사용 후 키 제거(재방문 시 재로드 안 함)');
+    ok('악보집의 타브로 버튼이 곡을 타브 변환기로 넘긴다');
+
+    assert.equal(errors.length, 0, 'JS 오류 없음: ' + errors.join(' | '));
+    ok('페이지 JS 오류 없음(타브로 넘김)');
+  } catch (e) { bad('타브로 곡 넘김', e); }
+  await page.close();
+}
+
 await browser.close();
 server.close();
 if (fail) { console.error(`\n${fail} test(s) failed`); process.exit(1); }
