@@ -43,6 +43,19 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
     assert.equal(await page.textContent('#pa'), '50');
     ok('비율을 바꾸면 마디 배분이 실시간으로 바뀐다');
 
+    // 2.5) A리듬+B멜로디 모드 → 비율 비활성, 모든 마디 결합, 안내 문구
+    await page.click('.gran[data-g="rm"]');
+    await page.waitForTimeout(150);
+    assert.equal(await page.getAttribute('.gran[data-g="rm"]', 'aria-pressed'), 'true', 'rm 모드 눌림');
+    assert.ok(await page.$eval('#ratio', el => el.classList.contains('ratio-off')), '비율 비활성');
+    assert.equal(await page.$$eval('#strip .bar.rm', els => els.length), 4, '모든 마디 결합 셀');
+    assert.ok(/A곡 리듬.*B곡 멜로디/.test(await page.textContent('#mixInfo')), 'A리듬+B멜로디 안내');
+    assert.ok(/T:곡 믹서 \(A리듬 \+ B멜로디\)/.test(await page.textContent('#resultAbc')), '결과 제목');
+    ok('A리듬+B멜로디 모드가 모든 마디를 결합한다');
+    // 다시 마디 모드로 복귀(이후 테스트 영향 없게)
+    await page.click('.gran[data-g="bar"]');
+    await page.waitForTimeout(150);
+
     // 3) 악보연구소/타브로 보내기 → localStorage 핸드오프 설정
     await page.evaluate(() => { window.__open = window.open; window.open = () => {}; });
     await page.click('#toLabBtn');
