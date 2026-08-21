@@ -134,7 +134,7 @@
     </div>
 
     <div class="io-box">
-      <label>🎹 함께 입력 <span style="font-weight:400;color:var(--ink-soft);font-size:.8rem;">— 멜로디 칸이나 리듬 칸에 커서를 두고, 악보를 보며 <b>왼손 알파벳(멜로디)</b> + <b>오른손 숫자(리듬)</b>를 치세요. <b>스페이스=도</b>, <b>Q=마디</b>, <b>T=쉼표</b>.</span></label>
+      <label>🎹 함께 입력 <span style="font-weight:400;color:var(--ink-soft);font-size:.8rem;">— 멜로디 칸이나 리듬 칸에 커서를 두고, 악보를 보며 <b>왼손 알파벳(멜로디)</b> + <b>오른손 숫자(리듬)</b>를 치세요. <b>a=보통 도</b>, <b>스페이스=높은 도</b>, <b>Q=마디</b>, <b>T=쉼표</b>.</span></label>
       <div class="keypad">
         <div class="piano" id="piano"></div>
         <div class="kp-row" style="margin-top:10px;">
@@ -151,9 +151,9 @@
         <details style="margin-top:8px;">
           <summary style="cursor:pointer;font-weight:700;color:var(--brass-deep);font-size:.85rem;">⌨️ 전체 키보드 배치 보기</summary>
           <div style="font-size:.8rem;color:var(--ink-soft);margin-top:6px;line-height:1.7;">
-            <b>저음(왼쪽):</b> <code>z</code>솔 <code>x</code>라 <code>c</code>시(가장 낮음) · <code>a</code>도 <code>s</code>레 <code>d</code>미 <code>f</code>파 <code>w</code>솔 <code>e</code>라 <code>r</code>시<br>
-            <b>스페이스</b> = 도(보통) — <code>a</code>의 도보다 한 옥타브 위<br>
-            <b>고음(오른쪽):</b> <code>j</code>레 <code>k</code>미 <code>l</code>파 <code>u</code>솔 <code>i</code>라 <code>o</code>시 · <code>p</code>높은도 <code>m</code>높은레 <code>,</code>높은미 <code>.</code>높은파 <code>/</code>높은솔<br>
+            <b>저음(왼쪽):</b> <code>z</code>솔 <code>x</code>라 <code>c</code>시(한 옥타브 아래) · <code>a</code>도(보통·중앙) <code>s</code>레 <code>d</code>미 <code>f</code>파 <code>w</code>솔 <code>e</code>라 <code>r</code>시<br>
+            <b>스페이스</b> = 높은 도 — <code>a</code>의 보통 도보다 한 옥타브 위<br>
+            <b>고음(오른쪽):</b> <code>j</code>높은레 <code>k</code>높은미 <code>l</code>높은파 <code>u</code>높은솔 <code>i</code>높은라 <code>o</code>높은시 · <code>p</code>맨위도 <code>m</code>맨위레 <code>,</code>맨위미 <code>.</code>맨위파 <code>/</code>맨위솔<br>
             <b>리듬</b> = 숫자 <code>1</code>~<code>9</code> · <b>마디</b> = <code>Q</code> · <b>쉼표</b> = <code>T</code>
           </div>
         </details>
@@ -474,20 +474,20 @@ if (typeof window !== 'undefined') window.CombineCore = CombineCore;
     return map;
   }
 
-  // 물리 키 → 계이름 토큰 (원장님 배치: 스페이스=보통 도, a는 한 옥타브 아래 도, 좌→우 상행. u=솔)
+  // 물리 키 → 계이름 토큰 (원장님 배치: a=보통 도(중앙), 스페이스=높은 도, 좌→우 상행. u=높은 솔)
   var NOTE = {
-    'z': ',,솔', 'x': ',,라', 'c': ',,시',
-    'a': ',도', 's': ',레', 'd': ',미', 'f': ',파', 'w': ',솔', 'e': ',라', 'r': ',시',
-    ' ': '도',
-    'j': '레', 'k': '미', 'l': '파', 'u': '솔', 'i': '라', 'o': '시',
-    'p': "도'", 'm': "레'", ',': "미'", '.': "파'", '/': "솔'"
+    'z': ',솔', 'x': ',라', 'c': ',시',
+    'a': '도', 's': '레', 'd': '미', 'f': '파', 'w': '솔', 'e': '라', 'r': '시',
+    ' ': "도'",
+    'j': "레'", 'k': "미'", 'l': "파'", 'u': "솔'", 'i': "라'", 'o': "시'",
+    'p': "도''", 'm': "레''", ',': "미''", '.': "파''", '/': "솔''"
   };
-  // 피아노(음높이 순 흰건반) — z가 가장 낮음, /가 가장 높음(약 3옥타브)
+  // 피아노(음높이 순 흰건반) — z가 가장 낮음, /가 가장 높음(약 3옥타브). a=보통 도(중앙), 스페이스=높은 도
   var PIANO = [
-    { sol: '솔', tok: ',,솔', cap: 'z', cls: 'low' }, { sol: '라', tok: ',,라', cap: 'x', cls: 'low' }, { sol: '시', tok: ',,시', cap: 'c', cls: 'low' },
-    { sol: '도', tok: ',도', cap: 'a', cls: 'low' }, { sol: '레', tok: ',레', cap: 's', cls: 'low' }, { sol: '미', tok: ',미', cap: 'd', cls: 'low' }, { sol: '파', tok: ',파', cap: 'f', cls: 'low' }, { sol: '솔', tok: ',솔', cap: 'w', cls: 'low' }, { sol: '라', tok: ',라', cap: 'e', cls: 'low' }, { sol: '시', tok: ',시', cap: 'r', cls: 'low' },
-    { sol: '도', tok: '도', cap: '⎵', cls: 'mid' }, { sol: '레', tok: '레', cap: 'j', cls: 'mid' }, { sol: '미', tok: '미', cap: 'k', cls: 'mid' }, { sol: '파', tok: '파', cap: 'l', cls: 'mid' }, { sol: '솔', tok: '솔', cap: 'u', cls: 'mid' }, { sol: '라', tok: '라', cap: 'i', cls: 'mid' }, { sol: '시', tok: '시', cap: 'o', cls: 'mid' },
-    { sol: '도', tok: "도'", cap: 'p', cls: 'high' }, { sol: '레', tok: "레'", cap: 'm', cls: 'high' }, { sol: '미', tok: "미'", cap: ',', cls: 'high' }, { sol: '파', tok: "파'", cap: '.', cls: 'high' }, { sol: '솔', tok: "솔'", cap: '/', cls: 'high' }
+    { sol: '솔', tok: ',솔', cap: 'z', cls: 'low' }, { sol: '라', tok: ',라', cap: 'x', cls: 'low' }, { sol: '시', tok: ',시', cap: 'c', cls: 'low' },
+    { sol: '도', tok: '도', cap: 'a', cls: 'mid' }, { sol: '레', tok: '레', cap: 's', cls: 'mid' }, { sol: '미', tok: '미', cap: 'd', cls: 'mid' }, { sol: '파', tok: '파', cap: 'f', cls: 'mid' }, { sol: '솔', tok: '솔', cap: 'w', cls: 'mid' }, { sol: '라', tok: '라', cap: 'e', cls: 'mid' }, { sol: '시', tok: '시', cap: 'r', cls: 'mid' },
+    { sol: '도', tok: "도'", cap: '⎵', cls: 'high' }, { sol: '레', tok: "레'", cap: 'j', cls: 'high' }, { sol: '미', tok: "미'", cap: 'k', cls: 'high' }, { sol: '파', tok: "파'", cap: 'l', cls: 'high' }, { sol: '솔', tok: "솔'", cap: 'u', cls: 'high' }, { sol: '라', tok: "라'", cap: 'i', cls: 'high' }, { sol: '시', tok: "시'", cap: 'o', cls: 'high' },
+    { sol: '도', tok: "도''", cap: 'p', cls: 'high' }, { sol: '레', tok: "레''", cap: 'm', cls: 'high' }, { sol: '미', tok: "미''", cap: ',', cls: 'high' }, { sol: '파', tok: "파''", cap: '.', cls: 'high' }, { sol: '솔', tok: "솔''", cap: '/', cls: 'high' }
   ];
 
   var ac = null, keyEl = {};
