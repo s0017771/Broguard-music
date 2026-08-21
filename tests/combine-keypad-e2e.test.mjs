@@ -37,37 +37,37 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
     ok('멜로디 칸이 왼쪽, 리듬 칸이 오른쪽에 있다');
 
     // 2) 피아노 15건반 + 숫자 9개, 피아노 클릭 → 멜로디 입력
-    assert.equal(await page.$$eval('#piano .pkey', e => e.length), 15, '흰건반 15');
+    assert.equal(await page.$$eval('#piano .pkey', e => e.length), 22, '흰건반 22(약 3옥타브)');
     assert.equal(await page.$$eval('#rnums .rnum', e => e.length), 9, '리듬 숫자 9');
     await clear();
-    await page.click('#piano .pkey:nth-child(4)'); // 도
-    assert.equal(await page.inputValue('#melodyIn'), '도 ', '피아노 클릭 → 멜로디');
-    ok('피아노 15건반 · 숫자 9개, 클릭하면 멜로디에 입력된다');
+    await page.click('#piano .pkey:nth-child(11)'); // 11번째 = 스페이스 자리 = 보통 도
+    assert.equal(await page.inputValue('#melodyIn'), '도 ', '피아노 클릭 → 멜로디(보통 도)');
+    ok('피아노 22건반 · 숫자 9개, 클릭하면 멜로디에 입력된다');
 
-    // 3) 물리 키: 알파벳=멜로디, 숫자=리듬, 스페이스=도, Q=마디(둘 다), T=쉼표
+    // 3) 물리 키: 알파벳=멜로디, 숫자=리듬, 스페이스=보통도, Q=마디(둘 다), T=쉼표
     await clear();
     await page.focus('#melodyIn');
-    for (const k of ['a', 's', 'd']) await page.keyboard.press(k);  // 도 레 미
-    await page.keyboard.press('Space');                            // 도
+    for (const k of ['a', 's', 'd']) await page.keyboard.press(k);  // ,도 ,레 ,미 (a는 한 옥타브 아래)
+    await page.keyboard.press('Space');                            // 도(보통)
     for (const k of ['4', '4', '4', '4']) await page.keyboard.press(k); // 리듬으로 라우팅
     await page.keyboard.press('q');                                // 마디(둘 다)
-    await page.keyboard.press('z');                                // 낮은솔
+    await page.keyboard.press('z');                                // 가장 낮은 솔(,,솔)
     await page.keyboard.press('t');                                // 쉼표(멜로디 0)
-    await page.keyboard.press(';');                                // 솔
-    await page.keyboard.press('p');                                // 높은도
-    assert.equal(await page.inputValue('#melodyIn'), "도 레 미 도 r ,솔 0 솔 도' ", '알파벳/스페이스/Q/T/기호 매핑');
+    await page.keyboard.press('u');                                // 솔(보통)
+    await page.keyboard.press('p');                                // 높은도(도')
+    assert.equal(await page.inputValue('#melodyIn'), ",도 ,레 ,미 도 r ,,솔 0 솔 도' ", '옥타브 반영 매핑');
     assert.equal(await page.inputValue('#rhythmIn'), '4 4 4 4 r ', '숫자→리듬, Q→리듬에도 마디');
-    ok('알파벳=멜로디 · 숫자=리듬 · 스페이스=도 · Q=마디 · T=쉼표');
+    ok('알파벳=멜로디(옥타브 반영) · 숫자=리듬 · 스페이스=보통도 · Q=마디 · T=쉼표');
 
-    // 4) u 도 솔 (별칭)
+    // 4) u = 솔(보통)
     await clear(); await page.focus('#melodyIn'); await page.keyboard.press('u');
-    assert.equal(await page.inputValue('#melodyIn'), '솔 ', 'u = 솔');
-    ok('u 키도 솔로 입력된다');
+    assert.equal(await page.inputValue('#melodyIn'), '솔 ', 'u = 보통 솔');
+    ok('u 키가 보통 솔로 입력된다');
 
     // 5) 크로스 라우팅: 리듬 칸에 커서를 둬도 알파벳은 멜로디로
     await clear(); await page.focus('#rhythmIn');
     await page.keyboard.press('a'); await page.keyboard.press('2');
-    assert.equal(await page.inputValue('#melodyIn'), '도 ', '리듬 칸에서 친 알파벳 → 멜로디');
+    assert.equal(await page.inputValue('#melodyIn'), ',도 ', '리듬 칸에서 친 알파벳 → 멜로디');
     assert.equal(await page.inputValue('#rhythmIn'), '2 ', '리듬 칸에서 친 숫자 → 리듬');
     ok('어느 칸에 커서를 둬도 알파벳→멜로디, 숫자→리듬');
 
@@ -75,7 +75,7 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
     await clear(); await page.focus('#melodyIn');
     await page.keyboard.press('a'); await page.keyboard.press('s');
     await page.click('#kpBackM');
-    assert.equal(await page.inputValue('#melodyIn'), '도 ', '⌫ 멜로디 = 마지막 토큰 삭제');
+    assert.equal(await page.inputValue('#melodyIn'), ',도 ', '⌫ 멜로디 = 마지막 토큰 삭제');
     ok('⌫ 멜로디/리듬 버튼이 마지막 토큰을 지운다');
 
     assert.equal(errors.length, 0, 'JS 오류 없음: ' + errors.join(' | '));
