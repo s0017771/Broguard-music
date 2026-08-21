@@ -38,11 +38,16 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
 
     // 2) 피아노 15건반 + 숫자 9개, 피아노 클릭 → 멜로디 입력
     assert.equal(await page.$$eval('#piano .pkey', e => e.length), 22, '흰건반 22(약 3옥타브)');
-    assert.equal(await page.$$eval('#rnums .rnum', e => e.length), 9, '리듬 숫자 9');
+    assert.equal(await page.$$eval('#rnums .rnum', e => e.length), 16, '리듬 숫자 16(16분음표 대응)');
+    assert.equal(await page.$$eval('#rnums .rnum.click-only', e => e.length), 7, '10~16은 클릭 전용');
     await clear();
     await page.click('#piano .pkey:nth-child(4)'); // 4번째 = a 자리 = 보통 도(중앙)
     assert.equal(await page.inputValue('#melodyIn'), '도 ', '피아노 클릭 → 멜로디(보통 도)');
-    ok('피아노 22건반 · 숫자 9개, 클릭하면 멜로디에 입력된다');
+    // 16 버튼 클릭 → 리듬에 '16 ' 한 토큰
+    await clear();
+    await page.click('#rnums .rnum:nth-child(16)');
+    assert.equal(await page.inputValue('#rhythmIn'), '16 ', '16 클릭 → 리듬 16');
+    ok('피아노 22건반 · 리듬 16개, 클릭하면 입력된다(16 포함)');
 
     // 3) 물리 키: 알파벳=멜로디, 숫자=리듬, 스페이스=높은도, Q=마디(둘 다), T=쉼표
     await clear();

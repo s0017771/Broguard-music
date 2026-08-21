@@ -105,7 +105,9 @@
   .pkey.on .cap { color: #fff; }
   .pkey.low { background: linear-gradient(#eef1f4, #e2e8ee); }
   .pkey.high { background: linear-gradient(#fdf6ec, #f6ead6); }
+  #rnums { display: inline-flex; flex-wrap: wrap; gap: 6px; }
   .rnum { min-width: 34px; padding: 8px 6px; font-weight: 800; }
+  .rnum.click-only { border-style: dashed; opacity: .92; }
 </style>
 </head>
 <body>
@@ -524,10 +526,11 @@ if (typeof window !== 'undefined') window.CombineCore = CombineCore;
     b.addEventListener('click', function () { mel.focus(); addMelody(p.tok); });
     keyEl[p.tok] = b; piano.appendChild(b);
   });
-  // 리듬 숫자 버튼
+  // 리듬 숫자 버튼(1~16). 1~9는 자판으로도, 10~16은 클릭 전용(점선)
   var rn = $("rnums");
-  for (var i = 1; i <= 9; i++) (function (d) {
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'kp-ins rnum'; b.textContent = d;
+  for (var i = 1; i <= 16; i++) (function (d) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'kp-ins rnum' + (d > 9 ? ' click-only' : ''); b.textContent = d;
+    if (d > 9) b.title = '클릭 전용(자판은 1~9)';
     b.addEventListener('click', function () { rhy.focus(); addRhythm('' + d); }); rn.appendChild(b);
   })(i);
   $("kpBar").addEventListener('click', addBar);
