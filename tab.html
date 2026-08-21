@@ -83,6 +83,8 @@
   #fbPlay:hover { filter: brightness(1.06); }
   #fbSpeedVal { font-variant-numeric: tabular-nums; min-width: 3ch; color: var(--ink); }
   #fbStatus { font-size: .76rem; color: var(--ink-soft); margin-top: 8px; line-height: 1.6; }
+  .fb-controls button[aria-pressed="true"] { background: var(--brass); color: #241a06; border-color: var(--brass); }
+  #fbRangeWrap select { min-width: 3.4em; }
 </style>
 </head>
 <body>
@@ -172,6 +174,11 @@
     <div class="fb-controls">
       <button id="fbPlay">&#9654; 재생</button>
       <label>속도 <input type="range" id="fbSpeed" min="40" max="110" value="85"><span id="fbSpeedVal">1.0&times;</span></label>
+      <button id="fbLoop" class="alt" aria-pressed="false">&#128257; 구간 반복</button>
+      <label id="fbRangeWrap" style="display:none;">마디
+        <select id="fbBarA"></select> ~ <select id="fbBarB"></select>
+      </label>
+      <button id="fbTrainer" class="alt" aria-pressed="false" style="display:none;">&#128200; 속도 트레이너</button>
     </div>
     <p id="fbStatus"></p>
   </div>
@@ -1184,6 +1191,7 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
   var STR_LBL = ['E', 'A', 'D', 'G', 'B', 'e'];// index 0..5 에 대응(저→고)
   var fbAc = null, fbBuf = {}, fbTimeline = [], fbMaxFret = 5, fbRaf = 0, fbPlaying = false,
       fbStartT = 0, fbIdx = -1, fbSpeed = 0.85, fbTotal = 0;
+  var fbNumBars = 1, fbLoopOn = false, fbTrainerOn = false, fbBaseSpeed = 0.85, fbLiveSpeed = 0.85;
   var fbReduce = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
   var NS = 'http://www.w3.org/2000/svg';
   var fbDotsG = null, fbStrY = [];
@@ -1251,9 +1259,12 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
     if (!res || !res.events) { fbHide(); return; }
     var unit = res.song.unit || 1 / 8, qpm = fbBpm(res.song.tempo), capo = res.capoUsed || 0;
     var secPerUnit = unit * 4 * (60 / qpm);
-    fbTimeline = []; fbMaxFret = 5; var t = 0;
+    var mm = /(\d+)\s*\/\s*(\d+)/.exec(res.song.meter || '4/4');
+    var measureUnits = mm ? ((+mm[1]) / (+mm[2])) / unit : 4 / unit;   // 한 마디 = 몇 L단위
+    fbTimeline = []; fbMaxFret = 5; var t = 0, cu = 0;
     res.events.forEach(function (ev) {
       var dur = (ev.dur || 0) * secPerUnit;
+      var bar = measureUnits > 0 ? Math.floor((cu + 1e-6) / measureUnits) : 0;   // 0-based 마디
       if (ev.type === 'note' && ev.frets && ev.frets.length) {
         var pos = [], mid = [];
         ev.frets.forEach(function (f) {
@@ -1262,53 +1273,102 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
           mid.push(TUNING[f.string] + capo + f.fret);
           if (f.fret > fbMaxFret) fbMaxFret = f.fret;
         });
-        fbTimeline.push({ t0: t, t1: t + dur, pos: pos, mid: mid });
+        fbTimeline.push({ t0: t, t1: t + dur, pos: pos, mid: mid, bar: bar });
       } else if (ev.type === 'rest') {
-        fbTimeline.push({ t0: t, t1: t + dur, pos: [], mid: [] });
+        fbTimeline.push({ t0: t, t1: t + dur, pos: [], mid: [], bar: bar });
       }
-      t += dur;
+      t += dur; cu += (ev.dur || 0);
     });
     fbTotal = t;
     if (!fbTimeline.length) { fbHide(); return; }
     fbMaxFret = Math.min(15, Math.max(5, fbMaxFret));
+    fbNumBars = Math.max(1, (fbTimeline[fbTimeline.length - 1].bar || 0) + 1);
+    // 마디 선택 채우기
+    var sa = $('fbBarA'), sb = $('fbBarB'); sa.innerHTML = ''; sb.innerHTML = '';
+    for (var i = 1; i <= fbNumBars; i++) {
+      var oa = document.createElement('option'); oa.value = i; oa.textContent = i; sa.appendChild(oa);
+      var ob = document.createElement('option'); ob.value = i; ob.textContent = i; sb.appendChild(ob);
+    }
+    sa.value = 1; sb.value = fbNumBars;
+    $('fbRangeWrap').style.display = fbLoopOn ? '' : 'none';
+    $('fbTrainer').style.display = fbLoopOn ? '' : 'none';
     fbStop();
     fbDrawBoard(fbMaxFret);
     $('fbCard').style.display = '';
-    $('fbStatus').textContent = '총 ' + fbTimeline.filter(function (x) { return x.pos.length; }).length + '음 · 약 ' + Math.round(fbTotal) + '초(원속도) · 속도를 낮춰 천천히 연습하세요.';
+    fbStatus();
+  }
+  function fbStatus() {
+    var nNotes = fbTimeline.filter(function (x) { return x.pos.length; }).length;
+    var msg = '총 ' + nNotes + '음 · ' + fbNumBars + '마디 · 약 ' + Math.round(fbTotal) + '초(원속도)';
+    if (fbLoopOn) msg += ' · 🔁 ' + $('fbBarA').value + '~' + $('fbBarB').value + '마디 반복';
+    if (fbTrainerOn) msg += ' · 📈 트레이너: 반복마다 조금씩 빨라져요';
+    $('fbStatus').textContent = msg;
+  }
+  function fbLoopWindow() {
+    var a = Math.min(+$('fbBarA').value, +$('fbBarB').value) - 1;
+    var b = Math.max(+$('fbBarA').value, +$('fbBarB').value) - 1;
+    var segs = fbTimeline.filter(function (s) { return s.bar >= a && s.bar <= b; });
+    if (!segs.length) return { s: 0, e: fbTotal };
+    return { s: segs[0].t0, e: segs[segs.length - 1].t1 };
   }
   function fbHide() { fbStop(); $('fbCard').style.display = 'none'; }
 
+  var fbWin = { s: 0, e: 0 };
+  function fbNow() { var a = fbCtx(); return ((a ? a.currentTime : performance.now() / 1000) - fbStartT) * fbLiveSpeed; }
+  function fbAnchor(to) { var a = fbCtx(); fbStartT = (a ? a.currentTime : performance.now() / 1000) - to / fbLiveSpeed; }
+  function fbShowLive() { $('fbSpeedVal').textContent = fbLiveSpeed.toFixed(2).replace(/0$/, '') + '×'; }
   function fbTick() {
     if (!fbPlaying) return;
-    var a = fbCtx(); var now = (a ? a.currentTime : performance.now() / 1000) - fbStartT;
-    now *= fbSpeed;                          // 재생 배속(1.0=원속도, 0.85=느리게)
+    var now = fbNow();
+    if (now >= fbWin.e) {                    // 구간 끝 도달
+      if (fbLoopOn) {
+        if (fbTrainerOn && fbLiveSpeed < 1.0) { fbLiveSpeed = Math.min(1.0, fbLiveSpeed + 0.05); fbShowLive(); }
+        fbIdx = -1; fbAnchor(fbWin.s);       // 처음으로 되감기
+        now = fbNow();
+      } else { fbStop(); return; }
+    }
     var ni = -1, k;
     for (k = 0; k < fbTimeline.length; k++) { if (now >= fbTimeline[k].t0) ni = k; else break; }
     if (ni !== fbIdx && ni >= 0) {
       fbIdx = ni; var seg = fbTimeline[ni];
-      fbLight(seg.pos);
-      seg.mid.forEach(fbPluck);
+      fbLight(seg.pos); seg.mid.forEach(fbPluck);
     }
-    if (now >= fbTotal) { fbStop(); return; }
     fbRaf = requestAnimationFrame(fbTick);
   }
   function fbStart() {
     if (!fbTimeline.length) return;
     var a = fbCtx(); if (a && a.state === 'suspended') a.resume();
-    fbPlaying = true; fbIdx = -1; fbStartT = (a ? a.currentTime : performance.now() / 1000);
+    fbWin = fbLoopOn ? fbLoopWindow() : { s: 0, e: fbTotal };
+    fbLiveSpeed = fbSpeed;                    // 트레이너 시작점 = 슬라이더 속도
+    fbShowLive();
+    fbPlaying = true; fbIdx = -1; fbAnchor(fbWin.s);
     $('fbPlay').innerHTML = '&#9632; 정지'; fbRaf = requestAnimationFrame(fbTick);
   }
   function fbStop() {
     fbPlaying = false; cancelAnimationFrame(fbRaf); fbIdx = -1;
     if (fbDotsG) while (fbDotsG.firstChild) fbDotsG.removeChild(fbDotsG.firstChild);
     var pb = $('fbPlay'); if (pb) pb.innerHTML = '&#9654; 재생';
+    fbLiveSpeed = fbSpeed; fbShowLive();
   }
   $('fbPlay').addEventListener('click', function () { fbPlaying ? fbStop() : fbStart(); });
   $('fbSpeed').addEventListener('input', function () {
-    fbSpeed = (+this.value) / 100; $('fbSpeedVal').textContent = fbSpeed.toFixed(2).replace(/0$/, '') + '×';
-    if (fbPlaying) fbStop();               // 속도 바꾸면 정지 후 다시 재생
+    fbSpeed = (+this.value) / 100; fbLiveSpeed = fbSpeed; fbShowLive();
+    if (fbPlaying) fbStop();
   });
-  (function () { fbSpeed = (+$('fbSpeed').value) / 100; $('fbSpeedVal').textContent = fbSpeed.toFixed(2).replace(/0$/, '') + '×'; })();
+  $('fbLoop').addEventListener('click', function () {
+    fbLoopOn = !fbLoopOn; this.setAttribute('aria-pressed', fbLoopOn ? 'true' : 'false');
+    $('fbRangeWrap').style.display = fbLoopOn ? '' : 'none';
+    $('fbTrainer').style.display = fbLoopOn ? '' : 'none';
+    if (!fbLoopOn && fbTrainerOn) { fbTrainerOn = false; $('fbTrainer').setAttribute('aria-pressed', 'false'); }
+    if (fbPlaying) fbStop(); fbStatus();
+  });
+  $('fbTrainer').addEventListener('click', function () {
+    fbTrainerOn = !fbTrainerOn; this.setAttribute('aria-pressed', fbTrainerOn ? 'true' : 'false');
+    if (fbPlaying) fbStop(); fbStatus();
+  });
+  $('fbBarA').addEventListener('change', function () { if (fbPlaying) fbStop(); fbStatus(); });
+  $('fbBarB').addEventListener('change', function () { if (fbPlaying) fbStop(); fbStatus(); });
+  (function () { fbSpeed = (+$('fbSpeed').value) / 100; fbLiveSpeed = fbSpeed; fbShowLive(); })();
 
   // abcjs를 동적 로드(실패해도 앱은 동작)
   var s = document.createElement('script');

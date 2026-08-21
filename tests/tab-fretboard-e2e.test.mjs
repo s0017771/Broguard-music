@@ -75,6 +75,58 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
   await page.close();
 }
 
+// ── 2단계: 구간 반복 + 속도 트레이너 ──
+{
+  const page = await browser.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if (m.type() === 'error' && !/abcjs|ABCJS|Failed to load/.test(m.text())) errors.push('C:' + m.text()); });
+  try {
+    await page.goto(`${base}/tab.html?autotest=1`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.__autotestDone === true, { timeout: 5000 });
+    await page.waitForTimeout(200);
+
+    // 1) 구간 반복 켜면 마디 선택·트레이너가 나타난다
+    assert.equal(await page.$eval('#fbRangeWrap', el => getComputedStyle(el).display), 'none', '초기엔 마디선택 숨김');
+    await page.click('#fbLoop');
+    assert.equal(await page.$eval('#fbLoop', el => el.getAttribute('aria-pressed')), 'true');
+    assert.notEqual(await page.$eval('#fbRangeWrap', el => getComputedStyle(el).display), 'none', '마디 선택 표시');
+    assert.notEqual(await page.$eval('#fbTrainer', el => getComputedStyle(el).display), 'none', '트레이너 버튼 표시');
+    assert.ok(/반복/.test(await page.textContent('#fbStatus')), '상태에 반복 표기');
+    ok('구간 반복을 켜면 마디 선택과 트레이너가 나타난다');
+
+    // 2) 1마디만 반복 지정 후 재생하면, 한 번 길이가 지나도 계속 재생(=반복)된다
+    await page.selectOption('#fbBarA', '1');
+    await page.selectOption('#fbBarB', '1');
+    await page.evaluate(() => { const s = document.getElementById('fbSpeed'); s.value = 110; s.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.click('#fbPlay');
+    await page.waitForTimeout(3500);   // 1마디 재생 시간보다 충분히 길게
+    assert.ok(/정지/.test(await page.textContent('#fbPlay')), '한 번 지나도 계속 재생 중(반복)');
+    ok('구간 반복이 한 소절을 지나도 멈추지 않고 반복한다');
+    await page.click('#fbPlay'); // stop
+
+    // 3) 트레이너 켜고 반복하면 배속이 올라간다
+    await page.evaluate(() => { const s = document.getElementById('fbSpeed'); s.value = 70; s.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.click('#fbTrainer');
+    const spd0 = await page.textContent('#fbSpeedVal');
+    await page.click('#fbPlay');
+    await page.waitForTimeout(6000);   // 1마디(0.7×)를 최소 한 번 되감으며 +0.05
+    const spd1 = await page.textContent('#fbSpeedVal');
+    await page.click('#fbPlay'); // stop
+    assert.notEqual(spd0, spd1, `트레이너로 배속 증가 (${spd0} → ${spd1})`);
+    ok('속도 트레이너를 켜면 반복마다 배속이 올라간다');
+
+    // 4) 구간 반복 끄면 마디 선택이 다시 숨고 트레이너도 꺼진다
+    await page.click('#fbLoop');
+    assert.equal(await page.$eval('#fbRangeWrap', el => getComputedStyle(el).display), 'none', '마디 선택 숨김');
+    assert.equal(await page.$eval('#fbTrainer', el => el.getAttribute('aria-pressed')), 'false', '트레이너 해제');
+    ok('구간 반복을 끄면 마디 선택이 숨고 트레이너도 꺼진다');
+
+    assert.equal(errors.length, 0, 'JS 오류 없음: ' + errors.join(' | '));
+    ok('페이지 JS 오류 없음(2단계)');
+  } catch (e) { bad('구간 반복·트레이너', e); }
+  await page.close();
+}
+
 await browser.close();
 server.close();
 if (fail) { console.error(`\n${fail} test(s) failed`); process.exit(1); }
