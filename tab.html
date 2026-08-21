@@ -1500,6 +1500,16 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
     $('techCard').style.display = '';
   }
 
+  // 악보집 등에서 '🎸 타브로'로 넘겨준 곡이 있으면 불러와 바로 변환
+  try {
+    var handoff = localStorage.getItem('broguard_tab_abc');
+    if (handoff && handoff.trim()) {
+      abcIn.value = handoff;
+      localStorage.removeItem('broguard_tab_abc');   // 한 번만 사용
+      convertNow();
+    }
+  } catch (e) {}
+
   // abcjs를 동적 로드(실패해도 앱은 동작)
   var s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.5.2/abcjs-basic-min.js';
