@@ -79,6 +79,20 @@
   .guide code { background: var(--paper); padding: 1px 5px; border-radius: 4px; font-family: 'Consolas', monospace; color: var(--brass-deep); }
   .guide b { color: var(--ink); }
   code { background: var(--paper); padding: 1px 5px; border-radius: 4px; font-family: 'Consolas', monospace; }
+
+  /* 계이름 입력 도우미(건반) */
+  .keypad { border: 1px solid var(--mel); border-radius: 8px; padding: 10px; background: var(--mel-bg); }
+  .kp-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .kp-row + .kp-row { margin-top: 8px; }
+  .kp-note { min-width: 44px; padding: 12px 8px; font-size: 1.08rem; font-weight: 800; cursor: pointer;
+    background: var(--card); color: var(--ink); border: 1px solid var(--mel); border-radius: 8px; font-family: inherit; }
+  .kp-note:hover { background: #fff; }
+  .kp-note:active { background: var(--mel); color: #fff; transform: scale(.96); }
+  .kp-ins { padding: 10px 12px; font-size: .9rem; font-weight: 700; cursor: pointer;
+    background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font-family: inherit; }
+  .kp-ins:active { transform: scale(.96); }
+  .kp-row label { font-weight: 600; font-size: .85rem; display: inline-flex; align-items: center; gap: 4px; }
+  .kp-row select { width: auto; }
 </style>
 </head>
 <body>
@@ -104,6 +118,27 @@
       <label><span class="badge c">코드</span> (선택 · 마디마다)</label>
       <textarea id="chordIn" class="c" placeholder="예: C r Am r F G r C&#10;마디마다 코드 하나 · 한 마디에 두 코드면 공백으로 (예: F G) · 비우면 코드 없음 · 마디 구분 r"></textarea>
       <div class="field-hint">한 마디에 <b>한 코드</b>면 <code>C</code>, <b>두 코드</b>면 공백으로 <code>F G</code>(앞 코드=마디 앞부분, 뒤 코드=중간부터) &middot; 마디 구분 <code>r</code></div>
+    </div>
+
+    <div class="io-box">
+      <label>🎹 계이름 입력 도우미 <span style="font-weight:400;color:var(--ink-soft);font-size:.8rem;">— 버튼을 누르면 위 <b>멜로디 칸</b>에 입력돼요(소리도 나요). 커서 위치에 들어갑니다.</span></label>
+      <div class="keypad">
+        <div class="kp-row" id="kpNotes"></div>
+        <div class="kp-row">
+          <label>옥타브
+            <select id="kpOct">
+              <option value="0">기본</option>
+              <option value="high">높게 (도')</option>
+              <option value="low">낮게 (,도)</option>
+            </select>
+          </label>
+          <button type="button" class="kp-ins" data-ins="r">마디 r</button>
+          <button type="button" class="kp-ins" data-ins="0">쉼표 0</button>
+          <button type="button" class="kp-ins" data-ins=" ">한 칸 ␣</button>
+          <button type="button" class="kp-ins" id="kpBack">⌫ 지우기</button>
+          <label style="margin-left:auto;"><input type="checkbox" id="kpSound" checked> 🔊 소리</label>
+        </div>
+      </div>
     </div>
 
     <div class="opts">
@@ -397,6 +432,79 @@ if (typeof window !== 'undefined') window.CombineCore = CombineCore;
 
   rhythmHint();
   $("sampleBtn").click();
+})();
+</script>
+
+<script>
+/* 🎹 계이름 입력 도우미 — 멜로디 칸에 버튼으로 입력 + 소리 */
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var mel = $("melodyIn");
+  var NOTES = ["도", "레", "미", "파", "솔", "라", "시"];
+  var SEMI = { "도": 0, "레": 2, "미": 4, "파": 5, "솔": 7, "라": 9, "시": 11 };
+  var LETTER = { "도": "C", "레": "D", "미": "E", "파": "F", "솔": "G", "라": "A", "시": "B" };
+  var SHARPS = ['F', 'C', 'G', 'D', 'A', 'E', 'B'], FLATS = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+  var CNT = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7, F: -1, Bb: -2, Eb: -3, Ab: -4, Db: -5, Gb: -6, Cb: -7,
+    Am: 0, Em: 1, Bm: 2, 'F#m': 3, 'C#m': 4, 'G#m': 5, 'D#m': 6, Dm: -1, Gm: -2, Cm: -3, Fm: -4, Bbm: -5, Ebm: -6 };
+  function keySig(k) {
+    k = String(k || 'C').trim();
+    var n = CNT[k];
+    if (n === undefined) { var b = k.replace(/(maj|major|min|minor)\s*$/i, '').trim(); n = CNT[b]; }
+    if (n === undefined) n = 0;
+    var map = {}, i;
+    if (n > 0) for (i = 0; i < n; i++) map[SHARPS[i]] = 1;
+    else for (i = 0; i < -n; i++) map[FLATS[i]] = -1;
+    return map;
+  }
+
+  var row = $("kpNotes");
+  NOTES.forEach(function (n) {
+    var btn = document.createElement("button");
+    btn.type = "button"; btn.className = "kp-note"; btn.textContent = n;
+    btn.addEventListener("click", function () { addNote(n); });
+    row.appendChild(btn);
+  });
+  function octMark() { var v = $("kpOct").value; return { pre: v === "low" ? "," : "", post: v === "high" ? "'" : "" }; }
+  function insertAtCaret(t) {
+    var el = mel; el.focus();
+    var s = (el.selectionStart != null) ? el.selectionStart : el.value.length;
+    var e = (el.selectionEnd != null) ? el.selectionEnd : el.value.length;
+    var v = el.value;
+    el.value = v.slice(0, s) + t + v.slice(e);
+    var p = s + t.length; el.selectionStart = el.selectionEnd = p;
+  }
+  function addNote(n) { var o = octMark(); insertAtCaret(o.pre + n + o.post + " "); if ($("kpSound").checked) beep(n, o); }
+  function backToken() {
+    var el = mel; el.focus();
+    var s = (el.selectionStart != null) ? el.selectionStart : el.value.length;
+    var before = el.value.slice(0, s).replace(/\s+$/, '').replace(/\S+$/, '');
+    el.value = before + el.value.slice(s);
+    el.selectionStart = el.selectionEnd = before.length;
+  }
+  [].forEach.call(document.querySelectorAll('.keypad [data-ins]'), function (btn) {
+    btn.addEventListener('click', function () {
+      var ins = btn.getAttribute('data-ins');
+      insertAtCaret(ins + (ins.trim() ? ' ' : ''));   // r/0 은 뒤에 공백, 한 칸은 공백 하나
+    });
+  });
+  $("kpBack").addEventListener("click", backToken);
+
+  var ac = null;
+  function beep(n, o) {
+    try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) { return; }
+    if (!ac) return;
+    var acc = keySig($("keyIn").value)[LETTER[n]] || 0;
+    var oct = (o.pre ? -12 : 0) + (o.post ? 12 : 0);
+    var midi = 60 + SEMI[n] + acc + oct;
+    var f = 440 * Math.pow(2, (midi - 69) / 12);
+    var now = ac.currentTime, osc = ac.createOscillator(), g = ac.createGain();
+    osc.type = "triangle"; osc.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.25, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+    osc.connect(g); g.connect(ac.destination); osc.start(now); osc.stop(now + 0.5);
+  }
 })();
 </script>
 </body>
