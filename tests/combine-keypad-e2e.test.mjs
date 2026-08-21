@@ -63,6 +63,16 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
     assert.ok(/E2 C2/.test(result) && /L:1\/8/.test(result), '건반 입력이 ABC로 합쳐짐');
     ok('건반으로 넣은 멜로디가 정상적으로 합쳐진다');
 
+    // 6) 숫자자판 1~7 = 도~시 (멜로디 칸에서 물리 키 입력)
+    await page.evaluate(() => { const m = document.getElementById('melodyIn'); m.value = ''; m.focus(); });
+    await page.selectOption('#kpOct', '0');
+    await page.focus('#melodyIn');
+    await page.keyboard.press('1'); await page.keyboard.press('3'); await page.keyboard.press('5');
+    assert.equal(await page.inputValue('#melodyIn'), '도 미 솔 ', '숫자키 1·3·5 → 도·미·솔');
+    await page.keyboard.press('0'); // 쉼표는 그대로 입력(리매핑 안 함)
+    assert.ok((await page.inputValue('#melodyIn')).indexOf('0') >= 0, '0은 쉼표로 그대로 입력');
+    ok('숫자자판 1~7로 피아노처럼 계이름을 친다');
+
     assert.equal(errors.length, 0, 'JS 오류 없음: ' + errors.join(' | '));
     ok('페이지 JS 오류 없음');
   } catch (e) { bad('계이름 건반', e); }

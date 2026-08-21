@@ -121,7 +121,7 @@
     </div>
 
     <div class="io-box">
-      <label>🎹 계이름 입력 도우미 <span style="font-weight:400;color:var(--ink-soft);font-size:.8rem;">— 버튼을 누르면 위 <b>멜로디 칸</b>에 입력돼요(소리도 나요). 커서 위치에 들어갑니다.</span></label>
+      <label>🎹 계이름 입력 도우미 <span style="font-weight:400;color:var(--ink-soft);font-size:.8rem;">— 버튼을 누르거나, <b>멜로디 칸에서 숫자자판 1~7</b>을 눌러 피아노처럼 쳐요(<b>1</b>도 <b>2</b>레 <b>3</b>미 <b>4</b>파 <b>5</b>솔 <b>6</b>라 <b>7</b>시). 소리도 나요.</span></label>
       <div class="keypad">
         <div class="kp-row" id="kpNotes"></div>
         <div class="kp-row">
@@ -489,6 +489,14 @@ if (typeof window !== 'undefined') window.CombineCore = CombineCore;
     });
   });
   $("kpBack").addEventListener("click", backToken);
+
+  // 멜로디 칸에서 숫자자판 1~7 = 도~시 (피아노처럼 연주 입력)
+  var KEYNOTE = { "1": "도", "2": "레", "3": "미", "4": "파", "5": "솔", "6": "라", "7": "시" };
+  mel.addEventListener("keydown", function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var n = KEYNOTE[e.key];
+    if (n) { e.preventDefault(); addNote(n); }
+  });
 
   var ac = null;
   function beep(n, o) {
