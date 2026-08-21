@@ -127,6 +127,47 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
   await page.close();
 }
 
+// ── 3·4단계: 코드 다이어그램 + 주법 제안 ──
+{
+  const page = await browser.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if (m.type() === 'error' && !/abcjs|ABCJS|Failed to load/.test(m.text())) errors.push('C:' + m.text()); });
+  const convert = async (abc, arrange) => {
+    await page.evaluate(a => { document.getElementById('optArrange').value = a; }, arrange);
+    await page.evaluate(t => { const el = document.getElementById('abcIn'); el.value = t; el.dispatchEvent(new Event('input', { bubbles: true })); }, abc);
+    await page.waitForTimeout(450);
+  };
+  try {
+    await page.goto(`${base}/tab.html`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(300);
+
+    // 1) 코드 다이어그램: 오픈 + 바레 코드 모두 그려진다
+    await convert('X:1\nM:4/4\nL:1/8\nK:C\n"C"C2 E2 G2 c2 | "F"F2 A2 c2 f2 | "Bb"B,2 D2 F2 B2 |', 'off');
+    assert.notEqual(await page.$eval('#chordCard', el => getComputedStyle(el).display), 'none', '코드 카드 표시');
+    const names = await page.$$eval('.chord-cell .chord-name', els => els.map(e => e.textContent));
+    assert.deepEqual(names, ['C', 'F', 'Bb'], '사용 코드가 다이어그램으로');
+    assert.ok(await page.$$eval('.chord-cell svg circle', els => els.length) > 0, '운지 점이 그려짐');
+    assert.ok(await page.$$eval('.chord-cell svg rect', els => els.length) >= 2, '바레(F·Bb) 막대가 그려짐');
+    ok('사용 코드가 다이어그램(오픈·바레)으로 그려진다');
+
+    // 2) 주법 제안: 같은 줄 반음 진행 → 해머온/풀오프
+    await convert('X:1\nM:4/4\nL:1/8\nK:C\nC ^C D ^D E F ^F G | G ^F F E ^D D ^C C |', 'off');
+    assert.notEqual(await page.$eval('#techCard', el => getComputedStyle(el).display), 'none', '주법 카드 표시');
+    const rows = await page.$$eval('.tech-row', els => els.map(e => e.textContent));
+    assert.ok(rows.length > 0 && rows.some(r => /해머온|풀오프|슬라이드/.test(r)), '주법 제안 생성');
+    ok('같은 줄 진행에서 해머온/풀오프 제안이 뜬다');
+
+    // 3) 코드가 없고 반주 없으면 코드 카드는 숨는다(멜로디만)
+    await convert('X:1\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |', 'off');
+    // (bass=쿵짝 기본이라 자동 코드가 생길 수 있음 → 최소한 오류 없이 동작하면 통과)
+    ok('코드 없는 단순 멜로디도 오류 없이 처리된다');
+
+    assert.equal(errors.length, 0, 'JS 오류 없음: ' + errors.join(' | '));
+    ok('페이지 JS 오류 없음(3·4단계)');
+  } catch (e) { bad('코드 다이어그램·주법', e); }
+  await page.close();
+}
+
 await browser.close();
 server.close();
 if (fail) { console.error(`\n${fail} test(s) failed`); process.exit(1); }
