@@ -70,6 +70,25 @@ test('mix: 박자 다르면 경고', () => {
   assert.ok(r.ok && r.warns.length >= 1 && /박자/.test(r.warns[0]));
 });
 
+test('splitBarHalf: 마디를 반으로 나눔(경계 넘는 음은 잘라 재발음)', () => {
+  assert.deepEqual(MX.splitBarHalf('C2 E2 G2 c2', 4), ['C2 E2', 'G2 c2'], '고르게 절반');
+  assert.deepEqual(MX.splitBarHalf('C8', 4), ['C4', 'C4'], '온음표는 반으로 잘림');
+  assert.deepEqual(MX.splitBarHalf('"C"C3 E1 G4', 4), ['"C"C3 E', 'G4'], '코드기호 유지');
+});
+
+test('mix(half): 반마디 단위로 섞으면 한 마디 안에 두 곡이 섞인다', () => {
+  const A = 'X:1\nM:4/4\nL:1/8\nK:C\n"C"C2 E2 G2 c2 | "F"F2 A2 c2 f2 |';
+  const B = 'X:1\nM:4/4\nL:1/8\nK:C\n"G"G2 B2 d2 g2 | "Am"A2 c2 e2 a2 |';
+  const r = MX.mix(A, B, { ratioB: 50, granularity: 'half' });
+  assert.equal(r.slotsPerBar, 2, '반마디 = 마디당 2슬롯');
+  assert.equal(r.nSlots, 4, '2마디 × 2 = 4슬롯');
+  assert.equal(r.pattern.filter(x => x === 'A').length, 2, '50%면 A 2슬롯');
+  // 한 마디 안에 A 절반 + B 절반이 섞여 있어야(마디 통째 모드보다 촘촘)
+  const barMode = MX.mix(A, B, { ratioB: 50, granularity: 'bar' });
+  assert.notEqual(r.abc, barMode.abc, '반마디 결과는 마디 통째와 다르다');
+  assert.ok(/반마디/.test(r.abc), '제목에 반마디 표기');
+});
+
 test('mix: 비율 100이면 전부 B(A 0마디)', () => {
   const A = 'X:1\nM:4/4\nL:1/8\nK:C\nC4 C4 |';
   const B = 'X:1\nM:4/4\nL:1/8\nK:C\nG4 G4 | E4 E4 |';
