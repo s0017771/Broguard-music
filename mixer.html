@@ -51,6 +51,10 @@
   .strip .bar.half { font-size: 0; }
   .strip .bar.barstart { margin-left: 5px; }
   .strip .bar.rm { background: linear-gradient(90deg, var(--a-bg), var(--b-bg)); color: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--line); font-size: .62rem; }
+  .strip .bar.rmx { padding: 0; grid-template-columns: 1fr 1fr; box-shadow: inset 0 0 0 1px var(--line); font-size: .5rem; color: var(--ink-soft); overflow: hidden; }
+  .strip .bar.rmx .h1, .strip .bar.rmx .h2 { display: grid; place-items: center; height: 100%; padding: 3px 1px; }
+  .strip .bar.rmx .h1 { background: var(--a-bg); border-right: 1px dashed var(--line); }
+  .strip .bar.rmx .h2 { background: var(--b-bg); }
   .ratio-off { opacity: .4; pointer-events: none; }
 
   .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
@@ -119,6 +123,7 @@
       <button class="preset gran" data-g="bar" aria-pressed="true">마디 통째</button>
       <button class="preset gran" data-g="half" aria-pressed="false">반마디 (더 촘촘)</button>
       <button class="preset gran" data-g="rm" aria-pressed="false">A리듬 + B멜로디 🎼</button>
+      <button class="preset gran" data-g="rmx" aria-pressed="false">반마디 교차 🔀</button>
     </div>
     <div class="btn-row">
       <button class="act btn-go" id="mixBtn">🎚️ 섞기</button>
@@ -270,6 +275,13 @@ var MixerCore = (function () {
     });
     return out.join(' ');
   }
+  // 반마디 교차: 앞 반마디 = A리듬+B멜로디, 뒤 반마디 = B리듬+A멜로디 (역할이 매 반마디 뒤바뀜)
+  function crossBar(aBar, bBar, half) {
+    var a = splitBarHalf(aBar, half), b = splitBarHalf(bBar, half);
+    var first = rhythmMelodyBar(a[0], b[0]);   // A 리듬 + B 멜로디
+    var second = rhythmMelodyBar(b[1], a[1]);  // B 리듬 + A 멜로디 (교차)
+    return (first + ' ' + second).trim();
+  }
   function mix(abcA, abcB, opts) {
     opts = opts || {};
     var ratioB = (opts.ratioB != null) ? opts.ratioB : 70;
@@ -292,6 +304,19 @@ var MixerCore = (function () {
       var rmOut = rmLines.join('\n').replace(/\|$/, '|]');
       var rmHeader = 'X:1\nT:곡 믹서 (A리듬 + B멜로디)\nM:' + A.meter + '\nL:' + A.unit + (A.tempo ? '\nQ:' + A.tempo : '') + '\nK:' + A.key + '\n';
       return { ok: true, abc: rmHeader + rmOut, mode: 'rhythmMelody', shift: shift, warns: warns, total: total, fromKey: B.key, toKey: A.key };
+    }
+    // 모드: 반마디 교차 (반마디 리듬믹스 + 리듬/멜로디 교차를 함께 적용)
+    if (opts.mode === 'rmCross') {
+      var cm = /(\d+)\s*\/\s*(\d+)/.exec(A.meter || '4/4');
+      var cbeats = cm ? ((+cm[1]) * unitDen(A.unit) / (+cm[2])) : unitDen(A.unit);
+      var chalf = cbeats / 2;
+      var cross = [];
+      for (var c1 = 0; c1 < total; c1++) cross.push(crossBar(aBars[c1 % aBars.length], bBars[c1 % bBars.length], chalf));
+      var crLines = [];
+      for (var c2 = 0; c2 < cross.length; c2 += 4) crLines.push(cross.slice(c2, c2 + 4).join(' | ') + ' |');
+      var crOut = crLines.join('\n').replace(/\|$/, '|]');
+      var crHeader = 'X:1\nT:곡 믹서 (반마디 교차)\nM:' + A.meter + '\nL:' + A.unit + (A.tempo ? '\nQ:' + A.tempo : '') + '\nK:' + A.key + '\n';
+      return { ok: true, abc: crHeader + crOut, mode: 'rmCross', shift: shift, warns: warns, total: total, fromKey: B.key, toKey: A.key };
     }
     var gran = (opts.granularity === 'half') ? 2 : 1;   // 1=마디, 2=반마디
     var mm = /(\d+)\s*\/\s*(\d+)/.exec(A.meter || '4/4');
@@ -316,7 +341,7 @@ var MixerCore = (function () {
     var header = 'X:1\nT:곡 믹서 (A' + (100 - ratioB) + ' · B' + ratioB + (gran === 2 ? ' · 반마디' : '') + ')\nM:' + A.meter + '\nL:' + A.unit + (A.tempo ? '\nQ:' + A.tempo : '') + '\nK:' + A.key + '\n';
     return { ok: true, abc: header + out, pattern: pat, shift: shift, warns: warns, aCount: aCount, total: total, nSlots: nSlots, slotsPerBar: gran, fromKey: B.key, toKey: A.key };
   }
-  return { parseSong: parseSong, keyTonicPc: keyTonicPc, keyAccMap: keyAccMap, transposeBody: transposeBody, lenValue: lenValue, lenToAbc: lenToAbc, weave: weave, splitBarHalf: splitBarHalf, parseBarElements: parseBarElements, rhythmMelodyBar: rhythmMelodyBar, mix: mix };
+  return { parseSong: parseSong, keyTonicPc: keyTonicPc, keyAccMap: keyAccMap, transposeBody: transposeBody, lenValue: lenValue, lenToAbc: lenToAbc, weave: weave, splitBarHalf: splitBarHalf, parseBarElements: parseBarElements, rhythmMelodyBar: rhythmMelodyBar, crossBar: crossBar, mix: mix };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = MixerCore;
 if (typeof window !== 'undefined') window.MixerCore = MixerCore;
@@ -352,15 +377,15 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
     b.addEventListener('click', function () {
       gran = b.getAttribute('data-g');
       [].forEach.call(document.querySelectorAll('.gran'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-      // A리듬+B멜로디 모드는 비율 무관 → 슬라이더 흐리게
+      // A리듬+B멜로디 · 반마디 교차 모드는 비율 무관 → 슬라이더 흐리게
       var rr = document.querySelector('.ratio-head').parentNode;
-      $('ratio').classList.toggle('ratio-off', gran === 'rm');
+      $('ratio').classList.toggle('ratio-off', gran === 'rm' || gran === 'rmx');
       if (last || ($('abcA').value.trim() && $('abcB').value.trim())) doMix();
     });
   });
 
   function doMix() {
-    var opts = (gran === 'rm') ? { mode: 'rhythmMelody' } : { ratioB: +$('ratio').value, granularity: gran };
+    var opts = (gran === 'rm') ? { mode: 'rhythmMelody' } : (gran === 'rmx') ? { mode: 'rmCross' } : { ratioB: +$('ratio').value, granularity: gran };
     var res = MixerCore.mix($('abcA').value, $('abcB').value, opts);
     var w = $('warn');
     if (!res.ok) {
@@ -376,6 +401,13 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
     if (res.mode === 'rhythmMelody') {
       for (var i = 0; i < res.total; i++) { var c = document.createElement('div'); c.className = 'bar rm'; c.textContent = 'A♩+B♪'; strip.appendChild(c); }
       $('mixInfo').textContent = '모든 마디: A곡 리듬 + B곡 멜로디' + (res.shift ? ' · B곡 ' + (res.shift > 0 ? '+' : '') + res.shift + '반음' : '');
+    } else if (res.mode === 'rmCross') {
+      for (var ix = 0; ix < res.total; ix++) {
+        var cx = document.createElement('div'); cx.className = 'bar rmx';
+        cx.innerHTML = '<span class="h1">A♩+B♪</span><span class="h2">B♩+A♪</span>';
+        strip.appendChild(cx);
+      }
+      $('mixInfo').textContent = '반마디 교차: 앞 반마디는 A리듬+B멜로디, 뒤 반마디는 B리듬+A멜로디' + (res.shift ? ' · B곡 ' + (res.shift > 0 ? '+' : '') + res.shift + '반음' : '');
     } else {
       var spb = res.slotsPerBar || 1;
       res.pattern.forEach(function (src, idx) {

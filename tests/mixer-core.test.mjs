@@ -116,6 +116,28 @@ test('rhythmMelodyBar: B 음이 A 슬롯보다 적으면 반복 배분', () => {
   assert.equal(MX.rhythmMelodyBar('C2 C2 C2 C2', '"C"e2 e4'), '"C"e2 e2 e2 e2', 'B 적으면 채움');
 });
 
+test('crossBar: 반마디 교차 — 앞=A리듬+B멜로디, 뒤=B리듬+A멜로디', () => {
+  // 앞 반마디: A(C E)의 리듬에 B(G B)의 음정 → "G"G2 B2
+  // 뒤 반마디: B(d g)의 리듬에 A(G c)의 음정 → G2 c2 (역할 뒤바뀜)
+  assert.equal(MX.crossBar('C2 E2 G2 c2', '"G"G2 B2 d2 g2', 4), '"G"G2 B2 G2 c2');
+});
+
+test('mix(rmCross): 반마디 교차 모드 · B곡을 A조로 이조', () => {
+  const A = 'X:1\nM:4/4\nL:1/8\nQ:1/4=90\nK:C\n"C"C2 E2 G2 c2 | "F"F2 A2 c2 f2 |';
+  const B = 'X:1\nM:4/4\nL:1/8\nK:G\n"G"G2 B2 d2 g2 | "Em"E2 G2 B2 e2 |';
+  const r = MX.mix(A, B, { mode: 'rmCross' });
+  assert.ok(r.ok);
+  assert.equal(r.mode, 'rmCross');
+  assert.equal(r.total, 2);
+  assert.equal(r.shift, 5, 'G→C는 +5반음');
+  assert.ok(/K:C/.test(r.abc), '결과는 A조(C)');
+  assert.ok(/T:곡 믹서 \(반마디 교차\)/.test(r.abc), '제목 표기');
+  // 첫 마디: 앞반 = A리듬+B멜로디(C조 이조), 뒤반 = B리듬+A멜로디
+  assert.ok(/"C"c2 e2 G2 c2/.test(r.abc), '반마디마다 역할 교차');
+  // 둘째 마디: Em→Am 이조가 앞반 멜로디에 반영
+  assert.ok(/"Am"/.test(r.abc), 'Em → Am 이조');
+});
+
 test('mix(rhythmMelody): 모든 마디 A리듬+B멜로디 · B곡을 A조로 이조', () => {
   const A = 'X:1\nM:4/4\nL:1/8\nQ:1/4=90\nK:C\n"C"C2 E2 G2 c2 | "F"F2 A2 c2 f2 |';
   const B = 'X:1\nM:4/4\nL:1/8\nK:G\n"G"G2 B2 d2 g2 | "Em"E2 G2 B2 e2 |';

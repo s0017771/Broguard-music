@@ -52,6 +52,17 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
     assert.ok(/A곡 리듬.*B곡 멜로디/.test(await page.textContent('#mixInfo')), 'A리듬+B멜로디 안내');
     assert.ok(/T:곡 믹서 \(A리듬 \+ B멜로디\)/.test(await page.textContent('#resultAbc')), '결과 제목');
     ok('A리듬+B멜로디 모드가 모든 마디를 결합한다');
+
+    // 2.6) 반마디 교차 모드 → 비율 비활성, 각 마디에 앞/뒤 반쪽 셀, 안내 문구
+    await page.click('.gran[data-g="rmx"]');
+    await page.waitForTimeout(150);
+    assert.ok(await page.$eval('#ratio', el => el.classList.contains('ratio-off')), '교차 모드도 비율 비활성');
+    assert.equal(await page.$$eval('#strip .bar.rmx', els => els.length), 4, '마디마다 교차 셀');
+    assert.equal(await page.$$eval('#strip .bar.rmx .h1', els => els.length), 4, '앞 반마디 표시');
+    assert.equal(await page.$$eval('#strip .bar.rmx .h2', els => els.length), 4, '뒤 반마디 표시');
+    assert.ok(/반마디 교차/.test(await page.textContent('#mixInfo')), '반마디 교차 안내');
+    assert.ok(/T:곡 믹서 \(반마디 교차\)/.test(await page.textContent('#resultAbc')), '결과 제목');
+    ok('반마디 교차 모드가 마디마다 역할을 교차한다');
     // 다시 마디 모드로 복귀(이후 테스트 영향 없게)
     await page.click('.gran[data-g="bar"]');
     await page.waitForTimeout(150);
