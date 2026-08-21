@@ -71,14 +71,26 @@
   .hint b { color: var(--brass-deep); }
   footer { text-align: center; padding: 14px; font-size: .72rem; color: #b6ae9c; }
   @media (max-width: 620px) { pre#tabOut { font-size: .68rem; } }
+
+  /* ── 지판 따라가기 (1단계) ── */
+  .fb-wrap { overflow-x: auto; margin: 4px 0 2px; }
+  svg#fretboard { display: block; width: 100%; min-width: 520px; height: auto;
+    background: #241a10; border-radius: 12px; }
+  .fb-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 12px; }
+  .fb-controls label { display: flex; align-items: center; gap: 7px; font-size: .78rem; color: var(--ink-soft); font-weight: 700; }
+  .fb-controls input[type=range] { accent-color: var(--brass); width: 120px; }
+  #fbPlay { background: var(--brass); color: #241a06; }
+  #fbPlay:hover { filter: brightness(1.06); }
+  #fbSpeedVal { font-variant-numeric: tabular-nums; min-width: 3ch; color: var(--ink); }
+  #fbStatus { font-size: .76rem; color: var(--ink-soft); margin-top: 8px; line-height: 1.6; }
 </style>
 </head>
 <body>
 <header>
   <div class="staff-lines"><span></span><span></span><span></span><span></span><span></span></div>
   <a class="home" href="index.html">&larr; 랩 홈</a>
-  <h1><span class="clef">&#127928;</span>기타 타브 변환기 <small style="font-size:.7rem;color:var(--brass);">VER.1.2</small></h1>
-  <p>ABC 피아노 악보 &rarr; 기타 타브악보(TAB) &middot; 표준 튜닝 EADGBE &middot; 옥타브 자동 보정 &middot; 카포 지원</p>
+  <h1><span class="clef">&#127928;</span>기타 타브 변환기 <small style="font-size:.7rem;color:var(--brass);">VER.1.3</small></h1>
+  <p>ABC 악보 &rarr; 기타 타브(TAB) &middot; 자동 편곡(쉬운 조+카포) &middot; 베이스 반주 &middot; <b style="color:var(--brass);">지판 따라가기 재생</b></p>
 </header>
 <main>
 
@@ -151,6 +163,17 @@
       <button id="btnCopy" class="alt" disabled>&#128203; 복사</button>
       <button id="btnSave" disabled>&#128190; .txt 저장</button>
     </div>
+  </div>
+
+  <div class="card" id="fbCard" style="display:none;">
+    <h2>&#127928; 지판 따라가기</h2>
+    <p class="hint"><b>재생</b>을 누르면 타브를 기타 합성음으로 들려주며, <b>지금 짚을 줄·프렛에 불</b>이 켜집니다. 천천히(속도 조절) 따라 짚어보세요.</p>
+    <div class="fb-wrap"><svg id="fretboard" role="img" aria-label="기타 지판"></svg></div>
+    <div class="fb-controls">
+      <button id="fbPlay">&#9654; 재생</button>
+      <label>속도 <input type="range" id="fbSpeed" min="40" max="110" value="85"><span id="fbSpeedVal">1.0&times;</span></label>
+    </div>
+    <p id="fbStatus"></p>
   </div>
 
 </main>
@@ -916,7 +939,7 @@ var TabCore = (function () {
         ? autoShift(allMidis, lo, Math.min(hi, TUNING[5] + capo + 12))
         : (parseInt(opts.octaveShift, 10) || 0);
     }
-    result.shift = shift; result.arrange = arrange; result.derivedCapo = derivedCapo;
+    result.shift = shift; result.arrange = arrange; result.derivedCapo = derivedCapo; result.capoUsed = capo;
     var chShift = ((shift % 12) + 12) % 12;                  // 코드 이동량(옥타브만이면 0)
 
     var events = v.events.map(function (e) {
@@ -1060,6 +1083,7 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
       warnBox.style.display = 'none'; metaLine.textContent = '';
       $('btnCopy').disabled = $('btnSave').disabled = true;
       renderStaff('');
+      fbHide();
       return;
     }
     var res;
@@ -1079,9 +1103,11 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
         (res.autoChordApplied ? ' · 자동 코드: ' + res.autoChords.join(' ') : '') +
         ' · 튜닝 EADGBE';
       $('btnCopy').disabled = $('btnSave').disabled = false;
+      fbBuild(res);
     } else {
       tabOut.textContent = '변환할 수 없습니다.';
       $('btnCopy').disabled = $('btnSave').disabled = true;
+      fbHide();
     }
     if (res.warnings.length) {
       warnBox.style.display = 'block';
@@ -1152,6 +1178,137 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 300);
   });
+
+  /* ===================== 지판 따라가기 (1단계) ===================== */
+  var TUNING = TabCore.TUNING;                 // [40,45,50,55,59,64] index0=6번(저E) .. 5=1번(고e)
+  var STR_LBL = ['E', 'A', 'D', 'G', 'B', 'e'];// index 0..5 에 대응(저→고)
+  var fbAc = null, fbBuf = {}, fbTimeline = [], fbMaxFret = 5, fbRaf = 0, fbPlaying = false,
+      fbStartT = 0, fbIdx = -1, fbSpeed = 0.85, fbTotal = 0;
+  var fbReduce = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var NS = 'http://www.w3.org/2000/svg';
+  var fbDotsG = null, fbStrY = [];
+
+  function fbCtx() { if (!fbAc) { try { fbAc = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { fbAc = null; } } return fbAc; }
+  function fbBufFor(midi) {
+    if (fbBuf[midi]) return fbBuf[midi];
+    var a = fbCtx(); if (!a) return null;
+    var freq = 440 * Math.pow(2, (midi - 69) / 12), sr = a.sampleRate, p = Math.max(2, Math.round(sr / freq));
+    var len = Math.floor(sr * 1.5), buf = a.createBuffer(1, len, sr), d = buf.getChannelData(0);
+    var ring = new Float32Array(p), j; for (j = 0; j < p; j++) ring[j] = Math.random() * 2 - 1;
+    var damp = 0.995, ptr = 0, prev = 0, n;
+    for (n = 0; n < len; n++) { var cur = ring[ptr]; var o = (cur + prev) * 0.5 * damp; ring[ptr] = o; prev = o; d[n] = o * Math.pow(1 - n / len, 0.6); ptr = (ptr + 1) % p; }
+    fbBuf[midi] = buf; return buf;
+  }
+  function fbPluck(midi) {
+    var a = fbCtx(); if (!a) return; var b = fbBufFor(midi); if (!b) return;
+    var src = a.createBufferSource(); src.buffer = b;
+    var g = a.createGain(); g.gain.value = 0.85; src.connect(g); g.connect(a.destination); src.start();
+  }
+
+  function fbBpm(tempo) {
+    var m = /(\d+)\s*\/\s*(\d+)\s*=\s*(\d+)/.exec(tempo || '');
+    if (m) { return (+m[3]) * (((+m[1]) / (+m[2])) / 0.25); }
+    var m2 = /(\d+)\s*$/.exec(tempo || ''); return m2 ? +m2[1] : 90;
+  }
+
+  function fbEl(t, a) { var e = document.createElementNS(NS, t); for (var k in a) e.setAttribute(k, a[k]); return e; }
+  function fretX(f) { return f === 0 ? 26 : 56 + (f - 0.5) * 46; }
+
+  function fbDrawBoard(maxFret) {
+    var svg = $('fretboard'); while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var W = 56 + maxFret * 46 + 26, H = 176, top = 26, bot = 150;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    fbStrY = []; for (var i = 0; i < 6; i++) fbStrY.push(top + i * ((bot - top) / 5)); // fbStrY[row], row0=top
+    // 나무 결
+    svg.appendChild(fbEl('rect', { x: 56, y: top - 12, width: maxFret * 46, height: (bot - top) + 24, rx: 5, fill: '#3a2814' }));
+    // 인레이
+    [3, 5, 7, 9].forEach(function (f) { if (f <= maxFret) svg.appendChild(fbEl('circle', { cx: fretX(f), cy: (top + bot) / 2, r: 5, fill: 'rgba(255,255,255,.14)' })); });
+    if (maxFret >= 12) { svg.appendChild(fbEl('circle', { cx: fretX(12), cy: fbStrY[1], r: 5, fill: 'rgba(255,255,255,.14)' })); svg.appendChild(fbEl('circle', { cx: fretX(12), cy: fbStrY[4], r: 5, fill: 'rgba(255,255,255,.14)' })); }
+    // 프렛선
+    for (i = 1; i <= maxFret; i++) svg.appendChild(fbEl('line', { x1: 56 + i * 46, y1: top - 12, x2: 56 + i * 46, y2: bot + 12, stroke: '#c9b489', 'stroke-width': 2, opacity: .7 }));
+    svg.appendChild(fbEl('rect', { x: 52, y: top - 12, width: 5, height: (bot - top) + 24, fill: '#e6d3a6' })); // 너트
+    // 프렛 번호
+    [3, 5, 7, 9, 12, 15].forEach(function (f) { if (f <= maxFret) { var t = fbEl('text', { x: fretX(f), y: bot + 26, 'text-anchor': 'middle', fill: '#8a7c62', 'font-size': 12, 'font-family': 'Consolas,monospace' }); t.textContent = f; svg.appendChild(t); } });
+    // 줄(위=고음 e, 아래=저음 E) → row0 = 1번줄(고e, TUNING idx5)
+    for (i = 0; i < 6; i++) {
+      var tuneIdx = 5 - i;                 // row i → TUNING index
+      svg.appendChild(fbEl('line', { x1: 22, y1: fbStrY[i], x2: W - 22, y2: fbStrY[i], stroke: '#e6d9bb', 'stroke-width': (1 + i * 0.45).toFixed(1), opacity: .85 }));
+      var lt = fbEl('text', { x: W - 14, y: fbStrY[i] + 4, fill: '#8a7c62', 'font-size': 12, 'font-family': 'Consolas,monospace' }); lt.textContent = STR_LBL[tuneIdx]; svg.appendChild(lt);
+    }
+    fbDotsG = fbEl('g', {}); svg.appendChild(fbDotsG);
+  }
+  function fbLight(positions) {
+    while (fbDotsG.firstChild) fbDotsG.removeChild(fbDotsG.firstChild);
+    positions.forEach(function (p) {
+      var row = 5 - p.string;             // TUNING index → row
+      var x = fretX(p.fret), y = fbStrY[row];
+      fbDotsG.appendChild(fbEl('circle', { cx: x, cy: y, r: 11, fill: p.isBass ? '#b08a2e' : '#f2b23a', stroke: '#241a10', 'stroke-width': 1.5 }));
+      var t = fbEl('text', { x: x, y: y + 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: '#241a10', 'font-family': 'Consolas,monospace' }); t.textContent = p.fret; fbDotsG.appendChild(t);
+    });
+  }
+
+  function fbBuild(res) {
+    if (!res || !res.events) { fbHide(); return; }
+    var unit = res.song.unit || 1 / 8, qpm = fbBpm(res.song.tempo), capo = res.capoUsed || 0;
+    var secPerUnit = unit * 4 * (60 / qpm);
+    fbTimeline = []; fbMaxFret = 5; var t = 0;
+    res.events.forEach(function (ev) {
+      var dur = (ev.dur || 0) * secPerUnit;
+      if (ev.type === 'note' && ev.frets && ev.frets.length) {
+        var pos = [], mid = [];
+        ev.frets.forEach(function (f) {
+          if (!f) return;
+          pos.push({ string: f.string, fret: f.fret, isBass: !!f.isBass });
+          mid.push(TUNING[f.string] + capo + f.fret);
+          if (f.fret > fbMaxFret) fbMaxFret = f.fret;
+        });
+        fbTimeline.push({ t0: t, t1: t + dur, pos: pos, mid: mid });
+      } else if (ev.type === 'rest') {
+        fbTimeline.push({ t0: t, t1: t + dur, pos: [], mid: [] });
+      }
+      t += dur;
+    });
+    fbTotal = t;
+    if (!fbTimeline.length) { fbHide(); return; }
+    fbMaxFret = Math.min(15, Math.max(5, fbMaxFret));
+    fbStop();
+    fbDrawBoard(fbMaxFret);
+    $('fbCard').style.display = '';
+    $('fbStatus').textContent = '총 ' + fbTimeline.filter(function (x) { return x.pos.length; }).length + '음 · 약 ' + Math.round(fbTotal) + '초(원속도) · 속도를 낮춰 천천히 연습하세요.';
+  }
+  function fbHide() { fbStop(); $('fbCard').style.display = 'none'; }
+
+  function fbTick() {
+    if (!fbPlaying) return;
+    var a = fbCtx(); var now = (a ? a.currentTime : performance.now() / 1000) - fbStartT;
+    now *= fbSpeed;                          // 재생 배속(1.0=원속도, 0.85=느리게)
+    var ni = -1, k;
+    for (k = 0; k < fbTimeline.length; k++) { if (now >= fbTimeline[k].t0) ni = k; else break; }
+    if (ni !== fbIdx && ni >= 0) {
+      fbIdx = ni; var seg = fbTimeline[ni];
+      fbLight(seg.pos);
+      seg.mid.forEach(fbPluck);
+    }
+    if (now >= fbTotal) { fbStop(); return; }
+    fbRaf = requestAnimationFrame(fbTick);
+  }
+  function fbStart() {
+    if (!fbTimeline.length) return;
+    var a = fbCtx(); if (a && a.state === 'suspended') a.resume();
+    fbPlaying = true; fbIdx = -1; fbStartT = (a ? a.currentTime : performance.now() / 1000);
+    $('fbPlay').innerHTML = '&#9632; 정지'; fbRaf = requestAnimationFrame(fbTick);
+  }
+  function fbStop() {
+    fbPlaying = false; cancelAnimationFrame(fbRaf); fbIdx = -1;
+    if (fbDotsG) while (fbDotsG.firstChild) fbDotsG.removeChild(fbDotsG.firstChild);
+    var pb = $('fbPlay'); if (pb) pb.innerHTML = '&#9654; 재생';
+  }
+  $('fbPlay').addEventListener('click', function () { fbPlaying ? fbStop() : fbStart(); });
+  $('fbSpeed').addEventListener('input', function () {
+    fbSpeed = (+this.value) / 100; $('fbSpeedVal').textContent = fbSpeed.toFixed(2).replace(/0$/, '') + '×';
+    if (fbPlaying) fbStop();               // 속도 바꾸면 정지 후 다시 재생
+  });
+  (function () { fbSpeed = (+$('fbSpeed').value) / 100; $('fbSpeedVal').textContent = fbSpeed.toFixed(2).replace(/0$/, '') + '×'; })();
 
   // abcjs를 동적 로드(실패해도 앱은 동작)
   var s = document.createElement('script');
