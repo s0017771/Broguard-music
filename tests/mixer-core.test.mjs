@@ -96,3 +96,39 @@ test('mix: 비율 100이면 전부 B(A 0마디)', () => {
   assert.equal(r.aCount, 0);
   assert.ok(r.pattern.every(x => x === 'B'));
 });
+
+test('rhythmMelodyBar: A 리듬(길이) 유지 + B 멜로디(음정) 배분', () => {
+  // 슬롯 수가 같으면 그대로 대응 — A 길이, B 음정·코드
+  assert.equal(MX.rhythmMelodyBar('C2 E2 G2 c2', '"G"G2 B2 d2 g2'), '"G"G2 B2 d2 g2');
+  // A 리듬이 다르면 A 길이를 그대로 쓰되 음정만 B에서: 온음표 두 개 → B의 4음을 2슬롯에 배분
+  assert.equal(MX.rhythmMelodyBar('C4 C4', '"C"C2 E2 G2 c2'), '"C"C4 G4', 'B 4음을 A 2슬롯에 고르게');
+});
+
+test('rhythmMelodyBar: A 쉼표는 그대로 두고 음 슬롯에만 B 멜로디', () => {
+  // A: E4 z2 F2 (음 2 + 쉼표 1), B: C E G → 쉼표 위치 보존
+  assert.equal(MX.rhythmMelodyBar('E4 z2 F2', '"C"C2 E2 G2'), '"C"C4 z2 E2', 'A 쉼표 유지');
+  // A가 전부 쉼표면 원본 그대로(붙일 음 없음)
+  assert.equal(MX.rhythmMelodyBar('z4 z4', '"C"C2 E2 G2 c2'), 'z4 z4', 'A 전부 쉼표면 유지');
+});
+
+test('rhythmMelodyBar: B 음이 A 슬롯보다 적으면 반복 배분', () => {
+  // A 4슬롯, B 2음 → B 음정이 늘어나며 채워짐
+  assert.equal(MX.rhythmMelodyBar('C2 C2 C2 C2', '"C"e2 e4'), '"C"e2 e2 e2 e2', 'B 적으면 채움');
+});
+
+test('mix(rhythmMelody): 모든 마디 A리듬+B멜로디 · B곡을 A조로 이조', () => {
+  const A = 'X:1\nM:4/4\nL:1/8\nQ:1/4=90\nK:C\n"C"C2 E2 G2 c2 | "F"F2 A2 c2 f2 |';
+  const B = 'X:1\nM:4/4\nL:1/8\nK:G\n"G"G2 B2 d2 g2 | "Em"E2 G2 B2 e2 |';
+  const r = MX.mix(A, B, { mode: 'rhythmMelody' });
+  assert.ok(r.ok);
+  assert.equal(r.mode, 'rhythmMelody');
+  assert.equal(r.total, 2);
+  assert.equal(r.shift, 5, 'G→C는 +5반음');
+  assert.equal(r.fromKey, 'G'); assert.equal(r.toKey, 'C');
+  assert.ok(/K:C/.test(r.abc), '결과는 A조(C)');
+  assert.ok(/T:곡 믹서 \(A리듬 \+ B멜로디\)/.test(r.abc), '제목 표기');
+  // B의 Em 마디가 C조로 이조되면 Am 코드
+  assert.ok(/"Am"/.test(r.abc), 'Em → Am 이조');
+  // 첫 마디: A의 8분×4 리듬에 B의 G장조 멜로디(C조로 이조)
+  assert.ok(/"C"c2 e2 g2 c'2/.test(r.abc), 'A 리듬 유지 + B 멜로디 이조');
+});
