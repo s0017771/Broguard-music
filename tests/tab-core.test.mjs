@@ -189,6 +189,26 @@ test('카포: 프렛은 카포 기준 상대값', () => {
   assert.ok(note.frets[0].fret >= 0);
 });
 
+test('카포(원조 유지): 짚는 코드 모양 안내 + 개방현(0) 설명', () => {
+  const abc = 'X:1\nT:t\nM:4/4\nL:1/8\nK:Bm\n"Bm" B2 c2 d2 e2 | "F#m" f2 e2 d2 c2 | "G" B2 A2 G2 F2 | "A" A4 z4 |]';
+  const res = TabCore.convert(abc, { arrange: 'keep', capo: 2, octaveShift: 'auto' });
+  assert.ok(res.ok);
+  // 사용 코드는 소리나는 코드(Bm 조), 짚는 모양은 카포만큼 낮은 모양(Am·Em·F·G)
+  assert.ok(/■ 사용 코드:.*Bm.*F#m/.test(res.tab), '사용(소리) 코드는 Bm 조');
+  assert.ok(/짚는 코드 모양\(카포 2프렛 기준\):.*Am.*Em/.test(res.tab), '짚는 모양은 카포 기준 2반음 낮은 모양');
+  // 0=카포 개방현 안내 문구
+  assert.ok(/프렛 번호는 카포\(2프렛\) 기준/.test(res.tab), '카포 기준 프렛 안내');
+  assert.ok(/0은.*개방현/.test(res.tab), '0=카포 개방현 설명');
+});
+
+test('카포 없음: 짚는 코드 모양·카포 안내 문구 없음', () => {
+  const abc = 'X:1\nT:t\nM:4/4\nL:1/8\nK:C\n"C" C2 E2 G2 c2 | "G" G2 B2 d2 g2 |]';
+  const res = TabCore.convert(abc, { arrange: 'keep', capo: 0 });
+  assert.ok(res.ok);
+  assert.ok(!/짚는 코드 모양/.test(res.tab), '카포 없으면 짚는 모양 줄 없음');
+  assert.ok(!/프렛 번호는 카포/.test(res.tab), '카포 없으면 카포 안내 없음');
+});
+
 // ---------- ASCII 렌더링 ----------
 test('renderAscii: 6줄 시스템, 줄 길이 동일, 마디선 존재', () => {
   const res = TabCore.convert(PIANO_ABC, {});

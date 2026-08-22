@@ -1017,6 +1017,14 @@ var TabCore = (function () {
     } else if (shift) header.push('■ 옥타브 보정: ' + (shift > 0 ? '+' : '') + (shift / 12));
     if (chordMap.length && chShift) header.push('■ 코드표: ' + chordMap.map(function (c) { return c.from + '→' + c.to; }).join(' · '));
     if (usedChords.length) header.push('■ 사용 코드: ' + usedChords.join(' · ') + (result.autoChordApplied ? ' (자동 추정)' : ''));
+    // 원조 유지 + 수동 카포: 프렛은 카포 기준(더 낮게)으로 나오므로, 실제로 '짚는' 코드 모양은 카포 칸수만큼 낮은 모양
+    if (!arrange && capo > 0 && usedChords.length) {
+      var shapeChords = usedChords.map(function (s) { return transposeChordSym(s, -capo, song.key.useFlats); });
+      header.push('■ 짚는 코드 모양(카포 ' + capo + '프렛 기준): ' + shapeChords.join(' · ') + ' — 소리는 위 \'사용 코드\'와 같아요');
+    }
+    // 카포가 있으면 프렛 번호는 카포 기준(0 = 카포에 눌린 개방현)임을 안내
+    var noteCapo = (!arrange && capo > 0) ? capo : ((arrange && derivedCapo >= 1 && derivedCapo <= 7) ? derivedCapo : 0);
+    if (noteCapo) header.push('※ 프렛 번호는 카포(' + noteCapo + '프렛) 기준이에요 — 0은 아무 것도 안 짚고 카포에 눌린 개방현을 그대로 치라는 뜻입니다.');
     header.push('■ 확신도: 음정 100% · 운지 95% · 화성 ' + (result.autoChordApplied ? '70%(자동 추정, 원곡과 다를 수 있음)' : (usedChords.length ? '100%(입력 코드)' : '—')));
     header.push('개인 연습용 · 배포·재게시 금지');
     header.push('');
