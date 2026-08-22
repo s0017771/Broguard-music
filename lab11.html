@@ -150,13 +150,29 @@
         <div class="grow">
           <label class="fld" for="genKey">조성</label>
           <select id="genKey">
-            <option value="C">C (다장조)</option>
-            <option value="G" selected>G (사장조)</option>
-            <option value="D">D (라장조)</option>
-            <option value="F">F (바장조)</option>
-            <option value="Am">Am (가단조)</option>
-            <option value="Em">Em (마단조)</option>
-            <option value="Dm">Dm (라단조)</option>
+            <optgroup label="장조">
+              <option value="C">C (다장조)</option>
+              <option value="G" selected>G (사장조)</option>
+              <option value="D">D (라장조)</option>
+              <option value="A">A (가장조)</option>
+              <option value="E">E (마장조)</option>
+              <option value="B">B (나장조)</option>
+              <option value="F">F (바장조)</option>
+              <option value="Bb">Bb (내림나장조)</option>
+              <option value="Eb">Eb (내림마장조)</option>
+              <option value="Ab">Ab (내림가장조)</option>
+            </optgroup>
+            <optgroup label="단조">
+              <option value="Am">Am (가단조)</option>
+              <option value="Em">Em (마단조)</option>
+              <option value="Bm">Bm (나단조)</option>
+              <option value="F#m">F#m (올림바단조)</option>
+              <option value="C#m">C#m (올림다단조)</option>
+              <option value="Dm">Dm (라단조)</option>
+              <option value="Gm">Gm (사단조)</option>
+              <option value="Cm">Cm (다단조)</option>
+              <option value="Fm">Fm (바단조)</option>
+            </optgroup>
           </select>
         </div>
         <div class="grow">
@@ -328,13 +344,27 @@
   };
   var ALL = ["C,","D,","E,","F,","G,","A,","B,","C","D","E","F","G","A","B","c","d","e","f","g","a","b","c'"];
   var KEYS = {
+    // 장조 (tonic = ALL[] 사다리에서 으뜸음 글자의 자리, 7=C … 13=B)
     C:  { tonic: 7,  minor: false, names: ["C","D","E","F","G","A","B"] },
     G:  { tonic: 11, minor: false, names: ["G","A","B","C","D","E","F#"] },
     D:  { tonic: 8,  minor: false, names: ["D","E","F#","G","A","B","C#"] },
+    A:  { tonic: 12, minor: false, names: ["A","B","C#","D","E","F#","G#"] },
+    E:  { tonic: 9,  minor: false, names: ["E","F#","G#","A","B","C#","D#"] },
+    B:  { tonic: 13, minor: false, names: ["B","C#","D#","E","F#","G#","A#"] },
     F:  { tonic: 10, minor: false, names: ["F","G","A","Bb","C","D","E"] },
-    Am: { tonic: 12, minor: true,  names: ["A","B","C","D","E","F","G"] },
-    Em: { tonic: 9,  minor: true,  names: ["E","F#","G","A","B","C","D"] },
-    Dm: { tonic: 8,  minor: true,  names: ["D","E","F","G","A","Bb","C"] }
+    Bb: { tonic: 13, minor: false, names: ["Bb","C","D","Eb","F","G","A"] },
+    Eb: { tonic: 9,  minor: false, names: ["Eb","F","G","Ab","Bb","C","D"] },
+    Ab: { tonic: 12, minor: false, names: ["Ab","Bb","C","Db","Eb","F","G"] },
+    // 단조
+    Am:  { tonic: 12, minor: true, names: ["A","B","C","D","E","F","G"] },
+    Em:  { tonic: 9,  minor: true, names: ["E","F#","G","A","B","C","D"] },
+    Bm:  { tonic: 13, minor: true, names: ["B","C#","D","E","F#","G","A"] },
+    "F#m": { tonic: 10, minor: true, names: ["F#","G#","A","B","C#","D","E"] },
+    "C#m": { tonic: 7,  minor: true, names: ["C#","D#","E","F#","G#","A","B"] },
+    Dm:  { tonic: 8,  minor: true, names: ["D","E","F","G","A","Bb","C"] },
+    Gm:  { tonic: 11, minor: true, names: ["G","A","Bb","C","D","Eb","F"] },
+    Cm:  { tonic: 7,  minor: true, names: ["C","D","Eb","F","G","Ab","Bb"] },
+    Fm:  { tonic: 10, minor: true, names: ["F","G","Ab","Bb","C","Db","Eb"] }
   };
   var QUAL_MAJ = ["", "m", "m", "", "", "m", "dim"];
   var QUAL_MIN = ["m", "dim", "", "m", "m", "", ""];
@@ -871,7 +901,7 @@
     var K = KEYS[c.keyName];
     var bucket = K.minor ? st.min : st.maj;
     if (!bucket || !Object.keys(bucket.starts).length) return null;
-    var tonic = K.tonic, lo = tonic - 5, hi = tonic + 9;
+    var tonic = K.tonic, lo = Math.max(0, tonic - 5), hi = Math.min(ALL.length - 1, tonic + 9);
     var prevState = 0;
     var out = [];
     for (var m = 0; m < c.bars; m++) {
@@ -1010,7 +1040,7 @@
   }
   function genMelody(c) {
     var K = KEYS[c.keyName];
-    var tonic = K.tonic, lo = tonic - 5, hi = tonic + 9;
+    var tonic = K.tonic, lo = Math.max(0, tonic - 5), hi = Math.min(ALL.length - 1, tonic + 9);
     var plan = phrasePlan(c.bars);
     /* 리듬 레이어가 고정(저장 리듬 선택)이 아니면, 모티프 글자별로 리듬을 통일해 응집감 부여 */
     if (!c.rhythmLocked) {
@@ -1346,7 +1376,7 @@
       if (!PATTERNS[cur.meter]) { setStatus("이 박자(" + cur.meter + ")에서는 멜로디 재생성을 지원하지 않습니다.", true); return; }
       cur.mood = $("genMood").value;
       var K = KEYS[cur.keyName];
-      var tonic = K.tonic, lo = tonic - 5, hi = tonic + 9;
+      var tonic = K.tonic, lo = Math.max(0, tonic - 5), hi = Math.min(ALL.length - 1, tonic + 9);
       var STEPS = [-2,-1,-1,-1,0,1,1,1,2,3,-3];
       var idx = tonic;
       for (var m = 0; m < cur.bars; m++) {
@@ -1520,7 +1550,7 @@
     var suffix = (kMatch[2] || "").toLowerCase();
     var keyName = (suffix === "m" || suffix === "min" || suffix === "minor") ? root + "m" : root;
     if (!KEYS[keyName]) {
-      setStatus("조성 '" + keyName + "'은 아직 지원하지 않습니다. (지원: C G D F Am Em Dm)", true);
+      setStatus("조성 '" + keyName + "'은 아직 지원하지 않습니다. 지원 조성: " + Object.keys(KEYS).join(" "), true);
       return;
     }
     var K = KEYS[keyName];
@@ -1934,7 +1964,7 @@
 
   function buildExpanded(src, mode) {
     var K = KEYS[src.keyName];
-    var tonic = K.tonic, lo = tonic - 5, hi = tonic + 9;
+    var tonic = K.tonic, lo = Math.max(0, tonic - 5), hi = Math.min(ALL.length - 1, tonic + 9);
     var targetBars = 32;
     var srcBars = src.bars;
     /* 악구(프레이즈) 단위 확장:
