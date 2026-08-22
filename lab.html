@@ -2515,14 +2515,17 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
   function transposeBy(steps) {
     var abc = input.value.trim();
     if (!abc) { setStatus("조옮김할 악보가 없습니다.", true); return; }
-    if (!visualObj) { render(); }
+    // 반드시 먼저 렌더 → visualObj와 lastRenderedAbc(정규화 문자열)를 현재 입력과 동기화.
+    // strTranspose는 visualObj의 문자 위치를 그대로 쓰므로, 그 위치가 가리키는 '정규화된' 문자열을
+    // 넘겨야 한다. (원본 input.value는 slurSameToTie가 붙임줄 '-'를 삽입해 길이가 달라 위치가 어긋남)
+    render();
     if (!visualObj) { setStatus("먼저 올바른 악보를 만들어주세요.", true); return; }
     if (typeof ABCJS.strTranspose !== "function") {
       setStatus("이 abcjs 버전은 텍스트 조옮김을 지원하지 않습니다.", true); return;
     }
     try {
       stopPlay();
-      var out = ABCJS.strTranspose(abc, [visualObj], steps);
+      var out = ABCJS.strTranspose(lastRenderedAbc, [visualObj], steps);
       if (!out || typeof out !== "string") { setStatus("조옮김에 실패했습니다.", true); return; }
       input.value = out;
       cur = null;

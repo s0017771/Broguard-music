@@ -1560,7 +1560,8 @@
   function transposeBy(steps) {
     var abc = input.value.trim();
     if (!abc) { setStatus("조옮김할 악보가 없습니다.", true); return; }
-    if (!visualObj) { render(); }
+    // 먼저 렌더해 visualObj를 현재 입력과 동기화(오프셋 어긋남 방지)
+    render();
     if (!visualObj) { setStatus("먼저 올바른 악보를 만들어주세요.", true); return; }
     if (typeof ABCJS.strTranspose !== "function") {
       setStatus("이 abcjs 버전은 텍스트 조옮김을 지원하지 않습니다.", true); return;
