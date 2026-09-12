@@ -1,0 +1,32 @@
+X:1
+T:반딧불 캐논
+T:(Firefly Canon)
+R:Canon Variations
+M:4/4
+L:1/8
+Q:1/4=76
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:D
+% 캐논 진행: D - A - Bm - F#m - G - D - G - A (8마디 × 4변주)
+% ===== 기 (1-8마디) : 주제 제시 — 카논의 하강 선율, 담백하게 =====
+[V:1] !mp!"D"f6 e2 | "A"e6 d2 | "Bm"d6 c2 | "F#m"c6 B2 |
+[V:2] D,4 A,4 | A,,4 E,4 | B,,4 F,4 | F,,4 C,4 |
+[V:1] "G"B6 A2 | "D"A4 d4 | "G"B6 c2 | "A"c4 e4 |
+[V:2] G,,4 D,4 | D,4 A,4 | G,,4 D,4 | A,,4 E,4 |
+% ===== 승 (9-16마디) : 첫 변주 — 한 옥타브 위에서 밝게 노래하듯 =====
+[V:1] !mf!"D"f3 g a2 d'2 | "A"c'3 b a2 e2 | "Bm"b3 a f2 d2 | "F#m"a3 g f2 c2 |
+[V:2] D,,2 A,,2 D,2 F,2 | A,,2 E,2 A,2 C2 | B,,2 F,2 B,2 D2 | F,,2 C,2 F,2 A,2 |
+[V:1] "G"g3 a b2 d'2 | "D"a3 b a2 f2 | "G"g2 b2 d'3 b | "A"a2 c'2 e'3 d' |
+[V:2] G,,2 D,2 G,2 B,2 | D,,2 A,,2 D,2 F,2 | G,,2 D,2 G,2 B,2 | A,,2 B,,2 C,2 E,2 |
+% ===== 전 (17-24마디) : 두 번째 변주 — 8분음표 물결, 가장 화려한 절정 =====
+[V:1] !f!"D"d'c'd'e' f'e'f'd' | "A"c'bc'd' e'd'e'c' | "Bm"babc' d'c'd'b | "F#m"agab c'bc'a |
+[V:2] D,A,FA, D,A,FA, | A,,E,CE, A,,E,CE, | B,,F,DF, B,,F,DF, | F,,C,A,C, F,,C,A,C, |
+[V:1] "G"gfga babg | "D"fefg agaf | "G"gabc' d'e'd'b | "A"c'2 e'2 a3 g |
+[V:2] G,,D,B,D, G,,D,B,D, | D,A,FA, D,A,FA, | G,,D,B,D, G,,D,B,D, | A,,E,CE, A,,E,CE, |
+% ===== 결 (25-32마디) : 마지막 변주 — 3도 화음의 따뜻한 주제 회상, 잔잔한 행복 =====
+[V:1] !mp!"D"[df]6 [ce]2 | "A"[ce]6 [Bd]2 | "Bm"[Bd]6 [Ac]2 | "F#m"[Ac]6 [GB]2 |
+[V:2] D,2 A,2 D2 A,2 | A,,2 E,2 A,2 E,2 | B,,2 F,2 B,2 F,2 | F,,2 C,2 F,2 C,2 |
+[V:1] "G"[GB]6 [FA]2 | "D"[FA]4 [Ad]4 | !pp!"A""^rit."e3 d c2 e2 | "D"H[Adf]8 |]
+[V:2] G,,2 D,2 G,2 D,2 | D,2 A,2 D2 A,2 | A,,2 E,2 A,2 E,2 | H[D,,A,,D,]8 |]
