@@ -1,0 +1,31 @@
+X:1
+T:부자가 될 거예요
+T:(I'm Going to Be Rich)
+R:Anthem
+M:4/4
+L:1/8
+Q:1/4=80
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:F
+% ===== 기 (1-8마디) : 품위 있는 내려놓음 — F장조의 주제 =====
+[V:1] !mp!"F"c3 d c2 A2 | "Dm"d3 e f2 a2 | "Bb"b3 a g2 f2 | "C"e3 f g2 c2 |
+[V:2] F,,2 C,2 F,2 A,2 | D,2 A,2 D2 F2 | B,,2 F,2 B,2 D2 | C,2 G,2 C2 E2 |
+[V:1] "Dm"a3 g f2 d2 | "Gm"g3 f d2 B2 | "C7"A3 B c2 e2 | "F"f6 c2 |
+[V:2] D,2 A,2 D2 F2 | G,,2 D,2 G,2 B,2 | C,2 G,2 B,2 E2 | F,,2 C,2 F,2 A,2 |
+% ===== 승 (9-16마디) : 듀엣 — 나의 목소리, 아내의 목소리, 그리고 함께 =====
+[V:1] !p!"F""^나의 목소리"F3 G A2 c2 | "C7"c3 B A2 G2 | "F""^아내의 목소리"f3 g a2 c'2 | "Bb"d'4 b2 g2 |
+[V:2] F,,2 C,2 F,2 A,2 | C,2 G,2 C2 E2 | F,2 C2 F2 A2 | B,,2 F,2 B,2 D2 |
+[V:1] !mp!"Gm""^함께"[Bd]4 [ce]2 [df]2 | "Am"[ce]4 [df]2 [eg]2 | "Bb"[df]4 [ce]2 [Bd]2 | "C7"[ce]4 [Bd]2 [GB]2 |
+[V:2] G,,2 D,2 G,2 B,2 | A,,2 E,2 A,2 C2 | B,,2 F,2 B,2 D2 | C,2 G,2 B,2 E2 |
+% ===== 전 (17-24마디) : 세 번의 다짐 — 더 잘, 더 많이, 부자가 될 거예요 =====
+[V:1] !mf!"Bb""^세 번의 다짐"d2 d2 f2 g2 | "C"e2 e2 g2 a2 | "Dm"f2 f2 a2 b2 | !f!"C"c'4 a2 g2 |
+[V:2] B,,2 F,2 B,2 F,2 | C,2 G,2 C2 G,2 | D,2 A,2 D2 A,2 | C,2 G,2 C2 E2 |
+[V:1] "Bb"d'4 c'2 b2 | "Gm"b3 a g2 d2 | "D7""^새로운 문"d3 e ^f2 a2 | "D7"^f2 a2 c'2 d'2 |
+[V:2] B,,2 F,2 B,2 D2 | G,,2 D,2 G,2 B,2 | D,2 ^F,2 A,2 C2 | D,2 A,,2 D,2 A,,2 |
+% ===== 결 (25-32마디) : G장조 마에스토소 — 그리고 마지막의 "ㅎ" =====
+[V:1] [K:G] !f!"G""^Maestoso"[dd']3 [ee'] [dd']2 [Bb]2 | "C"[ee']3 [ff'] [gg']2 [ee']2 | "G/B"[bd']3 [ac'] [gb]2 [dg]2 | "D7"[fa]3 [gb] [fa]2 [df]2 |
+[V:2] [K:G] [G,,G,]2 D,2 [G,,G,]2 D,2 | [C,C]2 G,2 [C,C]2 G,2 | [B,,B,]2 D,2 [B,,B,]2 D,2 | [D,D]2 A,2 [D,D]2 C2 |
+[V:1] "Em"[gb]3 [fa] [eg]2 [Be]2 | "C"[ea]4 [eg]2 [ce]2 | "D7"a2 b2 c'2 d'2 | "G"[GBdg]6 !p!.g'2 |]
+[V:2] [E,E]2 B,2 [E,E]2 B,2 | [C,C]2 G,2 [C,C]2 G,2 | [D,D]2 F,2 A,2 C2 | [G,,D,G,]6 z2 |]
