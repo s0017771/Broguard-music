@@ -1,0 +1,32 @@
+X:1
+T:한낮의 가능성
+T:(Possibility in the Midday Sun)
+R:Air
+M:6/8
+L:1/8
+Q:3/8=56
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Em
+% 왼손 = 발걸음. 기: 무거운 두 걸음 / 승: 멈춰 섬(현타) / 전: 다시 움직임 / 결: 가벼워진 걸음
+% ===== 기 (1-8마디) : 뙤약볕, 무거운 발걸음 — Em =====
+[V:1] !mp!"Em"B2 A G3 | "D"A2 G F3 | "C"G2 F E3 | "B7"F2 E ^D3 |
+[V:2] E,3 B,3 | D,3 A,3 | C,3 G,3 | B,,3 F,3 |
+[V:1] "Em"B2 A G3 | "Am"c2 B A3 | "B7"A2 F ^D3 | "Em"E3 z3 |
+[V:2] E,3 B,3 | A,,3 E,3 | B,,3 F,3 | E,3 B,,3 |
+% ===== 승 (9-16마디) : 현타 — 걸음이 멈추고, 물음만 남는다 =====
+[V:1] !p!"Am"E2 A c3 | "G"d2 c B3 | "C"G2 c e3 | "Bm"d2 c B2 A |
+[V:2] A,,6 | G,,6 | C,6 | B,,6 |
+[V:1] "Am"c2 B A2 G | "Em"G2 F E3 | "Am"A2 B c2 d | "B7"e3 ^d2 B |
+[V:2] A,,6 | E,6 | A,,3 B,,3 | B,,6 |
+% ===== 전 (17-24마디) : 가능성을 보았다 — 해봤더니, 두렵지 않다 =====
+[V:1] !mf!"C"G2 A B2 c | "D"A2 B d2 f | "G"B2 c d2 g | "Em"g3 e2 d |
+[V:2] C,G,C G,C G, | D,A,D A,D A, | G,,D,G, D,G,D, | E,B,E B,E B, |
+[V:1] !f!"C"e2 f g2 a | "D"f2 g a2 b | "B7"^d'2 e' f'3 | "B7"e'2 ^d' B3 |
+[V:2] C,G,C G,C G, | D,A,D A,D A, | B,,F,^D F,^D F, | B,,F,B, F,B,F, |
+% ===== 결 (25-32마디) : 같은 길, 가벼워진 발걸음 — E장조 =====
+[V:1] [K:E] !mp!"E"G2 A B3 | "A"A2 B c3 | "E"B2 c d3 | "B7"e3 d3 |
+[V:2] [K:E] E,3 [G,B,]3 | A,,3 [C,E,]3 | E,3 [G,B,]3 | B,,3 [D,F,]3 |
+[V:1] "E"e2 d c2 B | "A"c2 B A2 F | "B7""^rit."A2 G F3 | "E"H[GBe]6 |]
+[V:2] E,3 [G,B,]3 | A,,3 [C,E,]3 | B,,3 [D,F,]3 | H[E,B,E]6 |]
