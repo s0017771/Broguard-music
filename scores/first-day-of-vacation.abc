@@ -1,0 +1,33 @@
+X:1
+T:방학 첫날
+T:(First Day of Vacation)
+R:Bright Piano
+M:4/4
+L:1/8
+Q:1/4=116
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:D
+% 밝은 여름 피아노 풍 오리지널(멜로디 창작): 통통 튀는 스타카토 반주(쿵짝-쉼짝),
+% 폴짝이는 멜로디, 8분음표 달리기, 옥타브 폴짝 엔딩
+% ===== 기 (1-8마디) : 아침 햇살 — 폴짝폴짝 =====
+[V:1] !mf!"D""^통통 튀게"f2a2 f2d2 | "G"g2b2 g2d2 | "A"e2a2 c'2a2 | "D"d'2a2 f2z2 |
+[V:2] D,2[FA]2 z2[FA]2 | G,2[GB]2 z2[GB]2 | A,2[CE]2 z2[CE]2 | D,2[FA]2 z2[FA]2 |
+[V:1] "D"f2a2 f2d2 | "G"g2b2 g2d2 | "A"e2f2 g2e2 | "D"d2f2 a2z2 |
+[V:2] D,2[FA]2 z2[FA]2 | G,2[GB]2 z2[GB]2 | A,2[CE]2 z2[CE]2 | D,2[FA]2 z2[FA]2 |
+% ===== 승 (9-16마디) : 자전거 — 한 층 높이 =====
+[V:1] "D""^자전거"a2d'2 a2f2 | "G"b2d'2 b2g2 | "A"a2c'2 e'2c'2 | "D"d'4 a2f2 |
+[V:2] D,2[FA]2 z2[FA]2 | G,2[GB]2 z2[GB]2 | A,2[CE]2 z2[CE]2 | D,2[FA]2 z2[FA]2 |
+[V:1] "Bm"b2d'2 b2f2 | "G"b2g2 e2g2 | "Em"g2e2 "A"e2c2 | "D"d2z2 d'2z2 |
+[V:2] B,2[DF]2 z2[DF]2 | G,2[GB]2 z2[GB]2 | E,2[GB]2 A,2[CE]2 | D,2[FA]2 z2[FA]2 |
+% ===== 전 (17-24마디) : 달리기 — 8분음표 질주 =====
+[V:1] !f!"D""^달리기"defg a2f2 | "G"gabc' d'2b2 | "A"abc'd' e'2c'2 | "D"f'2d'2 a2d'2 |
+[V:2] D,2[FA]2 z2[FA]2 | G,2[GB]2 z2[GB]2 | A,2[CE]2 z2[CE]2 | D,2[FA]2 z2[FA]2 |
+[V:1] "Bm"d'c'ba f2d2 | "G"b2g2 d2g2 | "Em"efga b2g2 | "A7"a2g2 e2c2 |
+[V:2] B,2[DF]2 z2[DF]2 | G,2[GB]2 z2[GB]2 | E,2[GB]2 z2[GB]2 | A,2[CE]2 z2[CE]2 |
+% ===== 결 (25-32마디) : 다시 아침 — 폴짝! =====
+[V:1] !mf!"D"f2a2 f2d2 | "G"g2b2 g2d2 | "A"e2a2 c'2a2 | "D"d'2a2 f2z2 |
+[V:2] D,2[FA]2 z2[FA]2 | G,2[GB]2 z2[GB]2 | A,2[CE]2 z2[CE]2 | D,2[FA]2 z2[FA]2 |
+[V:1] "D"f2a2 f2d2 | "G"g2b2 g2d2 | "A7"e2g2 a2c'2 | "D""^폴짝!"d'2a2 H[dfa]4 |]
+[V:2] D,2[FA]2 z2[FA]2 | G,2[GB]2 z2[GB]2 | A,2[CE]2 z2[CE]2 | D,2A,2 H[D,A,D]4 |]

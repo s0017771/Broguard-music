@@ -1,0 +1,35 @@
+X:1
+T:그린슬리브즈
+T:(Greensleeves — Traditional, arr.)
+C:Trad. English (16c) / 편곡: 브로가드 뮤직 랩
+R:Air
+M:6/8
+L:1/16
+Q:3/8=50
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Am
+% 16세기 잉글랜드 전통 민요(퍼블릭 도메인 선율) — 반주와 구성은 이 앨범의 편곡.
+% A선율 - B선율 - B선율 옥타브 위(정점) - 코다
+% ===== Intro (1-2마디) =====
+[V:1] !p!z12 | "E7"z8z2 A2 |
+[V:2] A,4C4E4 | E,4^G,4B,4 |
+% ===== A 선율 (3-10마디) =====
+[V:1] !mp!"Am"c4d2 e3fe2 | "G"d4B2 G3AB2 | "Am"c4A2 A3^GA2 | "E7"B4^G2 E4A2 |
+[V:2] A,4C4E4 | G,4B,4D4 | A,4C4E4 | E,4^G,4B,4 |
+[V:1] "Am"c4d2 e3fe2 | "G"d4B2 G3AB2 | "Am"c4A2 A3^GA2 | "E7"^G4E2 E6 |
+[V:2] A,4C4E4 | G,4B,4D4 | A,4C4E4 | E,4^G,4B,4 |
+% ===== B 선율 (11-18마디) =====
+[V:1] !mf!"C"g6 g3fe2 | "G"d4B2 G3AB2 | "Am"c4A2 A3^GA2 | "E7"B4^G2 E6 |
+[V:2] C,4E,4G,4 | G,4B,4D4 | A,4C4E4 | E,4^G,4B,4 |
+[V:1] "C"g6 g3fe2 | "G"d4B2 G3AB2 | "Am"c4A2 A3^GA2 | "E7"^G4E2 "Am"A6 |
+[V:2] C,4E,4G,4 | G,4B,4D4 | A,4C4E4 | E,4^G,4B,4 |
+% ===== B 선율, 옥타브 위 (19-26마디) : 정점 =====
+[V:1] !f!"C""^한 옥타브 위에서"g'6 g'3f'e'2 | "G"d'4b2 g3ab2 | "Am"c'4a2 a3^ga2 | "E7"b4^g2 e4a2 |
+[V:2] C,2G,2C2E2G2E2 | G,2D,2G,2B,2D2B,2 | A,2E,2A,2C2E2C2 | E,2B,2E2^G2B2^G2 |
+[V:1] "C"g'6 g'3f'e'2 | "G"d'4b2 g3ab2 | "Am"c'4a2 a3^ga2 | "E7"^g4e2 "Am"a6 |
+[V:2] C,2G,2C2E2G2E2 | G,2D,2G,2B,2D2B,2 | A,2E,2A,2C2E2C2 | E,2B,2E2^G2B2^G2 |
+% ===== Coda (27-28마디) =====
+[V:1] !p!"Am""^rit."e4c2 A6 | "Am"H[Ace]12 |]
+[V:2] A,4C4E4 | H[A,,E,A,]12 |]

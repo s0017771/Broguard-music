@@ -1,0 +1,33 @@
+X:1
+T:달빛 편지
+T:(Moonlight Letter)
+R:Ballad
+M:4/4
+L:1/16
+Q:1/4=66
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:C
+% 올드 만다린 연가 풍 오리지널(멜로디 창작): 5음음계(도레미솔라) 선율,
+% 다정한 분산화음, 물음과 대답의 연서, 달빛처럼 높이 끝나는 엔딩
+% ===== 기 · 첫 문장 (1-8마디) : 달에게 묻듯 =====
+[V:1] !mp!"C""^달에게 묻듯"e6ge g8 | "Em"g6ag e8 | "F"a6ga c'8 | "C"g8 e4d4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | E,2B,2G2B,2 E2B,2G2B,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "F"d'6c'a a8 | "C/E"g6ag e8 | "Dm7"d6ed a8 | "G7"d8 z4 d2e2 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | E,2G,2C2G,2 E2G,2C2G,2 | D,2A,2F2A,2 D2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2F2D,2 |
+% ===== 승 · 두 번째 문장 (9-16마디) : 마음이 조금 커진다 =====
+[V:1] !mf!"C""^마음이 커진다"g6ag c'8 | "Am"a6c'a e'8 | "F"d'6c'a c'8 | "C"c'8 g4e4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "Am"a6ga e8 | "Em"g6eg d8 | "Dm7"d6cd a8 | "G7"g8 z8 |
+[V:2] A,,2E,2C2E,2 A,2E,2C2E,2 | E,2B,2G2B,2 E2B,2G2B,2 | D,2A,2F2A,2 D2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2F2D,2 |
+% ===== 전 · 사무치는 문장 (17-24마디) : 높은 곳의 고백 =====
+[V:1] !f!"C""^사무치게"c'6d'c' e'8 | "Am"e'6c'e' a8 | "F"d'6c'd' a8 | "C"g8 e4d4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "F"a6c'a d'8 | "C/E"g6ag e8 | "Dm7"d4e4 f4a4 | "G7"d8 B4G4 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | E,2G,2C2G,2 E2G,2C2G,2 | D,2A,2F2A,2 D2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2F2D,2 |
+% ===== 결 · 답장 (25-32마디) : 같은 문장이 대답이 되어 =====
+[V:1] !p!"C""^답장처럼"e6ge g8 | "Em"g6ag e8 | "F"a6ga c'8 | "C"g8 e4d4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | E,2B,2G2B,2 E2B,2G2B,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "F"d'6c'a a8 | "C/E"g6ag e8 | !pp!"G7""^rit."d6cd B4G4 | "C""^달빛"H[egc']16 |]
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | E,2G,2C2G,2 E2G,2C2G,2 | G,,2D,2B,2D,2 G,2D,2F2D,2 | H[C,G,C]16 |]

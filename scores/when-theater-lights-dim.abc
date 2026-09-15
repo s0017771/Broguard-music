@@ -1,0 +1,33 @@
+X:1
+T:극장의 불이 꺼지면
+T:(When the Theater Lights Dim)
+R:Romance
+M:4/4
+L:1/16
+Q:1/4=69
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 이탈리아 영화음악 풍 오리지널(멜로디 창작): 6도 도약의 칸타빌레,
+% 길게 숨쉬는 프레이즈, 회상의 상승부, 따뜻한 고음 엔딩
+% ===== 기 · 첫 장면 (1-8마디) : 6도 도약의 노래 =====
+[V:1] !mp!"G""^노래하듯"d4b4 b6ab | "Em"g6fg e4B4 | "C"c4a4 a6ga | "D7"f8 d4A4 |
+[V:2] G,,2D,2B,2D,2 G,2D,2B,2D,2 | E,2B,2G2B,2 E2B,2G2B,2 | C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2C2A,2 D2A,2C2A,2 |
+[V:1] "G"d4b4 b6ab | "Em"g6fg e4B4 | "Am7"c4e4 a6ba | "D7"a8 f4d4 |
+[V:2] G,,2D,2B,2D,2 G,2D,2B,2D,2 | E,2B,2G2B,2 E2B,2G2B,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | D,2A,2C2A,2 D2A,2C2A,2 |
+% ===== 승 · 두 번째 상영 (9-16마디) =====
+[V:1] !mf!"G""^두 번째 상영"d4b4 b6ab | "Em"g6fg e4B4 | "C"c4a4 a6ga | "D7"f8 d4A4 |
+[V:2] G,,2D,2B,2D,2 G,2D,2B,2D,2 | E,2B,2G2B,2 E2B,2G2B,2 | C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2C2A,2 D2A,2C2A,2 |
+[V:1] "G"d4b4 b6ab | "Em"g6fg e4B4 | "Am7"e4a4 c'6bc' | "D7"d'8 c'4a4 |
+[V:2] G,,2D,2B,2D,2 G,2D,2B,2D,2 | E,2B,2G2B,2 E2B,2G2B,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | D,2A,2C2A,2 D2A,2C2A,2 |
+% ===== 전 · 회상 (17-24마디) : 필름이 거꾸로 돈다 =====
+[V:1] !f!"C""^회상"e'6d'e' c'4g4 | "G/B"d'6c'd' b4g4 | "Am"c'6bc' a4e4 | "D7"a6ga f4d4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | B,,2G,2D2G,2 B,2G,2D2G,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | D,2A,2C2A,2 D2A,2C2A,2 |
+[V:1] "C"e'6d'e' c'4g4 | "G/B"d'6c'd' b4g4 | "Am"e'4c'4 a4c'4 | "D7"d'8 z4 a2b2 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | B,,2G,2D2G,2 B,2G,2D2G,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | D,2A,2C2A,2 D2A,2C2A,2 |
+% ===== 결 · 마지막 장면 (25-32마디) : 불이 꺼지고, 별이 켜진다 =====
+[V:1] !mf!"G""^마지막 장면"d4b4 b6ab | "Em"g6fg e4B4 | "C"c4a4 a6ga | "D7"f8 d4A4 |
+[V:2] G,,2D,2B,2D,2 G,2D,2B,2D,2 | E,2B,2G2B,2 E2B,2G2B,2 | C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2C2A,2 D2A,2C2A,2 |
+[V:1] "G"d4b4 d'8 | "Em"b6ab g4e4 | !p!"Am7""^rit."c'4a4 "D7"f4a4 | "G""^별"H[gbd']16 |]
+[V:2] G,,2D,2B,2D,2 G,2D,2B,2D,2 | E,2B,2G2B,2 E2B,2G2B,2 | A,,2E,2C2E,2 D,2A,2C2A,2 | H[G,,D,G,]16 |]

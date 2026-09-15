@@ -1,0 +1,33 @@
+X:1
+T:밤하늘 산책
+T:(A Walk in the Night Sky)
+R:Duet Ballad
+M:4/4
+L:1/16
+Q:1/4=88
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:D
+% 듀엣 발라드 풍 오리지널(멜로디 창작): 그의 소절 - 그녀의 소절(높이) - 3도 화음 함께 -
+% 반음 위 전조(D→Eb)의 마지막 비행
+% ===== 기 · 그의 목소리 (1-8마디) =====
+[V:1] !mp!"D""^그의 목소리"d4e4 f6gf | "G"g4b4 d'8 | "D"a6ba f4d4 | "A"e8 c4A4 |
+[V:2] D,2A,2F2A,2 D2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | D,2A,2F2A,2 D2A,2F2A,2 | A,,2E,2C2E,2 A,2E,2C2E,2 |
+[V:1] "Bm"d4f4 b6ab | "G"b4g4 e4g4 | "A7"a8 g4e4 | "D"f8 d4z4 |
+[V:2] B,,2F,2D2F,2 B,2F,2D2F,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | A,,2E,2G2E,2 A,2E,2C2E,2 | D,2A,2F2A,2 D2A,2F2A,2 |
+% ===== 승 · 그녀의 목소리 (9-16마디) : 더 높이 날아오른다 =====
+[V:1] !mf!"D""^그녀의 목소리"a4b4 d'6e'd' | "G"b4d'4 g'8 | "D"f'6e'f' d'4a4 | "A"e'8 c'4a4 |
+[V:2] D,2A,2F2A,2 D2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | D,2A,2F2A,2 D2A,2F2A,2 | A,,2E,2C2E,2 A,2E,2C2E,2 |
+[V:1] "Bm"d'4f'4 b4d'4 | "G"b4g4 e'4d'4 | "A7"c'8 d'4e'4 | "D"f'8 d'4z4 |
+[V:2] B,,2F,2D2F,2 B,2F,2D2F,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | A,,2E,2G2E,2 A,2E,2C2E,2 | D,2A,2F2A,2 D2A,2F2A,2 |
+% ===== 전 · 함께 (17-24마디) : 3도 화음으로 나란히 =====
+[V:1] !f!"Bm""^함께"[df]4[eg]4 [fa]4[gb]4 | "G"[gb]8 [fa]4[df]4 | "Em"[eg]4[fa]4 [gb]4[ac']4 | "A7"[gb]8 [ac']4[bd']4 |
+[V:2] B,,2F,2D2F,2 B,2F,2D2F,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | E,2B,2G2B,2 E2B,2G2B,2 | A,,2E,2G2E,2 A,2E,2C2E,2 |
+[V:1] "Bm"[df]4[eg]4 [fa]4[gb]4 | "G"[gb]4[ac']4 [bd']8 | "Em"[c'e']8 "A7"[bd']4[ac']4 | "A7"[ac']8 z8 |
+[V:2] B,,2F,2D2F,2 B,2F,2D2F,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | E,2B,2G2B,2 A,,2E,2G2E,2 | A,,2E,2G2E,2 A,2E,2C2E,2 |
+% ===== 결 · 새로운 하늘 (25-32마디) : 반음 위로 — Eb장조의 마지막 비행 =====
+[V:1] [K:Eb] !f!"Eb""^새로운 하늘"e4f4 g6ag | "Ab"a4c'4 e'8 | "Eb"b6c'b g4e4 | "Bb"f8 d4B4 |
+[V:2] [K:Eb] E,2B,2G2B,2 E2B,2G2B,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | E,2B,2G2B,2 E2B,2G2B,2 | B,,2F,2D2F,2 B,2F,2D2F,2 |
+[V:1] "Cm"e4g4 c'6bc' | "Ab"c'4a4 f4a4 | !p!"Bb7""^rit."b8 a4f4 | "Eb"H[gbe']16 |]
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | B,,2F,2A,2F,2 B,2F,2D2F,2 | H[E,B,E]16 |]
