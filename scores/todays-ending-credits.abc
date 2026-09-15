@@ -1,0 +1,36 @@
+X:1
+T:오늘의 엔딩 크레딧
+T:(Today's Ending Credits — 16th Groove)
+R:Ballad
+M:4/4
+L:1/16
+Q:1/4=72
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Bb
+% 아이유 발라드 풍 오리지널(멜로디 창작): 하강 베이스 라인, 6도 도약 훅, 마지막 코러스 전조(Bb→C)
+% ===== 기 · Verse (1-8마디) : 오늘 하루를 자막처럼 읽어내려간다 =====
+[V:1] !mp!"Bb""^Verse"d3d f2d2 B6z2 | "F/A"c3c d2c2 A6z2 | "Gm7"B3B d2B2 G6z2 | "F"A3A c2A2 F6z2 |
+[V:2] B,,2F,2D2F,2 B,2F,2D2F,2 | A,,2F,2C2F,2 A,2F,2C2F,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 |
+[V:1] "Eb"e3e g2e2 c6z2 | "Dm7"d3d f2d2 A6z2 | "Cm7"c3c e2c2 G4B2c2 | "F7"d4c4 A4 FGAB |
+[V:2] E,2B,2G2B,2 E,2B,2G2B,2 | D,2A,2F2A,2 D,2A,2F2A,2 | C,2G,2E2G,2 C2G,2E2G,2 | F,2C,2A,2C,2 F,2C,2E2C2 |
+% ===== 승 · Pre-Chorus (9-12마디) : 자막이 빨라진다 =====
+[V:1] !mf!"Gm""^Pre-Chorus"B2B2 c2c2 d4d3d | "Eb"c2c2 d2d2 e4e3e | "Cm7"e2e2 f2f2 g4g3g | "F7"a8 z4 c2d2 |
+[V:2] G,,4D,4 G,4D,4 | E,4B,4 E4B,4 | C,4G,4 C4G,4 | F,4C,4 F,4z4 |
+% ===== 전 · Chorus (13-20마디) : 6도 도약 — 오늘의 주인공은 당신 =====
+[V:1] !f!"Bb""^Chorus"d4b4 b6c'b | "F/A"a6ba f4c4 | "Gm7"g4d'4 d'6c'b | "Eb"c'6ba g4e4 |
+[V:2] B,,2F,2D2F,2 B,2F,2D2F,2 | A,,2F,2C2F,2 A,2F,2C2F,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | E,2B,2G2B,2 E,2B,2G2B,2 |
+[V:1] "Bb"d4b4 b6c'b | "F/A"a6ba f4d4 | "Cm7"c'4g4 e4g4 | "F7"f6ef d4c4 |
+[V:2] B,,2F,2D2F,2 B,2F,2D2F,2 | A,,2F,2C2F,2 A,2F,2C2F,2 | C,2G,2E2G,2 C2G,2E2G,2 | F,2C,2A,2C,2 F,2C,2E2C2 |
+% ===== 그늘 · Interlude (21-24마디) : 회상 장면 — 그리고 조명이 바뀐다 =====
+[V:1] !p!"Ebmaj7""^Interlude"g8 f4e4 | "Dm7"f8 d4c4 | "Cm7"e8 d4c4 | !mf!"F7"c2d2 e2f2 g4a4 |
+[V:2] E,4B,4 E4B,4 | D,4A,4 D4A,4 | C,4G,4 C4G,4 | F,4A,4 C4E4 |
+% ===== 결 · Final Chorus (25-32마디) : C장조 전조 — 내일의 예고편처럼 =====
+[V:1] [K:C] !f!"C""^한 음 위로"e4c'4 c'6d'c' | "G/B"b6c'b g4d4 | "Am7"a4e'4 e'6d'c' | "F"d'6c'b a4f4 |
+[V:2] [K:C] C,2G,2E2G,2 C2G,2E2G,2 | B,,2G,2D2G,2 B,2G,2D2G,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | F,2C2A,2C2 F,2C2A,2C2 |
+[V:1] "C"e4c'4 c'6d'c' | "G/B"b6c'b g4e4 | "Dm7"d'4a4 f4a4 | "G7"g6fg e4d4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | B,,2G,2D2G,2 B,2G,2D2G,2 | D,2A,2F2A,2 D,2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2F2D2 |
+% ===== Outro (33-36마디) : 크레딧이 올라간다 =====
+[V:1] !p!"C""^Outro"e3e g2e2 c6z2 | "F"f3f a2f2 c6z2 | !pp!"G7""^rit."d4e4 d4B4 | "C"H[ceg]16 |]
+[V:2] C,4G,4 E4G,4 | F,4C4 A,4C4 | G,4D4 B,4D4 | H[C,G,C]16 |]
