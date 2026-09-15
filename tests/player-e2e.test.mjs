@@ -45,19 +45,45 @@ await page.addInitScript(() => {
 await page.goto(`${base}/player.html`, { waitUntil: 'domcontentloaded' });
 
 try {
-  // 1) 악보집 목록
-  const lib = await page.$$eval('#liblist li .t', els => els.map(e => e.textContent));
-  assert.deepEqual(lib, ['곡 하나', '곡 둘', '곡 셋'], '악보집 3곡, 최근순');
-  ok('악보집 곡들이 목록에 보인다');
+  // 1) 악보집 목록 — 카테고리(분류) 그룹으로 표시
+  const groups = await page.$$eval('#liblist details.catgrp', els => els.map(d => ({
+    name: d.querySelector('summary span').textContent,
+    cnt: d.querySelector('summary .cnt').textContent,
+    titles: Array.from(d.querySelectorAll('li .t')).map(e => e.textContent)
+  })));
+  assert.equal(groups.length, 2, '분류 그룹 2개(K-가요·기타)');
+  assert.equal(groups[0].name, 'K-가요'); assert.deepEqual(groups[0].titles, ['곡 하나']);
+  assert.equal(groups[1].name, '기타'); assert.deepEqual(groups[1].titles, ['곡 둘', '곡 셋'], '분류 없는 곡은 기타로');
+  assert.equal(groups[1].cnt, '2곡', '곡 수 표기');
+  ok('악보집이 카테고리별로 묶여 보인다');
 
-  // 2) 담기 + 전체 담기 → 재생목록 구성
-  await page.click('#liblist li:nth-child(2) button');   // 곡 둘 담기
-  await page.click('#addAllBtn');                        // + 전체(3곡)
+  // 2) 담기(개별) + 분류 담기 + 전체 담기 → 재생목록 구성
+  await page.evaluate(() => {   // '곡 둘' 개별 담기
+    const li = Array.from(document.querySelectorAll('#liblist li')).find(l => l.querySelector('.t').textContent === '곡 둘');
+    li.querySelector('button').click();
+  });
   let st = await page.evaluate(() => window.__player.getState());
-  assert.equal(st.count, 4, '재생목록 4곡(담기 1 + 전체 3)');
+  assert.deepEqual(st.titles, ['곡 둘'], '개별 담기');
+  await page.evaluate(() => {   // '기타' 분류 통째 담기(2곡)
+    document.querySelectorAll('#liblist details.catgrp summary button.catadd')[1].click();
+  });
+  st = await page.evaluate(() => window.__player.getState());
+  assert.equal(st.count, 3, '분류 담기로 +2곡');
+  await page.click('#addAllBtn');                        // + 전체(3곡)
+  st = await page.evaluate(() => window.__player.getState());
+  assert.equal(st.count, 6, '전체 담기로 +3곡');
+  assert.equal(await page.$$eval('#plist li', e => e.length), 6, '목록 UI 6줄');
+  ok('➕ 담기 / 분류 담기 / 전체 담기가 재생목록에 쌓인다');
+
+  // 이후 시나리오(순서·저장·재생)를 위해 비우고 원래 4곡 구성으로 재구성
+  await page.click('#clearBtn');
+  await page.evaluate(() => {
+    const li = Array.from(document.querySelectorAll('#liblist li')).find(l => l.querySelector('.t').textContent === '곡 둘');
+    li.querySelector('button').click();
+  });
+  await page.click('#addAllBtn');
+  st = await page.evaluate(() => window.__player.getState());
   assert.deepEqual(st.titles, ['곡 둘', '곡 하나', '곡 둘', '곡 셋']);
-  assert.equal(await page.$$eval('#plist li', e => e.length), 4, '목록 UI 4줄');
-  ok('➕ 담기 / 전체 담기가 재생목록에 쌓인다');
 
   // 3) 순서 이동·빼기
   await page.click('#plist li:nth-child(1) button[title="아래로"]');
