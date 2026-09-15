@@ -292,7 +292,8 @@
   /* ── 배경 재생 유지(화면 꺼짐 대비): 무음 오디오로 미디어 세션 유지 + 잠금화면 컨트롤 ── */
   var keeper = null;
   function makeSilentUrl() {
-    var sr = 8000, n = sr * 10, ab = new ArrayBuffer(44 + n * 2), dv = new DataView(ab);
+    /* 기기 출력과 같은 44.1kHz로 만들어 오디오 경로 전환(끊김) 방지 */
+    var sr = 44100, n = sr * 30, ab = new ArrayBuffer(44 + n * 2), dv = new DataView(ab);
     function ws(off, s) { for (var i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); }
     ws(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); ws(8, "WAVE"); ws(12, "fmt ");
     dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
@@ -307,6 +308,10 @@
     } catch (e) {}
   }
   function keeperOff() { try { if (keeper) keeper.pause(); } catch (e) {} }
+  /* 무음 유지 오디오는 '화면이 꺼져 있을 때만' — 재생 중 상시 틀면 일부 폰에서 소리가 뚝뚝 끊김 */
+  function syncKeeper() {
+    if (document.hidden && isPlaying && !isPaused) keeperOn(); else keeperOff();
+  }
   function setMediaSession(title, state) {
     if (!("mediaSession" in navigator)) return;
     try {
@@ -318,8 +323,9 @@
       navigator.mediaSession.setActionHandler("previoustrack", function () { $("prevBtn").click(); });
     } catch (e) {}
   }
-  /* 화면이 다시 켜졌을 때: 오디오가 끊겨 있으면 현재 곡부터 이어서 복구 */
+  /* 화면 꺼짐 → 무음 유지 켬 / 화면 켜짐 → 무음 유지 끄고, 끊긴 재생은 현재 곡부터 복구 */
   document.addEventListener("visibilitychange", function () {
+    syncKeeper();
     if (document.hidden || !isPlaying) return;
     try { if (audioCtx && audioCtx.state !== "running") audioCtx.resume(); } catch (e) {}
     if (!isPaused && synth && typeof synth.getIsRunning === "function" && !synth.getIsRunning()) playAt(curIdx);
@@ -383,7 +389,7 @@
       synth = sy;
       sy.start();
       failStreak = 0;
-      keeperOn();
+      syncKeeper();
       setMediaSession(it.title, "playing");
       setStatus("♪ 재생 중 — " + it.title + ($("chordAccChk").checked ? "" : " (코드 반주 없음)"));
     } catch (e) {
@@ -406,7 +412,7 @@
     if (isPaused && synth && typeof synth.resume === "function") {
       synth.resume(); isPaused = false;
       $("pauseBtn").textContent = "⏸ 일시정지"; setStatus("♪ 이어서 재생");
-      keeperOn(); setMediaSession(null, "playing");
+      syncKeeper(); setMediaSession(null, "playing");
       return;
     }
     playAt(curIdx >= 0 ? curIdx : 0);
@@ -421,7 +427,7 @@
     } else if (isPaused && typeof synth.resume === "function") {
       synth.resume(); isPaused = false;
       $("pauseBtn").textContent = "⏸ 일시정지"; setStatus("♪ 이어서 재생");
-      keeperOn(); setMediaSession(null, "playing");
+      syncKeeper(); setMediaSession(null, "playing");
     }
   });
   $("stopBtn").addEventListener("click", function () { stopAll(); setStatus("정지했어요."); });
@@ -463,7 +469,7 @@
 
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__player = {
-    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }) }; },
+    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), keeperActive: !!(keeper && !keeper.paused) }; },
     playAt: playAt, slurSameToTie: slurSameToTie
   };
 })();
