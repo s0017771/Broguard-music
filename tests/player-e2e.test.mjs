@@ -132,7 +132,9 @@ try {
     assert.equal(inits[0].chordsOff, false, '코드 반주 켬 → chordsOff:false');
     assert.equal(inits[0].sf, 'default', '기본 음질');
     assert.ok(/곡 하나/.test(await page.textContent('#nowTitle')), '지금 재생 표시');
-    ok('▶ 재생이 첫 곡부터 시작한다');
+    // 화면이 켜져 있는 동안엔 무음 유지 오디오를 틀지 않는다(재생 중 뚝뚝 끊김 방지)
+    assert.equal(st.keeperActive, false, '전면 재생 중엔 무음 유지 오디오 꺼짐');
+    ok('▶ 재생이 첫 곡부터 시작한다 (무음 유지 오디오 없이)');
 
     // 6) 곡 끝(onEnded) → 자동 다음 곡
     await page.evaluate(() => window.__onEnded());
