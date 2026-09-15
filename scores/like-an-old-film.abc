@@ -1,0 +1,33 @@
+X:1
+T:오래된 영화처럼
+T:(Like an Old Film)
+R:Romance
+M:4/4
+L:1/16
+Q:1/4=76
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Am
+% 옛 영화음악 풍 오리지널(멜로디 창작): 맴도는 순차진행 선율, 5도권 하강(Am-Dm-G-C-F),
+% 관계장조 회상 장면, 필름이 끝나는 단조 엔딩
+% ===== 기 · 주제 (1-8마디) : 눈 내리는 첫 장면 =====
+[V:1] !mp!"Am""^주제"a4b4 c'4b4 | "Dm"f4g4 a4g4 | "G"g4a4 b4a4 | "C"g8 e4c4 |
+[V:2] A,,2E,2C2E,2 A,2E,2C2E,2 | D,2A,2F2A,2 D,2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "F"f4g4 a4g4 | "Dm"f4e4 d4e4 | "E7"^g4a4 b4g4 | "Am"a8 z8 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D,2A,2F2A,2 | E,2B,2^G2B,2 E2B,2^G2B,2 | A,,2E,2C2E,2 A,2E,2C2E,2 |
+% ===== 승 · 두 번째 회전 (9-16마디) : 같은 주제가 위로 떠오른다 =====
+[V:1] !mf!"Am""^한 층 위에서"a4b4 c'4b4 | "Dm"f4g4 a4g4 | "G"g4a4 b4a4 | "C"g8 a4b4 |
+[V:2] A,,2E,2C2E,2 A,2E,2C2E,2 | D,2A,2F2A,2 D,2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "F"c'4d'4 c'4a4 | "Dm"f4g4 a4d'4 | "E7"^g4b4 e'4d'4 | "Am"c'8 b4a4 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D,2A,2F2A,2 | E,2B,2^G2B,2 E2B,2^G2B,2 | A,,2E,2C2E,2 A,2E,2C2E,2 |
+% ===== 전 · 회상 (17-24마디) : C장조의 환한 장면 =====
+[V:1] !mf!"C""^환한 회상"e'4d'4 c'4d'4 | "Am"e'4c'4 a4c'4 | "F"a4g4 f4a4 | "G"g4a4 b4d'4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 |
+[V:1] "C"e'4d'4 c'4d'4 | "Am"e'4c'4 a4c'4 | !f!"Dm"f'8 e'4d'4 | "E7"b8 ^g4e4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | D,2A,2F2A,2 D,2A,2F2A,2 | E,2B,2^G2B,2 E2B,2^G2B,2 |
+% ===== 결 · 마지막 장면 (25-32마디) : 필름이 끝난다 =====
+[V:1] !p!"Am""^마지막 장면"a4b4 c'4b4 | "Dm"f4g4 a4g4 | "G"g4a4 b4a4 | "C"g8 e4c4 |
+[V:2] A,,2E,2C2E,2 A,2E,2C2E,2 | D,2A,2F2A,2 D,2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "F"f4g4 a4g4 | "Dm"f4e4 d4e4 | !pp!"E7""^rit."^g4a4 b4g4 | "Am"H[Ace]16 |]
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D,2A,2F2A,2 | E,2B,2^G2B,2 E2B,2^G2B,2 | H[A,,E,A,]16 |]

@@ -1,0 +1,33 @@
+X:1
+T:깃털 하나
+T:(A Single Feather)
+R:Air
+M:4/4
+L:1/16
+Q:1/4=80
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:D
+% 서정 영화음악 풍 오리지널(멜로디 창작): 높은 음역에서 떠다니는 순수한 선율,
+% 16분음표 팔랑임, 바람이 바뀌는 단조 드리프트, 공중에 뜬 채 끝나는 엔딩
+% ===== 기 · 떠오르다 (1-8마디) =====
+[V:1] !p!"D""^가볍게, 떠다니듯"d'4a4 f4a4 | "G"b4g4 d4g4 | "A"c'4a4 e4a4 | "D"d'8 z8 |
+[V:2] D,2A,2D2F2 A2F2D2A,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 | A,,2E,2A,2C2 E2C2A,2E,2 | D,2A,2D2F2 A2F2D2A,2 |
+[V:1] "Bm"d'4b4 f4b4 | "G"b4d'4 g'8 | "A"f'4e'4 c'4a4 | "D"d'8 z8 |
+[V:2] B,,2F,2B,2D2 F2D2B,2F,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 | A,,2E,2A,2C2 E2C2A,2E,2 | D,2A,2D2F2 A2F2D2A,2 |
+% ===== 승 · 팔랑팔랑 (9-16마디) : 16분음표 바람 =====
+[V:1] !mp!"D""^팔랑팔랑"d'4a4 f4 agfe | "G"b4g4 d4 defg | "A"c'4a4 e4 efga | "D"d'8 f4a4 |
+[V:2] D,2A,2D2F2 A2F2D2A,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 | A,,2E,2A,2C2 E2C2A,2E,2 | D,2A,2D2F2 A2F2D2A,2 |
+[V:1] "Bm"d'4b4 f4 fgab | "G"b4d'4 g'8 | "A"f'4e'4 c'4 c'bag | "D"f8 d8 |
+[V:2] B,,2F,2B,2D2 F2D2B,2F,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 | A,,2E,2A,2C2 E2C2A,2E,2 | D,2A,2D2F2 A2F2D2A,2 |
+% ===== 전 · 바람이 바뀌다 (17-24마디) : 잠깐의 단조 드리프트 =====
+[V:1] !mf!"Bm""^바람이 바뀐다"b8 a4f4 | "F#m"a8 f4c4 | "G"g4a4 b4d'4 | "D"f8 a4d'4 |
+[V:2] B,,2F,2B,2D2 F2D2B,2F,2 | F,2C,2F,2A,2 C2A,2F,2C,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 | D,2A,2D2F2 A2F2D2A,2 |
+[V:1] "Em"e'8 d'4b4 | "Bm"d'8 b4f4 | "G"g4b4 d'4e'4 | "A7"c'8 e4g4 |
+[V:2] E,2B,2E2G2 B2G2E2B,2 | B,,2F,2B,2D2 F2D2B,2F,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 | A,,2E,2C2E,2 G2E2C2E,2 |
+% ===== 결 · 다시 하늘로 (25-32마디) : 착지하지 않는 엔딩 =====
+[V:1] !p!"D""^다시 하늘로"d'4a4 f4a4 | "G"b4g4 d4g4 | "A"c'4a4 e4a4 | "D"d'8 z8 |
+[V:2] D,2A,2D2F2 A2F2D2A,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 | A,,2E,2A,2C2 E2C2A,2E,2 | D,2A,2D2F2 A2F2D2A,2 |
+[V:1] "G"b4d'4 g'8 | !pp!"A7""^rit."f'4e'4 c'4g4 | "D"f4e4 d4e4 | "D""^공중에서"Hd'16 |]
+[V:2] G,,2D,2G,2B,2 D2B,2G,2D,2 | A,,2E,2C2E,2 G2E2C2E,2 | D,2A,2D2F2 A2F2D2A,2 | H[D,A,D]16 |]
