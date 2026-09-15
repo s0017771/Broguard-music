@@ -1,0 +1,37 @@
+X:1
+T:떼창의 밤
+T:(Night of the Singalong)
+R:Dance
+M:4/4
+L:1/16
+Q:1/4=132
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Am
+% 파티 댄스 풍 오리지널(멜로디 창작): 쿵-짝 스톰프, 브라스 스탭 리프,
+% 콜 앤 리스폰스 응원, 2002 클랩(짝-짝-짝짝짝) 브레이크다운, 옥타브 드롭
+% ===== Intro (1-4마디) : 브라스 스탭 리프 — 파티 시작! =====
+[V:1] !f!"Am""^스탭 리프"a2a2 z2e2 a2b2 c'4 | "Am"c'2b2 a2g2 a8 | "F"f2f2 z2c2 f2g2 a4 | "G"b2a2 g2f2 e2d2 e4 |
+[V:2] A,,4[CE]4 A,,4[CE]4 | A,,4[CE]4 A,,4[CE]4 | F,,4[A,C]4 F,,4[A,C]4 | G,,4[B,D]4 G,,4[B,D]4 |
+% ===== 기 · Verse (5-12마디) : 랩처럼 — 16분음표 수다 =====
+[V:1] !mf!"Am""^랩처럼"e2e2 eeee e2d2 c4 | "Am"c2c2 cccc c2B2 A4 | "F"f2f2 ffff f2e2 c4 | "G"d2d2 dddd d2e2 f4 |
+[V:2] A,,4[CE]4 A,,4[CE]4 | A,,4[CE]4 A,,4[CE]4 | F,,4[A,C]4 F,,4[A,C]4 | G,,4[B,D]4 G,,4[B,D]4 |
+[V:1] "Am"e2e2 eeee e2d2 c4 | "Am"c2c2 cccc c2B2 A4 | "F"a2a2 aaaa a2g2 f4 | "E7"^g2g2 z4 e2g2 b4 |
+[V:2] A,,4[CE]4 A,,4[CE]4 | A,,4[CE]4 A,,4[CE]4 | F,,4[A,C]4 F,,4[A,C]4 | E,4[^G,D]4 E,4[^G,D]4 |
+% ===== 승 · Call & Response (13-20마디) : 외치고 — 대답하고 =====
+[V:1] !f!"Am""^외치면!"e'4c'4 a4z4 | "F"f'4e'4 "G"d'4z4 | "Am""^대답한다!"A2c2 e2c2 A4z4 | "E7"^G2B2 e2B2 ^G4z4 |
+[V:2] A,,4[CE]4 A,,4[CE]4 | F,,4[A,C]4 G,,4[B,D]4 | A,,4[CE]4 A,,4[CE]4 | E,4[^G,D]4 E,4[^G,D]4 |
+[V:1] "Am"e'4c'4 a4z4 | "F"f'4e'4 "G"d'4z4 | "Am"A2c2 e2c2 A4z4 | "E7"^G2B2 e2^g2 b4z4 |
+[V:2] A,,4[CE]4 A,,4[CE]4 | F,,4[A,C]4 G,,4[B,D]4 | A,,4[CE]4 A,,4[CE]4 | E,4[^G,D]4 E,4[^G,D]4 |
+% ===== 전 · Breakdown (21-24마디) : 그 클랩 — 짝-짝-짝짝짝! =====
+[V:1] !p!"Am""^클랩: 짝-짝-짝짝짝"c4 c4 c2c2c4 | "F"c4 c4 c2c2c4 | "G"d4 d4 d2d2d4 | !mf!"E7"e4 e4 e2e2 ^g2b2 |
+[V:2] A,,4 A,,4 A,,2A,,2A,,4 | F,,4 F,,4 F,,2F,,2F,,4 | G,,4 G,,4 G,,2G,,2G,,4 | E,4 E,4 E,2E,2 E,2E,2 |
+% ===== 결 · Drop (25-32마디) : 리프가 돌아온다 — 한 옥타브 위로! =====
+[V:1] !ff!"Am""^드롭!"a2a2 z2e2 a2b2 c'4 | "Am"c'2b2 a2g2 a8 | "F"f2f2 z2c2 f2g2 a4 | "G"b2a2 g2f2 e2d2 e4 |
+[V:2] A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | F,,2F,2F,,2F,2 F,,2F,2F,,2F,2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 |
+[V:1] "Am"e'2e'2 z2c'2 e'2d'2 c'4 | "Am"c'2b2 a2b2 c'8 | "F"f'2e'2 d'2c'2 "G"b2a2 g4 | "E7"b4b4 e'4e'4 |
+[V:2] A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | F,,2F,2F,,2F,2 G,,2G,2G,,2G,2 | E,2E2E,2E2 E,2E2E,2E2 |
+% ===== Outro (33-36마디) : 스탭 연타 — 쾅! =====
+[V:1] "Am"a2a2 z2a2 z2a2 a4 | "F"f2f2 z2g2 "G"z2a2 b4 | "Am"e'2z2 c'2z2 a2z2 e4 | "Am""^쾅!"a2z2 e2z2 H[Acea]8 |]
+[V:2] A,2A,2 z2A,2 z2A,2 A,4 | F,2F,2 z2G,2 z2A,2 B,4 | E2z2 C2z2 A,2z2 E,4 | A,2z2 E,2z2 H[A,,E,A,]8 |]
