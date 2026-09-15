@@ -87,7 +87,7 @@
       </label>
     </div>
     <div id="status">악보집에서 곡을 담고 ▶ 재생을 누르세요.</div>
-    <p class="hint" style="margin-top:8px">🎵 곡을 통째로 <b>음원으로 만든 뒤</b> 일반 음악처럼 재생해요 — 재생이 매끄럽고, <b>화면을 꺼도 계속</b> 이어지며, 잠금화면에서 조절할 수 있어요. 곡을 처음 시작할 때만 잠깐 준비 시간이 있고, <b>다음 곡은 재생 중에 미리 준비</b>해 둡니다.</p>
+    <p class="hint" style="margin-top:8px">🎵 곡을 통째로 <b>음원으로 만든 뒤</b> 일반 음악처럼 재생해요 — <b>재생 중에는 아무 작업도 하지 않아</b> 끊기지 않고, <b>화면을 꺼도 계속</b> 이어지며, 잠금화면에서 조절할 수 있어요. 곡이 바뀔 때 "준비 중…"이 잠깐 보이는 건 정상입니다. <span style="opacity:.6">· 재생 엔진 v3</span></p>
   </div>
 
   <div class="card">
@@ -296,12 +296,10 @@
      화면이 꺼져도 계속 재생되며 곡 끝(ended) 이벤트도 백그라운드에서 정상 동작한다. */
   var audioEl = $("audioEl");
   var curUrl = null;
-  var nextCache = null;   /* 다음 곡 미리 준비 {idx, sig, url} — 곡 사이 공백 최소화 */
-  function optsSig() { return ($("chordAccChk").checked ? "c1" : "c0") + "|" + $("soundSel").value; }
-  function revokeIfUnused(url) {
-    if (!url || url === curUrl || (nextCache && nextCache.url === url)) return;
-    try { URL.revokeObjectURL(url); } catch (e) {}
-  }
+  function revokeUrl(u) { if (u) { try { URL.revokeObjectURL(u); } catch (e) {} } }
+  /* 재생 중에는 아무 작업도 하지 않는다 — 합성·변환 같은 무거운 일은 곡 시작 전에만.
+     (재생 중 다음 곡을 미리 만들던 방식은 일부 폰에서 재생을 뚝뚝 끊어 제거) */
+  function restCtx() { try { if (audioCtx && audioCtx.state === "running") audioCtx.suspend(); } catch (e) {} }
   /* idx번 곡을 렌더 → 신디로 통째 합성 → WAV 블랍 URL */
   async function buildWavFor(idx) {
     var it = playlist[idx];
@@ -316,19 +314,6 @@
     await sy.init({ audioContext: audioCtx, visualObj: vo, options: o });
     await sy.prime();
     return { url: sy.download() };
-  }
-  function clearNextCache() { if (nextCache) { var u = nextCache.url; nextCache = null; revokeIfUnused(u); } }
-  function prefetchNext(cur) {
-    if (playlist.length < 2 || typeof ABCJS === "undefined") return;
-    var n = cur + 1;
-    if (n >= playlist.length) { if (!$("loopChk").checked) return; n = 0; }
-    var sig = optsSig(), idx = n, myToken = playToken;
-    buildWavFor(idx).then(function (r) {
-      if (!r || !r.url) return;
-      if (!isPlaying || myToken !== playToken || sig !== optsSig()) { revokeIfUnused(r.url); return; }
-      clearNextCache();
-      nextCache = { idx: idx, sig: sig, url: r.url };
-    }).catch(function () {});
   }
   function setMediaSession(title, state) {
     if (!("mediaSession" in navigator)) return;
@@ -356,7 +341,6 @@
     playToken++;
     isPlaying = false; isPaused = false;
     try { audioEl.pause(); audioEl.currentTime = 0; } catch (e) {}
-    clearNextCache();
     try { if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "none"; } catch (e) {}
     $("stopBtn").disabled = true; $("pauseBtn").disabled = true; $("pauseBtn").textContent = "⏸ 일시정지";
     $("playBtn").disabled = false;
@@ -388,24 +372,19 @@
     var it = playlist[i];
     try { await ensureAudio(); } catch (e) { setStatus("이 브라우저에서 오디오를 시작할 수 없습니다.", true); stopAll(); return; }
     setStatus("♪ 준비 중… " + it.title);
-    var url = null;
-    if (nextCache && nextCache.idx === i && nextCache.sig === optsSig()) {
-      url = nextCache.url; nextCache = null;   /* 미리 준비해둔 곡 — 바로 시작 */
-    } else {
-      clearNextCache();
-      var r = null;
-      try { r = await buildWavFor(i); } catch (e) { r = null; }
-      if (token !== playToken) { if (r && r.url) revokeIfUnused(r.url); return; }   /* 준비 중 다른 곡으로 이동함 */
-      if (!r || !r.url) {
-        if (r && r.err) { setStatus("'" + it.title + "' — " + r.err + " → 건너뜁니다.", true); return skipNext(token, r.err); }
-        if (!isRetry) return playAt(i, true);   /* 순간적인 음원 로딩 실패면 한 번 더 시도 */
-        setStatus("'" + it.title + "' 재생에 실패해 건너뜁니다. (음원 로딩 실패)", true);
-        return skipNext(token, "음원 로딩 실패");
-      }
-      url = r.url;
+    var r = null;
+    try { r = await buildWavFor(i); } catch (e) { r = null; }
+    restCtx();   /* 합성 끝 → 재생 중엔 오디오 회로를 재워 끊김 원인 제거 */
+    if (token !== playToken) { if (r && r.url && r.url !== curUrl) revokeUrl(r.url); return; }   /* 준비 중 다른 곡으로 이동함 */
+    if (!r || !r.url) {
+      if (r && r.err) { setStatus("'" + it.title + "' — " + r.err + " → 건너뜁니다.", true); return skipNext(token, r.err); }
+      if (!isRetry) return playAt(i, true);   /* 순간적인 음원 로딩 실패면 한 번 더 시도 */
+      setStatus("'" + it.title + "' 재생에 실패해 건너뜁니다. (음원 로딩 실패)", true);
+      return skipNext(token, "음원 로딩 실패");
     }
+    var url = r.url;
     var old = curUrl; curUrl = url;
-    if (old && old !== url) revokeIfUnused(old);
+    if (old && old !== url) revokeUrl(old);
     if (audioEl.src !== url) audioEl.src = url;
     try { audioEl.currentTime = 0; } catch (e) {}
     try {
@@ -420,7 +399,6 @@
     failStreak = 0;
     setMediaSession(it.title, "playing");
     setStatus("♪ 재생 중 — " + it.title + ($("chordAccChk").checked ? "" : " (코드 반주 없음)"));
-    prefetchNext(i);
   }
   function advance(token) {
     if (token !== playToken || !isPlaying) return;
