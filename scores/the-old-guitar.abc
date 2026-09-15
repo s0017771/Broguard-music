@@ -1,0 +1,36 @@
+X:1
+T:오래된 기타
+T:(The Old Guitar)
+R:Folk
+M:4/4
+L:1/16
+Q:1/4=84
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 김광석 풍 오리지널(멜로디 창작): 통기타 아르페지오, 하강 베이스(G-F#-E-D-C-B-A),
+% 담담한 벌스 - 먹먹한 후렴 - 하모니카 간주 - 마지막 후렴 - 혼자 남은 기타
+% ===== 기 · Verse (1-8마디) : 담담한 독백 — 베이스가 한 계단씩 내려간다 =====
+[V:1] !mp!"G""^Verse"d3B B2A2 G6z2 | "D/F#"A3A A2B2 A6z2 | "Em"G3G B2G2 E6z2 | "G/D"D3D G2A2 B6z2 |
+[V:2] G,2D2B,2D2 G,2D2B,2D2 | F,2D2A,2D2 F,2D2A,2D2 | E,2B,2G2B,2 E,2B,2G2B,2 | D,2B,2G2B,2 D,2B,2G2B,2 |
+[V:1] "C"c3B c2e2 d6z2 | "G/B"B3A B2d2 B6z2 | "Am7"c3c c2B2 A6z2 | "D7"A3B c2A2 F4A2c2 |
+[V:2] C,2G,2E2G,2 C,2G,2E2G,2 | B,,2G,2D2G,2 B,,2G,2D2G,2 | A,,2E,2C2E,2 A,,2E,2C2E,2 | D,2A,2C2A,2 D,2A,2F2A,2 |
+% ===== 승 · Chorus (9-16마디) : 길게 뻗는 노래 — 먹먹하게 차오른다 =====
+[V:1] !mf!"C""^Chorus"e4g4 a8 | "D"a6ba f4d4 | "G"g4b4 d'8 | "Em"b6ag g4e4 |
+[V:2] C,2G,2E2G,2 C,2G,2E2G,2 | D,2A,2F2A,2 D,2A,2F2A,2 | G,2D2B,2D2 G,2D2B,2D2 | E,2B,2G2B,2 E,2B,2G2B,2 |
+[V:1] "C"e4g4 a4c'4 | "D"b4a4 f4a4 | "G"g8 d4B4 | "G"G8 z8 |
+[V:2] C,2G,2E2G,2 C,2G,2E2G,2 | D,2A,2F2A,2 D,2A,2F2A,2 | G,2D2B,2D2 G,2D2B,2D2 | G,2D2B,2D2 G,2D2B,2D2 |
+% ===== 전 · 간주 (17-24마디) : 하모니카처럼 — 말 대신 우는 소리 =====
+[V:1] !mp!"G""^하모니카처럼"b6ag b4d'4 | "D/F#"a6ba a4f4 | "Em"g6ag e4g4 | "G/D"b8 a4g4 |
+[V:2] G,2D2B,2D2 G,2D2B,2D2 | F,2D2A,2D2 F,2D2A,2D2 | E,2B,2G2B,2 E,2B,2G2B,2 | D,2B,2G2B,2 D,2B,2G2B,2 |
+[V:1] "C"c'6d'c' a4g4 | "G/B"b6c'b g4d4 | "Am7"e'6d'c' a8 | "D7"a4b4 c'4a4 |
+[V:2] C,2G,2E2G,2 C,2G,2E2G,2 | B,,2G,2D2G,2 B,,2G,2D2G,2 | A,,2E,2C2E,2 A,,2E,2C2E,2 | D,2A,2C2A,2 D,2A,2F2A,2 |
+% ===== 결 · Last Chorus (25-32마디) : 한 번 더, 조금 더 깊게 =====
+[V:1] !mf!"C""^Last Chorus"e4g4 a8 | "D"a6ba f4d4 | "G"g4b4 d'8 | "Em"b6ag g4e4 |
+[V:2] C,2G,2E2G,2 C,2G,2E2G,2 | D,2A,2F2A,2 D,2A,2F2A,2 | G,2D2B,2D2 G,2D2B,2D2 | E,2B,2G2B,2 E,2B,2G2B,2 |
+[V:1] "C"e4g4 a4c'4 | "D"b4a4 f4a4 | "G""^rit."g8 e4d4 | "Am7"e4d4 "D7"B4A4 |
+[V:2] C,2G,2E2G,2 C,2G,2E2G,2 | D,2A,2F2A,2 D,2A,2F2A,2 | G,2D2B,2D2 G,2D2B,2D2 | A,,2E,2C2E,2 D,2A,2C2A,2 |
+% ===== Outro (33-34마디) : 혼자 남은 기타 =====
+[V:1] !p!"G""^혼자 남은 기타"B3A G2A2 G6z2 | !pp!"G"H[GBd]16 |]
+[V:2] G,2D2B,2D2 G,2D2B,2D2 | H[G,,D,G,]16 |]
