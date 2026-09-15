@@ -1,0 +1,36 @@
+X:1
+T:첫눈 캐럴
+T:(First Snow Carol)
+R:Christmas Swing
+M:12/8
+L:1/8
+Q:3/8=72
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:C
+% 레트로 크리스마스 팝 풍 오리지널(멜로디 창작): 12/8 셔플, 스트라이드 왼손, 두왑 진행, A7 반짝임
+% ===== Intro (1-4마디) : 오르골처럼 — 눈이 내리기 시작한다 =====
+[V:1] !p!"C""^오르골처럼"e4 g2 c'4 e'2 | "F"d'4 c'2 a4 f2 | "Am"e4 a2 c'4 b2 | "G7"d'6 z2 c2d2 |
+[V:2] [C,G,E]12 | [F,A,C]12 | [A,,E,C]12 | [G,,D,F,]12 |
+% ===== 기 · Verse (5-12마디) : 스트라이드 시작 — 통통 구르는 첫눈 =====
+[V:1] !mf!"C""^Verse"e2g e2g e2d c3 | "Am"c2e c2e c2B A3 | "Dm7"d2f d2f d2e f3 | "G7"d2B G3 B2d g3 |
+[V:2] C,[EG][EG] G,[EG][EG] C,[EG][EG] G,[EG][EG] | A,[CE][CE] E,[CE][CE] A,[CE][CE] E,[CE][CE] | D,[FA][FA] A,[FA][FA] D,[FA][FA] A,[FA][FA] | G,[B,F][B,F] D,[B,F][B,F] G,[B,F][B,F] D,[B,F][B,F] |
+[V:1] "C"e2g e2g e2d c3 | "Am"c2e c2e c2B A3 | "Dm7"f2a f2e d2c d3 | "G7"B6 z3 e2f |
+[V:2] C,[EG][EG] G,[EG][EG] C,[EG][EG] G,[EG][EG] | A,[CE][CE] E,[CE][CE] A,[CE][CE] E,[CE][CE] | D,[FA][FA] A,[FA][FA] D,[FA][FA] A,[FA][FA] | G,[B,F][B,F] D,[B,F][B,F] G,[B,F][B,F] D,[B,F][B,F] |
+% ===== 승 · Chorus (13-20마디) : 신나는 소원 — 길게 뻗고 폴짝 뛰고 =====
+[V:1] !f!"C""^Chorus"g6 e2g c'3 | "Am"c'2b a6 e3 | "F"a2g f6 d3 | "G7"d2e f2d B3 G3 |
+[V:2] C,[EG][EG] G,[EG][EG] C,[EG][EG] G,[EG][EG] | A,[CE][CE] E,[CE][CE] A,[CE][CE] E,[CE][CE] | F,[A,C][A,C] C,[A,C][A,C] F,[A,C][A,C] C,[A,C][A,C] | G,[B,F][B,F] D,[B,F][B,F] G,[B,F][B,F] D,[B,F][B,F] |
+[V:1] "C"g6 e2g c'3 | "A7""^반짝!"c'2b a2^g a6 | "Dm7"d'2c' a2f "G7"g2a b3 | "C"c'6 z3 f2g |
+[V:2] C,[EG][EG] G,[EG][EG] C,[EG][EG] G,[EG][EG] | A,[^CG][^CG] E,[^CG][^CG] A,[^CG][^CG] E,[^CG][^CG] | D,[FA][FA] A,[FA][FA] G,[B,F][B,F] D,[B,F][B,F] | C,[EG][EG] G,[EG][EG] C,[EG][EG] G,[EG][EG] |
+% ===== 전 · Bridge (21-24마디) : 썰매 종소리 — 높은 곳에서 딸랑딸랑 =====
+[V:1] !mf!"F""^썰매 종소리"a2c' a2c' a2g f3 | "Em"g2b g2b g2f e3 | "Dm7"f2a f2a f2e d3 | "G7"g2a b2c' d'2e' d'3 |
+[V:2] F,[A,C][A,C] C,[A,C][A,C] F,[A,C][A,C] C,[A,C][A,C] | E,[G,B,][G,B,] B,,[G,B,][G,B,] E,[G,B,][G,B,] B,,[G,B,][G,B,] | D,[FA][FA] A,[FA][FA] D,[FA][FA] A,[FA][FA] | G,[B,F][B,F] D,[B,F][B,F] G,[B,F][B,F] D,[B,F][B,F] |
+% ===== 결 · Last Chorus (25-32마디) : 한 번 더, 더 신나게 =====
+[V:1] !f!"C""^Last Chorus"g6 e2g c'3 | "Am"c'2b a6 e3 | "F"a2g f6 d3 | "G7"d2e f2d B3 G3 |
+[V:2] C,[EG][EG] G,[EG][EG] C,[EG][EG] G,[EG][EG] | A,[CE][CE] E,[CE][CE] A,[CE][CE] E,[CE][CE] | F,[A,C][A,C] C,[A,C][A,C] F,[A,C][A,C] C,[A,C][A,C] | G,[B,F][B,F] D,[B,F][B,F] G,[B,F][B,F] D,[B,F][B,F] |
+[V:1] "C"g6 e2g c'3 | "A7"c'2b a2^g a6 | "Dm7"d'2c' a2f "G7"g2a b3 | "C"c'6 z6 |
+[V:2] C,[EG][EG] G,[EG][EG] C,[EG][EG] G,[EG][EG] | A,[^CG][^CG] E,[^CG][^CG] A,[^CG][^CG] E,[^CG][^CG] | D,[FA][FA] A,[FA][FA] G,[B,F][B,F] D,[B,F][B,F] | C,[EG][EG] G,[EG][EG] C,[EG][EG] G,[EG][EG] |
+% ===== Outro (33-36마디) : 계단을 올라가 — 짜잔! =====
+[V:1] "F"a6 f2a c'3 | "G7"b6 g2b d'3 | !ff!"C"e'6 c'2d' e'3 | "C""^짜잔!"c'3 z3 H[egc']6 |]
+[V:2] F,[A,C][A,C] C,[A,C][A,C] F,[A,C][A,C] C,[A,C][A,C] | G,[B,F][B,F] D,[B,F][B,F] G,[B,F][B,F] D,[B,F][B,F] | C,[EG][EG] G,[EG][EG] C,[EG][EG] G,[EG][EG] | C,3 z3 H[C,G,C]6 |]
