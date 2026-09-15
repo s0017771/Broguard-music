@@ -57,25 +57,29 @@ try {
   assert.equal(groups[1].cnt, '2곡', '곡 수 표기');
   ok('악보집이 카테고리별로 묶여 보인다');
 
-  // 2) 담기(개별) + 분류 담기 + 전체 담기 → 재생목록 구성
+  // 2) 담기(개별/분류/전체) — 같은 곡은 중복으로 담기지 않는다
   await page.evaluate(() => {   // '곡 둘' 개별 담기
     const li = Array.from(document.querySelectorAll('#liblist li')).find(l => l.querySelector('.t').textContent === '곡 둘');
     li.querySelector('button').click();
   });
   let st = await page.evaluate(() => window.__player.getState());
   assert.deepEqual(st.titles, ['곡 둘'], '개별 담기');
-  await page.evaluate(() => {   // '기타' 분류 통째 담기(2곡)
+  await page.evaluate(() => {   // '기타' 분류 통째 담기 → 곡 둘은 이미 있어 곡 셋만 추가
     document.querySelectorAll('#liblist details.catgrp summary button.catadd')[1].click();
   });
   st = await page.evaluate(() => window.__player.getState());
-  assert.equal(st.count, 3, '분류 담기로 +2곡');
-  await page.click('#addAllBtn');                        // + 전체(3곡)
+  assert.equal(st.count, 2, '분류 담기: 이미 있는 곡 제외하고 +1곡');
+  await page.click('#addAllBtn');                        // 전체 담기 → 곡 하나만 새로
   st = await page.evaluate(() => window.__player.getState());
-  assert.equal(st.count, 6, '전체 담기로 +3곡');
-  assert.equal(await page.$$eval('#plist li', e => e.length), 6, '목록 UI 6줄');
-  ok('➕ 담기 / 분류 담기 / 전체 담기가 재생목록에 쌓인다');
+  assert.equal(st.count, 3, '전체 담기: 새 곡만 +1');
+  assert.ok(/이미 있던/.test(await page.textContent('#status')), '제외 안내 문구');
+  await page.click('#addAllBtn');                        // 한 번 더 → 아무것도 안 늘어남
+  st = await page.evaluate(() => window.__player.getState());
+  assert.equal(st.count, 3, '전체 담기 반복해도 중복 없음');
+  assert.equal(await page.$$eval('#plist li', e => e.length), 3, '목록 UI 3줄');
+  ok('담기가 중복 없이 쌓인다(같은 곡 반복 재생 방지)');
 
-  // 이후 시나리오(순서·저장·재생)를 위해 비우고 원래 4곡 구성으로 재구성
+  // 3) 순서 이동·빼기
   await page.click('#clearBtn');
   await page.evaluate(() => {
     const li = Array.from(document.querySelectorAll('#liblist li')).find(l => l.querySelector('.t').textContent === '곡 둘');
@@ -83,22 +87,25 @@ try {
   });
   await page.click('#addAllBtn');
   st = await page.evaluate(() => window.__player.getState());
-  assert.deepEqual(st.titles, ['곡 둘', '곡 하나', '곡 둘', '곡 셋']);
-
-  // 3) 순서 이동·빼기
+  assert.deepEqual(st.titles, ['곡 둘', '곡 하나', '곡 셋']);
   await page.click('#plist li:nth-child(1) button[title="아래로"]');
   st = await page.evaluate(() => window.__player.getState());
   assert.deepEqual(st.titles.slice(0, 2), ['곡 하나', '곡 둘'], '↓ 이동');
   await page.click('#plist li:nth-child(3) button[title="빼기"]');
   st = await page.evaluate(() => window.__player.getState());
-  assert.equal(st.count, 3, '✕ 빼기');
+  assert.equal(st.count, 2, '✕ 빼기');
   ok('↑↓ 이동과 ✕ 빼기가 동작한다');
 
-  // 4) 자동 저장 → 새로고침 후 유지
+  // 4) 자동 저장·복원 + 예전에 중복으로 저장된 목록은 자동 정리
+  await page.evaluate(() => localStorage.setItem('broguard_player_list', JSON.stringify([
+    { id: 'p1', title: '곡 하나' }, { id: 'p2', title: '곡 둘' }, { id: 'p1', title: '곡 하나' },
+    { id: 'p3', title: '곡 셋' }, { id: 'p2', title: '곡 둘' }
+  ])));
   await page.reload({ waitUntil: 'domcontentloaded' });
   st = await page.evaluate(() => window.__player.getState());
-  assert.equal(st.count, 3, '재생목록이 저장되어 복원됨');
-  ok('재생목록이 자동 저장·복원된다');
+  assert.equal(st.count, 3, '중복 5곡 → 3곡으로 정리');
+  assert.deepEqual(st.titles, ['곡 하나', '곡 둘', '곡 셋'], '순서 유지하며 중복 제거');
+  ok('재생목록 자동 저장·복원 + 저장된 중복 자동 정리');
 
   if (abcjsSrc) {
     // 신디 스텁: init 옵션 캡처 + onEnded 저장(곡 끝 흉내)
@@ -157,6 +164,26 @@ try {
       return last.chordsOff === true && /MusyngKite/.test(last.sf);
     }, undefined, { timeout: 5000 });
     ok('🎸 코드 반주 끔·🔊 고음질이 재생에 즉시 반영된다');
+
+    // 8.2) ⏸ 일시정지 중 곡-끝 이벤트(abcjs는 pause 때도 onEnded 발생)가 와도 다음 곡으로 튀지 않는다
+    const idxBefore = (await page.evaluate(() => window.__player.getState())).curIdx;
+    await page.click('#pauseBtn');
+    st = await page.evaluate(() => window.__player.getState());
+    assert.ok(st.paused, '일시정지 상태');
+    await page.evaluate(() => window.__onEnded());   // pause가 유발한 가짜 '곡 끝'
+    await page.waitForTimeout(250);
+    st = await page.evaluate(() => window.__player.getState());
+    assert.equal(st.curIdx, idxBefore, '일시정지 중엔 곡이 넘어가지 않음');
+    assert.ok(st.paused, '여전히 일시정지');
+    await page.click('#playBtn');                    // 이어서
+    st = await page.evaluate(() => window.__player.getState());
+    assert.ok(!st.paused && st.playing, '이어서 재생');
+    ok('⏸ 일시정지가 다음 곡으로 튀지 않는다(onEnded 가드)');
+
+    // 8.3) 잠금화면 미디어 세션(화면 꺼짐 대비) 등록
+    const msTitle = await page.evaluate(() => (navigator.mediaSession && navigator.mediaSession.metadata) ? navigator.mediaSession.metadata.title : null);
+    assert.ok(msTitle, '미디어 세션 제목: ' + msTitle);
+    ok('잠금화면 미디어 세션이 등록된다');
     await page.click('#stopBtn');
   } else {
     console.log('SKIP - 로컬 abcjs 없음: 재생 엔진 검증 생략(UI 검증만 수행)');
