@@ -294,6 +294,7 @@
     <div class="controls">
       <button id="playBtn" class="btn-brass">&#9654; 재생</button>
       <button id="stopBtn" class="btn-ink" disabled>&#9632; 정지</button>
+      <label style="display:inline-flex;align-items:center;gap:5px;font-size:.85rem;font-weight:600;cursor:pointer;" title="끄면 코드 기호('C' 등)의 자동 기타 반주 없이 멜로디·베이스만 들려요"><input type="checkbox" id="chordAccChk" checked> &#127928; 코드 반주</label>
       <button id="quickEditBtn" class="btn-ghost" disabled title="재생을 정지한 음을 수정">&#9999;&#65039; 이 음 수정</button>
       <button id="arrangeBtn2" class="btn-ink" type="button" title="레이어 버튼 활성화">&#127929; 재분석</button>
       <button id="backBtn" class="btn-ghost" type="button" title="작곡실로 돌아가기">&larr; 작곡실</button>
@@ -521,6 +522,7 @@
   function scheduleRender() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 350); }
 
   /* ════════ 재생 ════════ */
+  function chordAccOff() { var c = $("chordAccChk"); return !!(c && !c.checked); }
   function unlight() { litNotes.forEach(function (el) { el.style.fill = ""; }); litNotes = []; }
   function highlight(ev) {
     unlight();
@@ -603,7 +605,7 @@
         synth = new ABCJS.synth.CreateSynth();
         await synth.init({
           audioContext: audioCtx, visualObj: visualObj,
-          options: { onEnded: function () { unlight(); resetPlayUI(); setStatus(""); } }
+          options: { chordsOff: chordAccOff(), onEnded: function () { unlight(); resetPlayUI(); setStatus(""); } }
         });
         await synth.prime();
         synth.start();
@@ -2116,6 +2118,11 @@
   $("transUpBtn").addEventListener("click", function () { transposeBy(1); });
   $("transDownBtn").addEventListener("click", function () { transposeBy(-1); });
   playBtn.addEventListener("click", startPlay);
+  $("chordAccChk").addEventListener("change", function () {
+    var on = $("chordAccChk").checked;
+    if (isPlaying) { stopPlay(); startPlay(); }
+    else setStatus(on ? "🎸 코드 반주 켬 — 다음 재생부터 코드 기호를 기타 반주로 함께 연주해요." : "🎸 코드 반주 끔 — 다음 재생은 멜로디·베이스만 들려요.");
+  });
   stopBtn.addEventListener("click", stopPlay);
   saveBtn.addEventListener("click", saveAbc);
   genBtn.addEventListener("click", fullGenerate);
