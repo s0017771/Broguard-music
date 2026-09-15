@@ -245,15 +245,40 @@ test('combine: 5트랙 전체 — 채널·프로그램 올바름', () => {
   assert.deepEqual(out.tracks, ['drums', 'bass', 'piano', 'guitar', 'melody']);
 });
 
-test('MELODY_VOICES: 악기 5종 + 허밍 2종, 남성 보컬은 옥타브 아래', () => {
+test('MELODY_VOICES: 악기 10종 + 허밍 2종, 남성 보컬은 옥타브 아래', () => {
   const v = StudioCore.MELODY_VOICES;
-  assert.equal(v.length, 7, '7종');
+  assert.equal(v.length, 12, '12종');
   assert.ok(v.some(x => /여성 보컬/.test(x.name)) && v.some(x => /남성 보컬/.test(x.name)), '허밍 2종');
-  ['바이올린', '플루트', '오보에', '클라리넷', '신스'].forEach(n =>
+  ['합창', '현악 앙상블', '바이올린', '첼로', '플루트', '오보에', '클라리넷', '색소폰', '트럼펫', '신스'].forEach(n =>
     assert.ok(v.some(x => x.name.includes(n)), n));
   const male = v.find(x => /남성/.test(x.name));
   assert.equal(male.oct, -12, '남성 = -12(한 옥타브 아래)');
+  const cello = v.find(x => /첼로/.test(x.name));
+  assert.equal(cello.oct, -12, '첼로 = 한 옥타브 아래(악기 음역)');
   v.forEach(x => assert.ok(x.prog >= 0 && x.prog <= 127, x.name + ' GM 번호'));
+});
+
+test('BASS_VOICES: 베이스 기타 음색 목록(기본=핑거 일렉 베이스)', () => {
+  const b = StudioCore.BASS_VOICES;
+  assert.ok(b.length >= 5, '5종 이상');
+  assert.equal(b[0].prog, 33, '기본 = 일렉 베이스(핑거)');
+  ['핑거', '픽', '슬랩', '어쿠스틱', '신스'].forEach(n => assert.ok(b.some(x => x.name.includes(n)), n));
+  b.forEach(x => assert.ok(x.prog >= 32 && x.prog <= 39, x.name + ' = GM 베이스 계열'));
+});
+
+test('importMelodyAbc: 2성부(RH/LH) ABC → 멜로디 + 원곡 베이스 분리', () => {
+  const abc = ['X:1', 'T:t', 'M:4/4', 'L:1/8', 'Q:1/4=90',
+    '%%score {RH LH}', 'V:RH clef=treble', 'V:LH clef=bass', 'K:C',
+    '[V:RH] "C"C2 E2 G2 c2 | "F"F2 A2 c2 f2 |',
+    '[V:LH] C,4 G,4 | F,4 C,4 |'].join('\n');
+  const r = StudioCore.importMelodyAbc(abc);
+  assert.ok(r.ok);
+  assert.equal(r.melodyLane.length, 8, '멜로디 8음(RH만)');
+  assert.ok(r.bassLane && r.bassLane.length === 4, '원곡 베이스 4음 추출');
+  assert.deepEqual(r.bassLane.map(n => n.midi), [48, 55, 53, 48], 'LH 음정 그대로(C, G, F, C)');
+  // 단선율이면 bassLane 없음
+  const r2 = StudioCore.importMelodyAbc('X:1\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |');
+  assert.ok(r2.ok && !r2.bassLane, '단선율은 베이스 자동 생성 경로');
 });
 
 test('combine: progs 덮어쓰기 — 멜로디를 바이올린(40)으로', () => {

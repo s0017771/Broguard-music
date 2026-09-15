@@ -119,6 +119,46 @@
   var MUSYNG = "https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/";
   var LIST_KEY = "broguard_player_list", PREF_KEY = "broguard_player_prefs";
 
+  /* ── 같은 음 슬러(이음줄) → 붙임줄 정규화 (연구소와 동일 — 두 번 소리나는 문제 방지) ── */
+  function normalizeAbcPunct(line) {
+    return line
+      .replace(/（/g, '(').replace(/）/g, ')')
+      .replace(/　/g, ' ')
+      .replace(/[‐-―−－]/g, '-');
+  }
+  function slurSameToTie(abc) {
+    var lines = String(abc).split('\n');
+    var out = [], slurDepth = 0, prev = null;
+    var noteRe = /^[_^=]*[A-Ga-g][,']*[0-9]*\/*[0-9]*/;
+    for (var li = 0; li < lines.length; li++) {
+      if (li > 0) out.push('\n');
+      var line = lines[li];
+      if (/^[A-Za-z]:/.test(line) || /^\s*%/.test(line)) { out.push(line); continue; }
+      line = normalizeAbcPunct(line);
+      var i = 0, n = line.length;
+      while (i < n) {
+        var c = line[i];
+        if (c === '"') { var j = line.indexOf('"', i + 1); if (j < 0) j = n - 1; out.push(line.slice(i, j + 1)); i = j + 1; continue; }
+        if (c === '{') { var j2 = line.indexOf('}', i + 1); if (j2 < 0) j2 = n - 1; out.push(line.slice(i, j2 + 1)); i = j2 + 1; continue; }
+        if (c === '!' || c === '+') { var j3 = line.indexOf(c, i + 1); if (j3 < 0) j3 = n - 1; out.push(line.slice(i, j3 + 1)); i = j3 + 1; continue; }
+        if (c === '(') { if (!/\d/.test(line[i + 1] || '')) slurDepth++; out.push(c); i++; prev = null; continue; }
+        if (c === ')') { if (slurDepth > 0) slurDepth--; out.push(c); i++; prev = null; continue; }
+        if (c === 'z' || c === 'x' || c === 'Z' || c === 'X') { out.push(c); i++; prev = null; continue; }
+        if (c === '-') { out.push(c); i++; prev = null; continue; }
+        var m = noteRe.exec(line.slice(i));
+        if (m && m[0]) {
+          var tok = m[0], key = tok.replace(/[0-9\/]+$/, '');
+          if (slurDepth > 0 && prev && prev.key === key) out.splice(prev.insertAt, 0, '-');
+          out.push(tok);
+          prev = { key: key, insertAt: out.length };
+          i += tok.length; continue;
+        }
+        out.push(c); i++;
+      }
+    }
+    return out.join('');
+  }
+
   /* ── 악보집 ── */
   function libEntries() {
     var lib = null;
@@ -262,7 +302,7 @@
       return advance(token);
     }
     var vo = null;
-    try { vo = ABCJS.renderAbc("holder", entry.abc, { add_classes: false })[0]; } catch (e) {}
+    try { vo = ABCJS.renderAbc("holder", slurSameToTie(entry.abc), { add_classes: false })[0]; } catch (e) {}
     if (!vo) { setStatus("'" + it.title + "' 악보를 해석하지 못해 건너뜁니다.", true); return advance(token); }
     try { await ensureAudio(); } catch (e) { setStatus("이 브라우저에서 오디오를 시작할 수 없습니다.", true); stopAll(); return; }
     setStatus("♪ 준비 중… " + it.title);
@@ -339,7 +379,7 @@
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__player = {
     getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }) }; },
-    playAt: playAt
+    playAt: playAt, slurSameToTie: slurSameToTie
   };
 })();
 </script>
