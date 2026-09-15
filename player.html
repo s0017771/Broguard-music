@@ -87,7 +87,7 @@
       </label>
     </div>
     <div id="status">악보집에서 곡을 담고 ▶ 재생을 누르세요.</div>
-    <p class="hint" style="margin-top:8px">📱 <b>화면을 꺼도</b> 이어 듣도록 잠금화면 재생 컨트롤을 지원해요. 브라우저 절전 정책 탓에 간혹 끊기면, 화면을 켜는 순간 <b>자동으로 이어서 재생</b>됩니다. (끊김 없이 확실하게 들으려면 재생 중 화면을 켜 두세요)</p>
+    <p class="hint" style="margin-top:8px">🎵 곡을 통째로 <b>음원으로 만든 뒤</b> 일반 음악처럼 재생해요 — 재생이 매끄럽고, <b>화면을 꺼도 계속</b> 이어지며, 잠금화면에서 조절할 수 있어요. 곡을 처음 시작할 때만 잠깐 준비 시간이 있고, <b>다음 곡은 재생 중에 미리 준비</b>해 둡니다.</p>
   </div>
 
   <div class="card">
@@ -112,6 +112,7 @@
   </div>
 
   <div id="holder"></div>
+  <audio id="audioEl" preload="auto"></audio>
 </main>
 <script>
 (function () {
@@ -196,7 +197,7 @@
   } catch (e) {}
 
   /* ── 상태 ── */
-  var curIdx = -1, synth = null, audioCtx = null, isPlaying = false, isPaused = false, playToken = 0;
+  var curIdx = -1, audioCtx = null, isPlaying = false, isPaused = false, playToken = 0;
 
   function setStatus(msg, err) { var s = $("status"); s.textContent = msg || ""; s.className = err ? "err" : ""; }
   function renderNow() {
@@ -289,28 +290,45 @@
     });
   }
 
-  /* ── 배경 재생 유지(화면 꺼짐 대비): 무음 오디오로 미디어 세션 유지 + 잠금화면 컨트롤 ── */
-  var keeper = null;
-  function makeSilentUrl() {
-    /* 기기 출력과 같은 44.1kHz로 만들어 오디오 경로 전환(끊김) 방지 */
-    var sr = 44100, n = sr * 30, ab = new ArrayBuffer(44 + n * 2), dv = new DataView(ab);
-    function ws(off, s) { for (var i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); }
-    ws(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); ws(8, "WAVE"); ws(12, "fmt ");
-    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
-    ws(36, "data"); dv.setUint32(40, n * 2, true);
-    return URL.createObjectURL(new Blob([ab], { type: "audio/wav" }));
+  /* ── 재생 엔진: 곡을 통째로 음원(WAV)으로 만들어 <audio>로 재생 ──
+     Web Audio 직접 재생은 일부 폰에서 뚝뚝 끊기고 화면 꺼짐에 약하다.
+     <audio> 요소는 브라우저의 네이티브 음악 경로라 재생이 매끄럽고,
+     화면이 꺼져도 계속 재생되며 곡 끝(ended) 이벤트도 백그라운드에서 정상 동작한다. */
+  var audioEl = $("audioEl");
+  var curUrl = null;
+  var nextCache = null;   /* 다음 곡 미리 준비 {idx, sig, url} — 곡 사이 공백 최소화 */
+  function optsSig() { return ($("chordAccChk").checked ? "c1" : "c0") + "|" + $("soundSel").value; }
+  function revokeIfUnused(url) {
+    if (!url || url === curUrl || (nextCache && nextCache.url === url)) return;
+    try { URL.revokeObjectURL(url); } catch (e) {}
   }
-  function keeperOn() {
-    try {
-      if (!keeper) { keeper = new Audio(makeSilentUrl()); keeper.loop = true; keeper.volume = 0.001; }
-      var p = keeper.play(); if (p && p.catch) p.catch(function () {});
-    } catch (e) {}
+  /* idx번 곡을 렌더 → 신디로 통째 합성 → WAV 블랍 URL */
+  async function buildWavFor(idx) {
+    var it = playlist[idx];
+    var entry = it && findEntry(it);
+    if (!entry || !entry.abc) return { err: "악보집에서 찾지 못함" };
+    var vo = null;
+    try { vo = ABCJS.renderAbc("holder", slurSameToTie(entry.abc), { add_classes: false })[0]; } catch (e) {}
+    if (!vo) return { err: "악보 해석 실패" };
+    var sy = new ABCJS.synth.CreateSynth();
+    var o = { chordsOff: !$("chordAccChk").checked };
+    if ($("soundSel").value === "musyng") o.soundFontUrl = MUSYNG;
+    await sy.init({ audioContext: audioCtx, visualObj: vo, options: o });
+    await sy.prime();
+    return { url: sy.download() };
   }
-  function keeperOff() { try { if (keeper) keeper.pause(); } catch (e) {} }
-  /* 무음 유지 오디오는 '화면이 꺼져 있을 때만' — 재생 중 상시 틀면 일부 폰에서 소리가 뚝뚝 끊김 */
-  function syncKeeper() {
-    if (document.hidden && isPlaying && !isPaused) keeperOn(); else keeperOff();
+  function clearNextCache() { if (nextCache) { var u = nextCache.url; nextCache = null; revokeIfUnused(u); } }
+  function prefetchNext(cur) {
+    if (playlist.length < 2 || typeof ABCJS === "undefined") return;
+    var n = cur + 1;
+    if (n >= playlist.length) { if (!$("loopChk").checked) return; n = 0; }
+    var sig = optsSig(), idx = n, myToken = playToken;
+    buildWavFor(idx).then(function (r) {
+      if (!r || !r.url) return;
+      if (!isPlaying || myToken !== playToken || sig !== optsSig()) { revokeIfUnused(r.url); return; }
+      clearNextCache();
+      nextCache = { idx: idx, sig: sig, url: r.url };
+    }).catch(function () {});
   }
   function setMediaSession(title, state) {
     if (!("mediaSession" in navigator)) return;
@@ -323,21 +341,22 @@
       navigator.mediaSession.setActionHandler("previoustrack", function () { $("prevBtn").click(); });
     } catch (e) {}
   }
-  /* 화면 꺼짐 → 무음 유지 켬 / 화면 켜짐 → 무음 유지 끄고, 끊긴 재생은 현재 곡부터 복구 */
+  /* 화면이 다시 켜졌을 때: 혹시 끊겼으면 이어서 재생 */
   document.addEventListener("visibilitychange", function () {
-    syncKeeper();
-    if (document.hidden || !isPlaying) return;
-    try { if (audioCtx && audioCtx.state !== "running") audioCtx.resume(); } catch (e) {}
-    if (!isPaused && synth && typeof synth.getIsRunning === "function" && !synth.getIsRunning()) playAt(curIdx);
+    if (document.hidden || !isPlaying || isPaused) return;
+    if (audioEl.paused) { var p = audioEl.play(); if (p && p.catch) p.catch(function () {}); }
+  });
+  /* 곡이 끝나면 자동으로 다음 곡 — <audio>의 ended는 화면이 꺼져 있어도 발생 */
+  audioEl.addEventListener("ended", function () {
+    if (!isPlaying || isPaused) return;
+    advance(playToken);
   });
 
-  /* ── 재생 엔진 ── */
-  function stopSynth() { if (synth) { try { synth.stop(); } catch (e) {} synth = null; } }
   function stopAll() {
     playToken++;
-    stopSynth();
     isPlaying = false; isPaused = false;
-    keeperOff();
+    try { audioEl.pause(); audioEl.currentTime = 0; } catch (e) {}
+    clearNextCache();
     try { if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "none"; } catch (e) {}
     $("stopBtn").disabled = true; $("pauseBtn").disabled = true; $("pauseBtn").textContent = "⏸ 일시정지";
     $("playBtn").disabled = false;
@@ -363,41 +382,45 @@
     if (i < 0) i = playlist.length - 1;
     if (i >= playlist.length) i = 0;
     var token = ++playToken;
-    stopSynth();
     curIdx = i; isPlaying = true; isPaused = false;
     renderNow();
     $("stopBtn").disabled = false; $("pauseBtn").disabled = false; $("pauseBtn").textContent = "⏸ 일시정지";
     var it = playlist[i];
-    var entry = findEntry(it);
-    if (!entry || !entry.abc) {
-      setStatus("'" + it.title + "'을(를) 악보집에서 찾지 못해 건너뜁니다.", true);
-      return skipNext(token, "악보집에 없음");
-    }
-    var vo = null;
-    try { vo = ABCJS.renderAbc("holder", slurSameToTie(entry.abc), { add_classes: false })[0]; } catch (e) {}
-    if (!vo) { setStatus("'" + it.title + "' 악보를 해석하지 못해 건너뜁니다.", true); return skipNext(token, "악보 해석 실패"); }
     try { await ensureAudio(); } catch (e) { setStatus("이 브라우저에서 오디오를 시작할 수 없습니다.", true); stopAll(); return; }
     setStatus("♪ 준비 중… " + it.title);
+    var url = null;
+    if (nextCache && nextCache.idx === i && nextCache.sig === optsSig()) {
+      url = nextCache.url; nextCache = null;   /* 미리 준비해둔 곡 — 바로 시작 */
+    } else {
+      clearNextCache();
+      var r = null;
+      try { r = await buildWavFor(i); } catch (e) { r = null; }
+      if (token !== playToken) { if (r && r.url) revokeIfUnused(r.url); return; }   /* 준비 중 다른 곡으로 이동함 */
+      if (!r || !r.url) {
+        if (r && r.err) { setStatus("'" + it.title + "' — " + r.err + " → 건너뜁니다.", true); return skipNext(token, r.err); }
+        if (!isRetry) return playAt(i, true);   /* 순간적인 음원 로딩 실패면 한 번 더 시도 */
+        setStatus("'" + it.title + "' 재생에 실패해 건너뜁니다. (음원 로딩 실패)", true);
+        return skipNext(token, "음원 로딩 실패");
+      }
+      url = r.url;
+    }
+    var old = curUrl; curUrl = url;
+    if (old && old !== url) revokeIfUnused(old);
+    if (audioEl.src !== url) audioEl.src = url;
+    try { audioEl.currentTime = 0; } catch (e) {}
     try {
-      var sy = new ABCJS.synth.CreateSynth();
-      /* 주의: abcjs는 stop()/pause() 때도 onEnded를 부른다 → 일시정지 중엔 다음 곡으로 넘기지 않기 */
-      var opts = { chordsOff: !$("chordAccChk").checked, onEnded: function () { if (token === playToken && !isPaused) advance(token); } };
-      if ($("soundSel").value === "musyng") opts.soundFontUrl = MUSYNG;
-      await sy.init({ audioContext: audioCtx, visualObj: vo, options: opts });
-      await sy.prime();
-      if (token !== playToken) return;   /* 준비 중 다른 곡으로 이동함 */
-      synth = sy;
-      sy.start();
-      failStreak = 0;
-      syncKeeper();
-      setMediaSession(it.title, "playing");
-      setStatus("♪ 재생 중 — " + it.title + ($("chordAccChk").checked ? "" : " (코드 반주 없음)"));
+      await audioEl.play();
     } catch (e) {
       if (token !== playToken) return;
-      if (!isRetry) return playAt(i, true);   /* 순간적인 음원 로딩 실패면 한 번 더 시도 */
-      setStatus("'" + it.title + "' 재생에 실패해 건너뜁니다. (음원 로딩 실패)", true);
-      skipNext(token, "음원 로딩 실패");
+      if (!isRetry) return playAt(i, true);
+      setStatus("'" + it.title + "' 오디오 재생에 실패해 건너뜁니다.", true);
+      return skipNext(token, "오디오 재생 실패");
     }
+    if (token !== playToken) return;
+    failStreak = 0;
+    setMediaSession(it.title, "playing");
+    setStatus("♪ 재생 중 — " + it.title + ($("chordAccChk").checked ? "" : " (코드 반주 없음)"));
+    prefetchNext(i);
   }
   function advance(token) {
     if (token !== playToken || !isPlaying) return;
@@ -408,27 +431,24 @@
   function startFrom(i) { playAt(i); }
 
   /* ── 컨트롤 ── */
+  function resumePlay() {
+    isPaused = false;
+    var p = audioEl.play(); if (p && p.catch) p.catch(function () {});
+    $("pauseBtn").textContent = "⏸ 일시정지"; setStatus("♪ 이어서 재생");
+    setMediaSession(null, "playing");
+  }
   $("playBtn").addEventListener("click", function () {
-    if (isPaused && synth && typeof synth.resume === "function") {
-      synth.resume(); isPaused = false;
-      $("pauseBtn").textContent = "⏸ 일시정지"; setStatus("♪ 이어서 재생");
-      syncKeeper(); setMediaSession(null, "playing");
-      return;
-    }
+    if (isPaused && isPlaying) { resumePlay(); return; }
     playAt(curIdx >= 0 ? curIdx : 0);
   });
   $("pauseBtn").addEventListener("click", function () {
-    if (!synth) return;
-    if (!isPaused && typeof synth.pause === "function") {
-      isPaused = true;                    /* pause()가 onEnded를 부르므로 반드시 먼저 표시 */
-      synth.pause();
+    if (!isPlaying) return;
+    if (!isPaused) {
+      isPaused = true;
+      try { audioEl.pause(); } catch (e) {}
       $("pauseBtn").textContent = "▶ 계속"; setStatus("일시정지");
-      keeperOff(); setMediaSession(null, "paused");
-    } else if (isPaused && typeof synth.resume === "function") {
-      synth.resume(); isPaused = false;
-      $("pauseBtn").textContent = "⏸ 일시정지"; setStatus("♪ 이어서 재생");
-      syncKeeper(); setMediaSession(null, "playing");
-    }
+      setMediaSession(null, "paused");
+    } else resumePlay();
   });
   $("stopBtn").addEventListener("click", function () { stopAll(); setStatus("정지했어요."); });
   $("nextBtn").addEventListener("click", function () { if (playlist.length) playAt(curIdx + 1); });
@@ -469,7 +489,7 @@
 
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__player = {
-    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), keeperActive: !!(keeper && !keeper.paused) }; },
+    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "" }; },
     playAt: playAt, slurSameToTie: slurSameToTie
   };
 })();
