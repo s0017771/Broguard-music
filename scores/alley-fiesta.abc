@@ -1,0 +1,36 @@
+X:1
+T:골목 피에스타
+T:(Alley Fiesta)
+R:Latin Rock
+M:4/4
+L:1/8
+Q:1/4=152
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:C
+% 라틴 로큰롤 풍 오리지널(멜로디 창작): C-F-G 순환 루프, 당김음 워킹 베이스,
+% 엇박 스트럼, 콜 앤 리스폰스, 기타 솔로풍 런
+% ===== Intro (1-4마디) : 엇박 스트럼 — 축제 개시! =====
+[V:1] !mf!"C""^스트럼"z2[EGc]2 z2[EGc]2 | "F"z2[FAc]2 "G"z2[GBd]2 | "C"z2[EGc]2 z2[EGc]2 | "F"z2[FAc]2 "G"z2[GBd]2 |
+[V:2] C,2E,G, A,2G,2 | F,2A,2 G,2B,2 | C,2E,G, A,2G,2 | F,2A,2 G,2B,2 |
+% ===== 기 · Verse (5-12마디) : 외치는 소절 =====
+[V:1] !f!"C""^외치면"G2GA c2e2 | "F"f2fe "G"d2B2 | "C"e2ed c2G2 | "F"A2Bc "G"d2z2 |
+[V:2] C,2E,G, A,2G,2 | F,2A,2 G,2B,2 | C,2E,G, A,2G,2 | F,2A,2 G,2B,2 |
+[V:1] "C"G2GA c2e2 | "F"f2fe "G"d2B2 | "C"e2ed c2G2 | "F"d2ef "G"g2z2 |
+[V:2] C,2E,G, A,2G,2 | F,2A,2 G,2B,2 | C,2E,G, A,2G,2 | F,2A,2 G,2B,2 |
+% ===== 승 · Response (13-20마디) : 한 옥타브 위의 화답! =====
+[V:1] "C""^화답!"g2ga c'2c'2 | "F"a2ag "G"f2d2 | "C"c'2c'b a2g2 | "F"a2af "G"g2z2 |
+[V:2] C,2E,G, A,2G,2 | F,2A,2 G,2B,2 | C,2E,G, A,2G,2 | F,2A,2 G,2B,2 |
+[V:1] "C"g2ga c'2c'2 | "F"a2ag "G"f2d2 | "C"c'2c'b a2g2 | "F"a2bc' "G"d'2z2 |
+[V:2] C,2E,G, A,2G,2 | F,2A,2 G,2B,2 | C,2E,G, A,2G,2 | F,2A,2 G,2B,2 |
+% ===== 전 · Break (21-28마디) : 기타 솔로처럼 — 8분음표 질주 =====
+[V:1] "C""^기타 솔로처럼"cdef gage | "F"fcAc "G"dBGB | "C"cdef g2e2 | "F"fedc "G"B2d2 |
+[V:2] C,2E,G, A,2G,2 | F,2A,2 G,2B,2 | C,2E,G, A,2G,2 | F,2A,2 G,2B,2 |
+[V:1] "C"efga c'2g2 | "F"agfe "G"d2B2 | "C"cege c'ege | "G"defg a2b2 |
+[V:2] C,2E,G, A,2G,2 | F,2A,2 G,2B,2 | C,2E,G, A,2G,2 | G,2B,2 D2B,2 |
+% ===== 결 · Final (29-36마디) : 다 같이! — 올레! =====
+[V:1] !ff!"C""^다 같이!"g2ga c'2e'2 | "F"f'2f'e' "G"d'2b2 | "C"e'2e'd' c'2g2 | "F"a2bc' "G"d'2z2 |
+[V:2] C,2E,G, A,2G,2 | F,2A,2 G,2B,2 | C,2E,G, A,2G,2 | F,2A,2 G,2B,2 |
+[V:1] "C"g2ga c'2e'2 | "F"f'2f'e' "G"d'2b2 | "C"e'2c'2 g2e2 | "G""^올레!"g2f2 "C"H[Gceg]4 |]
+[V:2] C,2E,G, A,2G,2 | F,2A,2 G,2B,2 | C,2E,G, A,2G,2 | G,2G,2 H[C,G,C]4 |]
