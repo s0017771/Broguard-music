@@ -1,0 +1,36 @@
+X:1
+T:머무는 사람
+T:(The One Who Stays — hommage à Keren Ann)
+R:Folk
+M:4/4
+L:1/8
+Q:1/4=72
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:C
+% Keren Ann 'Not Going Anywhere' 풍: 큰 절정 없이 속삭임 속에서 깊어지는 곡.
+% 왼손 아르페지오는 최면처럼 끝까지 계속되고, 베이스는 C-B-A-G로 반음씩 내려온다.
+% ===== 기 (1-8마디) : 긴 숨의 멜로디 — 베이스가 한 계단씩 가라앉는다 =====
+[V:1] !p!"C"e6 d2 | "C/B"d6 c2 | "Am7"c6 B2 | "C/G"B6 G2 |
+[V:2] C,G,EG, C,G,EG, | B,,G,EG, B,,G,EG, | A,,G,EG, A,,G,EG, | G,,G,EG, G,,G,EG, |
+[V:1] "F"A4 c2 d2 | "Em7"e4 d2 B2 | "Dm7"d4 c2 A2 | "G7"A6 z2 |
+[V:2] F,,C,A,C, F,,C,A,C, | E,B,G,B, E,B,G,B, | D,A,FA, D,A,FA, | G,,D,FD, G,,D,FD, |
+% ===== 승 (9-16마디) : 같은 자리, 조금 더 움직이는 마음 =====
+[V:1] !mp!"C"e3 f g2 e2 | "C/B"d3 e d2 c2 | "Am7"c3 d e2 a2 | "C/G"g4 e2 c2 |
+[V:2] C,G,EG, C,G,EG, | B,,G,EG, B,,G,EG, | A,,G,EG, A,,G,EG, | G,,G,EG, G,,G,EG, |
+[V:1] "F"a4 g2 f2 | "Em7"g4 e2 d2 | "Dm7"f4 e2 d2 | "G7"d6 e2 |
+[V:2] F,,C,A,C, F,,C,A,C, | E,B,G,B, E,B,G,B, | D,A,FA, D,A,FA, | G,,D,FD, G,,D,FD, |
+% ===== 전 (17-24마디) : 깊어지는 속삭임 — 7th 화음의 안개 속으로 =====
+[V:1] "Fmaj7""^여전히 조용하게"f3 f e2 c2 | "Em7"e3 e d2 B2 | "Dm7"d3 d c2 A2 | "Cmaj7"B4 c2 d2 |
+[V:2] F,,C,EC, F,,C,EC, | E,B,DB, E,B,DB, | D,A,CA, D,A,CA, | C,G,B,G, C,G,B,G, |
+[V:1] "Fmaj7"f3 f g2 a2 | "Em7"b4 g2 e2 | "Dm7"f4 e2 d2 | "G7"e2 d2 c2 d2 |
+[V:2] F,,C,EC, F,,C,EC, | E,B,DB, E,B,DB, | D,A,CA, D,A,CA, | G,,D,FD, G,,D,FD, |
+% ===== 결 (25-32마디) : 처음의 노래가 그대로 — 떠나지 않았다 =====
+[V:1] !p!"C"e6 d2 | "C/B"d6 c2 | "Am7"c6 B2 | "C/G"B6 G2 |
+[V:2] C,G,EG, C,G,EG, | B,,G,EG, B,,G,EG, | A,,G,EG, A,,G,EG, | G,,G,EG, G,,G,EG, |
+[V:1] "F"A4 c2 d2 | "Em7"e4 d2 B2 | "Dm7"d4 c2 A2 | "G7"A6 z2 |
+[V:2] F,,C,A,C, F,,C,A,C, | E,B,G,B, E,B,G,B, | D,A,FA, D,A,FA, | G,,D,FD, G,,D,FD, |
+% ===== Coda (33-36마디) : 한숨처럼 — 그리고 그 자리에 =====
+[V:1] !pp!"Fmaj7"c4 A2 G2 | "Fm6""^한숨처럼"_A6 F2 | "C""^rit."G6 E2 | "C"HE8 |]
+[V:2] F,,C,EC, F,,C,EC, | F,,C,_A,C, F,,C,_A,C, | C,G,EG, C,G,EG, | H[C,G,C]8 |]

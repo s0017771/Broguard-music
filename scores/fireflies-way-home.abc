@@ -1,0 +1,31 @@
+X:1
+T:퇴근길의 반딧불
+T:(Fireflies on the Way Home)
+R:Ballad
+M:4/4
+L:1/8
+Q:1/4=72
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Am
+% ===== 기 (1-8마디) : 고된 하루, 어스름한 저녁 — Am의 서정 =====
+[V:1] !p!"Am"A3 B c2 e2 | "G"d2 c2 B3 A | "F"A3 B c2 d2 | "E7"B4 ^G2 E2 |
+[V:2] A,,2 E,2 A,2 C2 | G,,2 D,2 G,2 B,2 | F,,2 C,2 F,2 A,2 | E,,2 B,,2 E,2 ^G,2 |
+[V:1] "Am"e3 d c2 B2 | "F"c3 d f2 e2 | "Dm"f3 e d2 A2 | "E7"B6 z2 |
+[V:2] A,,2 E,2 A,2 C2 | F,,2 C,2 F,2 A,2 | D,2 A,2 D2 F2 | E,,2 B,,2 ^G,2 B,2 |
+% ===== 승 (9-16마디) : 마음이 조금씩 풀리는 — C장조의 온기 =====
+[V:1] !mp!"C"e3 d e2 g2 | "G/B"d3 e d2 B2 | "Am"c3 d e2 a2 | "Em/G"g4 e2 d2 |
+[V:2] C,2 G,2 C2 E2 | B,,2 D,2 G,2 B,2 | A,,2 E,2 A,2 C2 | G,,2 E,2 G,2 B,2 |
+[V:1] "F"c3 d c2 A2 | "C/E"e3 f e2 c2 | "Dm"d2 f2 a3 g | "G7"d3 e f2 g2 |
+[V:2] F,,2 C,2 F,2 A,2 | E,2 G,2 C2 G,2 | D,2 A,2 D2 F2 | G,,2 D,2 G,2 B,2 |
+% ===== 전 (17-24마디) : 하루의 감정이 차오르는 절정 =====
+[V:1] !mf!"F"f3 g a2 c'2 | "G"b3 a g2 d2 | "Em"g2 a2 b3 c' | "Am"e'4 d'2 c'2 |
+[V:2] F,,2 C,2 F,2 C2 | G,,2 D,2 G,2 D2 | E,2 B,2 E2 B,2 | A,,2 E,2 A,2 C2 |
+[V:1] "Dm"d'3 c' a2 f2 | "Em"b3 a g2 e2 | "F"a3 g f2 c2 | "E7"B2 e2 d3 B |
+[V:2] D,2 A,2 D2 F2 | E,2 B,2 E2 B,2 | F,,2 C,2 F,2 A,2 | E,,2 B,,2 E,2 ^G,2 |
+% ===== 결 (25-32마디) : 반딧불처럼 잔잔한 행복 — A장조 =====
+[V:1] [K:A] !p!"A"A3 B c2 e2 | "D"f3 e d2 A2 | "A"e3 d c2 B2 | "E7"d3 c B2 E2 |
+[V:2] [K:A] A,,2 E,2 A,2 C2 | D,2 A,2 D2 F2 | A,,2 E,2 A,2 C2 | E,,2 B,,2 E,2 G,2 |
+[V:1] "A"c2 e2 a3 e | "D"f4 e2 d2 | !pp!"E7""^rit."c3 A B4 | "A"H[Ace]8 |]
+[V:2] A,,2 E,2 A,2 C2 | D,2 A,2 D2 F2 | E,,2 B,,2 E,2 G,2 | H[A,,E,A,]8 |]

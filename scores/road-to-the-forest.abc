@@ -1,0 +1,32 @@
+X:1
+T:숲으로 가는 길
+T:(The Road to the Forest — 16th Groove)
+R:Walking Song
+M:4/4
+L:1/16
+Q:1/4=112
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 토토로 풍 오리지널(멜로디 창작): 뚜벅뚜벅 걷는 베이스, 따.단 스킵 부점, 숲의 거인 발소리 구간
+% ===== 기 (1-8마디) : 산책 — 따.단 따.단 스킵하며 =====
+[V:1] !mf!"G""^뚜벅뚜벅"d3B G3B d3B d4 | "C"e3c e3c g4e4 | "G"d3B d3B g4d4 | "D"A3F A3F A8 |
+[V:2] G,4B,4 D4B,4 | C,4E,4 G,4E,4 | G,4B,4 D4B,4 | D,4F,4 A,4F,4 |
+[V:1] "G"d3B G3B d3B d4 | "C"e3c e3c a4g4 | "D"f3d f3d a4f4 | "G"g8 z8 |
+[V:2] G,4B,4 D4B,4 | C,4E,4 G,4E,4 | D,4F,4 A,4F,4 | G,4B,4 D4G4 |
+% ===== 승 (9-16마디) : 부르고 대답하고 — 숲이 가까워진다 =====
+[V:1] "G""^부르면"b3g b3g d'4b4 | "Em""^대답하고"g3e g3e B8 | "C"g3e g3e c'4g4 | "D"f3d f3d A8 |
+[V:2] G,4B,4 D4B,4 | E,4G,4 B,4G,4 | C,4E,4 G,4E,4 | D,4F,4 A,4F,4 |
+[V:1] "G"b3g b3g d'4b4 | "Em"e'3b e'3b g4e4 | "C"g3a b3c' d'4b4 | "D"a8 z8 |
+[V:2] G,4B,4 D4B,4 | E,4G,4 B,4G,4 | C,4E,4 G,4B,4 | D,8 z8 |
+% ===== 전 (17-24마디) : 쿵… 쿵… 숲의 거인이 함께 걷는다 =====
+[V:1] !f!"G""^쿵... 쿵..."z8 d2B2 G4 | "C"z8 e2c2 A4 | "G"d3B G3B d4B4 | "D"A3F A3F A4z4 |
+[V:2] [G,,G,]4z4 [G,,G,]4z4 | [C,C]4z4 [C,C]4z4 | G,4B,4 D4B,4 | D,4F,4 A,4F,4 |
+[V:1] "Em"z8 g2e2 B4 | "C"z8 a2g2 e4 | "G"b3g d'3b g4d4 | "D7"a2b2 c'2a2 f2d2 A2c2 |
+[V:2] [E,E]4z4 [E,E]4z4 | [C,C]4z4 [C,C]4z4 | G,4B,4 D4G4 | D,4F,4 C4A,4 |
+% ===== 결 (25-32마디) : 집으로 — 같은 길, 신나는 걸음 =====
+[V:1] !mf!"G"d3B G3B d3B d4 | "C"e3c e3c g4e4 | "G"d3B d3B g4d4 | "D"A3F A3F A8 |
+[V:2] G,4B,4 D4B,4 | C,4E,4 G,4E,4 | G,4B,4 D4B,4 | D,4F,4 A,4F,4 |
+[V:1] "G"d3B G3B d3B d4 | "C"e3c e3c a4g4 | "D7""^rit."f3d A3F A4c4 | "G"H[GBdg]16 |]
+[V:2] G,4B,4 D4B,4 | C,4E,4 G,4E,4 | D,4F,4 C4A,4 | H[G,,D,G,]16 |]

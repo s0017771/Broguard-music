@@ -1,0 +1,35 @@
+X:1
+T:어제에게
+T:(To Yesterday — 16th Groove)
+R:Ballad
+M:4/4
+L:1/16
+Q:1/4=80
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:F
+% 예스터데이 풍 오리지널: 7마디 벌스, A7→Dm의 그늘, 베이스 하강(D→C), 허밍 코다
+% ===== 기 · Verse 1 (1-7마디, 7마디 프레이즈!) : 어제라는 한 단어 =====
+[V:1] !mp!"F""^Verse (7마디)"a6gf f8 | "A7"e6fe ^c4A4 | "Dm"d4e4 f4g4 | "Dm/C"a8 f4e4 |
+[V:2] F,2C2A,2C2 F,2C2A,2C2 | A,2E2^C2E2 A,2E2^C2E2 | D,2A,2F2A,2 D,2A,2F2A,2 | C,2A,2F2A,2 C,2A,2F2A,2 |
+[V:1] "Bb"d6ed d4c4 | "C7"c4B4 A4G4 | "F"F12 z4 |
+[V:2] B,,2F,2D2F,2 B,,2F,2D2F,2 | C,2G,2E2G,2 C,2G,2B,2G,2 | F,2C2A,2C2 F,2C2A,2C2 |
+% ===== 승 · Verse 2 (8-14마디) : 같은 이야기, 조금 더 가까이 =====
+[V:1] "F""^Verse 2"a6gf f8 | "A7"e6fe ^c4A4 | "Dm"d4e4 f4g4 | "Dm/C"a8 f4e4 |
+[V:2] F,2C2A,2C2 F,2C2A,2C2 | A,2E2^C2E2 A,2E2^C2E2 | D,2A,2F2A,2 D,2A,2F2A,2 | C,2A,2F2A,2 C,2A,2F2A,2 |
+[V:1] "Bb"d6ed d4c4 | "C7"c4B4 A4G4 | "F"F8 c4d4 |
+[V:2] B,,2F,2D2F,2 B,,2F,2D2F,2 | C,2G,2E2G,2 C,2G,2B,2G,2 | F,2C2A,2C2 F,2C2A,2C2 |
+% ===== 전 · Bridge (15-22마디) : 왜 그랬을까 — 회한의 물음 =====
+[V:1] !mf!"A7""^Bridge"a6ge e4^c4 | "Dm"d4f4 a6ba | "Gm7"b6ag g4d4 | "C7"e4c4 G4 GABc |
+[V:2] A,2E2^C2E2 A,2E2^C2E2 | D,2A,2F2A,2 D,2A,2F2A,2 | G,2D2B,2D2 G,2D2B,2D2 | C,2G,2E2G,2 C,2G,2B,2G,2 |
+[V:1] "F"c6ba a4f4 | "A7"e6fe ^c4A4 | "Dm"d8 e4f4 | "C7"g8 e4c4 |
+[V:2] F,2C2A,2C2 F,2C2A,2C2 | A,2E2^C2E2 A,2E2^C2E2 | D,2A,2F2A,2 D,2A,2F2A,2 | C,2G,2E2G,2 C,2G,2B,2G,2 |
+% ===== 결 · Verse 3 (23-29마디) : 한 번 더, 여리게 =====
+[V:1] !p!"F""^Verse 3"a6gf f8 | "A7"e6fe ^c4A4 | "Dm"d4e4 f4g4 | "Dm/C"a8 f4e4 |
+[V:2] F,2C2A,2C2 F,2C2A,2C2 | A,2E2^C2E2 A,2E2^C2E2 | D,2A,2F2A,2 D,2A,2F2A,2 | C,2A,2F2A,2 C,2A,2F2A,2 |
+[V:1] "Bb"d6ed d4c4 | "C7"c4B4 A4G4 | "F"F16 |
+[V:2] B,,2F,2D2F,2 B,,2F,2D2F,2 | C,2G,2E2G,2 C,2G,2B,2G,2 | F,2C2A,2C2 F,2C2A,2C2 |
+% ===== Coda (30-33마디) : 허밍처럼 =====
+[V:1] !pp!"A7""^Coda - 허밍처럼"A4^c4 e4g4 | "Dm"f6ed d8 | "Bb""^rit."d4c4 "C7"B4G4 | "F"H[Acf]16 |]
+[V:2] A,2E2^C2E2 A,2E2^C2E2 | D,2A,2F2A,2 D,2A,2F2A,2 | B,,2F,2D2F,2 C,2G,2B,2G,2 | H[F,,C,F,]16 |]

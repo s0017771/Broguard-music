@@ -1,0 +1,41 @@
+X:1
+T:여기 있을게
+T:(I'm Not Going Anywhere)
+R:Ballad
+M:4/4
+L:1/8
+Q:1/4=76
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:D
+% 핵심 아이디어: 코러스에서 코드(D-A-Bm-G)가 바뀌어도 멜로디는 한 음(A)에 머문다 = "어디 안 가"
+% ===== Intro (1-4마디) : 조용한 약속의 예감 =====
+[V:1] !p!"D""^Intro"a4 f2 e2 | "A/C#"e4 c2 B2 | "Bm"d4 B2 A2 | "G"B2 A2 G2 A2 |
+[V:2] D,2 A,2 F2 A,2 | C,2 E,2 A,2 E,2 | B,,2 F,2 B,2 F,2 | G,,2 D,2 G,2 B,2 |
+% ===== 기 · Verse (5-12마디) : 담담한 고백 =====
+[V:1] !mp!"D""^Verse"A3 B d2 d2 | "A/C#"c3 B A2 A2 | "Bm"B3 c d2 e2 | "G"d4 B2 A2 |
+[V:2] D,2 A,2 D2 F2 | C,2 E,2 A,2 C2 | B,,2 F,2 B,2 D2 | G,,2 D,2 G,2 B,2 |
+[V:1] "D"A3 B d2 d2 | "A/C#"c3 B A2 c2 | "Bm"d3 e f2 d2 | "G"e4 d2 B2 |
+[V:2] D,2 A,2 D2 F2 | C,2 E,2 A,2 C2 | B,,2 F,2 B,2 D2 | G,,2 D,2 G,2 B,2 |
+% ===== 승 · Pre-Chorus (13-16마디) : 마음이 차오른다 =====
+[V:1] !mf!"Em""^Pre-Chorus"e2 e2 g2 g2 | "D/F#"f2 f2 a2 a2 | "G"b2 b2 a2 g2 | "A"a6 e2 |
+[V:2] E,2 B,2 E2 G2 | F,2 A,2 D2 A,2 | G,,2 D,2 G,2 B,2 | A,,2 E,2 A,2 E,2 |
+% ===== 전 · Chorus (17-24마디) : 머무는 음 — 코드가 바뀌어도 A음은 그대로 =====
+[V:1] "D""^Chorus - 머무는 음"a3 a a2 f2 | "A"a3 a a2 e2 | "Bm"a3 a a2 f2 | "G"a4 g2 f2 |
+[V:2] D,A,FA, DA,FA, | A,,E,CE, A,E,CE, | B,,F,DF, B,F,DF, | G,,D,B,D, G,D,B,D, |
+[V:1] "D"a3 a b2 d'2 | "A"c'3 b a2 e2 | "Bm"f3 g f2 e2 | "G"e4 "A"d2 e2 |
+[V:2] D,A,FA, DA,FA, | A,,E,CE, A,E,CE, | B,,F,DF, B,F,DF, | G,,D,B,D, A,,E,CE, |
+% ===== 그늘 · Bridge (25-32마디) : 세상이 흔들려도, 나는 여기 =====
+[V:1] !p!"Bm""^Bridge"d3 c B2 B2 | "F#m"c3 B A2 A2 | "G"B3 A G2 B2 | "D"A4 d2 f2 |
+[V:2] B,,2 F,2 B,2 D2 | F,2 C,2 F,2 A,2 | G,,2 D,2 G,2 B,2 | D,2 A,2 D2 F2 |
+[V:1] "Em"g3 f e2 e2 | "Bm"f3 e d2 d2 | !mf!"G"e2 e2 f2 g2 | "A7"a4 b2 c'2 |
+[V:2] E,2 B,2 E2 G2 | B,,2 F,2 B,2 D2 | G,,2 D,2 G,2 B,2 | A,,2 E,2 G,2 C2 |
+% ===== 결 · Last Chorus (33-40마디) : 같은 약속, 더 단단하게 =====
+[V:1] !f!"D""^Last Chorus"a3 a a2 f2 | "A"a3 a a2 e2 | "Bm"a3 a a2 f2 | "G"a4 g2 f2 |
+[V:2] D,A,FA, DA,FA, | A,,E,CE, A,E,CE, | B,,F,DF, B,F,DF, | G,,D,B,D, G,D,B,D, |
+[V:1] "D"a3 a b2 d'2 | "A"c'3 b a2 e2 | "Bm"f3 g f2 e2 | "A7"e4 d2 c2 |
+[V:2] D,A,FA, DA,FA, | A,,E,CE, A,E,CE, | B,,F,DF, B,F,DF, | A,,E,GE, A,E,CE, |
+% ===== Outro (41-44마디) : 처음의 약속이 메아리로 =====
+[V:1] !p!"D""^Outro"a4 f2 e2 | "Bm"d4 B2 A2 | !pp!"G""^rit."B4 A2 e2 | "D"H[Adef]8 |]
+[V:2] D,2 A,2 F2 A,2 | B,,2 F,2 B,2 F,2 | G,,2 D,2 G,2 B,2 | H[D,A,D]8 |]
