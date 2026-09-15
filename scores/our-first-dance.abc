@@ -1,0 +1,37 @@
+X:1
+T:우리의 첫 춤
+T:(Our First Dance)
+R:Slow Dance
+M:6/8
+L:1/8
+Q:3/8=60
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Eb
+% 슬로우 댄스 발라드 풍 오리지널(멜로디 창작): 6/8 스웨이, 두왑 진행(Eb-Cm-Ab-Bb),
+% 핑거피킹 벌스 - 로맨틱 코러스, 플라갈(Ab→Eb) 마무리
+% ===== Intro (1-4마디) : 손을 잡는다 =====
+[V:1] !p!"Eb""^천천히, 춤추듯"B2e2g2 | "Cm"g4 e2 | "Ab"c2e2f2 | "Bb"f4 d2 |
+[V:2] E,G,B,GB,G, | C,E,G,EG,E, | A,,C,E,CE,C, | B,,D,F,DF,D, |
+% ===== 기 · Verse (5-12마디) : 나지막이 — 발끝이 맞춰진다 =====
+[V:1] !mp!"Eb""^Verse"G3 GAB | "Cm"c3 cBG | "Ab"B2A2G2 | "Bb"F4 z2 |
+[V:2] E,G,B,GB,G, | C,E,G,EG,E, | A,,C,E,CE,C, | B,,D,F,DF,D, |
+[V:1] "Eb"G3 GAB | "Cm"c3 cde | "Ab"f2e2c2 | "Bb"d4 ef |
+[V:2] E,G,B,GB,G, | C,E,G,EG,E, | A,,C,E,CE,C, | B,,D,F,DF,D, |
+% ===== 승 · Pre-Chorus (13-16마디) : 눈이 마주친다 =====
+[V:1] !mf!"Ab""^Pre-Chorus"e3 e2f | "Bb"f3 f2g | "Cm"g3 g2b | "Bb"b4 z2 |
+[V:2] A,,C,E,CE,C, | B,,D,F,DF,D, | C,E,G,EG,E, | B,,D,F,DF,D, |
+% ===== 전 · Chorus (17-24마디) : 길게 뻗는 로맨스 =====
+[V:1] "Eb""^Chorus"b3 e'3 | "Cm"e'2d'2c'2 | "Ab"c'3 b2a | "Bb"b4 f2 |
+[V:2] E,G,B,GB,G, | C,E,G,EG,E, | A,,C,E,CE,C, | B,,D,F,DF,D, |
+[V:1] "Eb"b3 e'3 | "Cm"e'2d'2c'2 | "Ab"c'3 a2f | "Bb"f4 z2 |
+[V:2] E,G,B,GB,G, | C,E,G,EG,E, | A,,C,E,CE,C, | B,,D,F,DF,D, |
+% ===== 간주 (25-28마디) : 한 바퀴 — 인트로 모티프가 돌아온다 =====
+[V:1] !mp!"Eb""^한 바퀴"B2e2g2 | "Cm"g4 e2 | "Ab"c2e2f2 | "Bb"f2g2a2 |
+[V:2] E,G,B,GB,G, | C,E,G,EG,E, | A,,C,E,CE,C, | B,,D,F,DF,D, |
+% ===== 결 · Last Chorus (29-36마디) : 마지막 스텝까지 =====
+[V:1] !f!"Eb""^Last Chorus"b3 e'3 | "Cm"e'2d'2c'2 | "Ab"c'3 b2a | "Bb"b4 f2 |
+[V:2] E,G,B,GB,G, | C,E,G,EG,E, | A,,C,E,CE,C, | B,,D,F,DF,D, |
+[V:1] "Eb"b3 e'3 | "Cm"e'2f'2e'2 | !p!"Ab""^rit."c'2a2f2 | "Eb"H[GBe]6 |]
+[V:2] E,G,B,GB,G, | C,E,G,EG,E, | A,,C,E,CE,C, | H[E,B,E]6 |]

@@ -1,0 +1,36 @@
+X:1
+T:출근길 질주
+T:(Morning Rush Gallop)
+R:Electro
+M:4/4
+L:1/16
+Q:1/4=132
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Bm
+% 일렉트로 하우스 풍 오리지널(멜로디 창작): 갤럽 리듬(다그닥), 스웨거 벌스,
+% 빌드업-정적-드롭 구조, 화음 갤럽의 파이널 드롭
+% ===== Intro (1-4마디) : 스탭 — 시동을 건다 =====
+[V:1] !f!"Bm""^스탭"b4z4 f4z4 | "Bm"b4z4 f4z4 | "G"g4z4 b4z4 | "F#7"^a4z4 c'4z4 |
+[V:2] B,2B,B, B,2B,B, B,2B,B, B,2B,B, | B,2B,B, B,2B,B, B,2B,B, B,2B,B, | G,2G,G, G,2G,G, G,2G,G, G,2G,G, | F,2F,F, F,2F,F, F,2F,F, F,2F,F, |
+% ===== 기 · Verse (5-12마디) : 스웨거 — 어깨 들썩이며 =====
+[V:1] !mf!"Bm""^스웨거"d3d B3B d2c2 B4 | "Bm"d3d B3B c2B2 F4 | "G"d3d B3B d2e2 g4 | "F#7"c3c c2^A2 F4z4 |
+[V:2] B,2B,B, B,2B,B, B,2B,B, B,2B,B, | B,2B,B, B,2B,B, B,2B,B, B,2B,B, | G,2G,G, G,2G,G, G,2G,G, G,2G,G, | F,2F,F, F,2F,F, F,2F,F, F,2F,F, |
+[V:1] "Bm"d3d B3B d2c2 B4 | "Bm"d3d B3B c2B2 F4 | "G"d3d B3B d2e2 g4 | "F#7"c3c c2^A2 c2e2 f4 |
+[V:2] B,2B,B, B,2B,B, B,2B,B, B,2B,B, | B,2B,B, B,2B,B, B,2B,B, B,2B,B, | G,2G,G, G,2G,G, G,2G,G, G,2G,G, | F,2F,F, F,2F,F, F,2F,F, F,2F,F, |
+% ===== 승 · Build-up (13-20마디) : 층층이 쌓인다 — 그리고 정적 =====
+[V:1] !mf!"Em""^빌드업!"eeee eeee e2e2 e4 | "Em"gggg gggg g2g2 g4 | "F#7"^aaaa aaaa a2a2 a4 | "F#7"c'c'c'c' c'c'c'c' c'2c'2 c'4 |
+[V:2] E,2E2E,2E2 E,2E2E,2E2 | E,2E2E,2E2 E,2E2E,2E2 | F,2F2F,2F2 F,2F2F,2F2 | F,2F2F,2F2 F,2F2F,2F2 |
+[V:1] !f!"G"d'd'd'd' d'd'd'd' d'2d'2 d'4 | "A"e'e'e'e' e'e'e'e' e'2e'2 e'4 | "F#7""^정적..."f'4 z4 z8 | "F#7"z8 z4 f2^a2 |
+[V:2] G,2G2G,2G2 G,2G2G,2G2 | A,2A2A,2A2 A,2A2A,2A2 | F,2F2F,2F2 z8 | z8 z4 F,2F,2 |
+% ===== 전 · Drop (21-28마디) : 다그닥 다그닥 — 달린다! =====
+[V:1] !ff!"Bm""^드롭! 다그닥"b2bb b2bb d'2c'2 b4 | "Bm"b2bb b2bb f2a2 b4 | "G"g2gg g2gg b2a2 g4 | "F#7"f2ff f2ff ^a2c'2 f4 |
+[V:2] B,2B,B, B,2B,B, B,2B,B, B,2B,B, | B,2B,B, B,2B,B, B,2B,B, B,2B,B, | G,2G,G, G,2G,G, G,2G,G, G,2G,G, | F,2F,F, F,2F,F, F,2F,F, F,2F,F, |
+[V:1] "Bm"b2bb b2bb d'2c'2 b4 | "Bm"b2bb b2bb f2a2 b4 | "G"g2gg g2gg b2c'2 d'4 | "F#7"e'2d'2 c'2^a2 f4 z4 |
+[V:2] B,2B,B, B,2B,B, B,2B,B, B,2B,B, | B,2B,B, B,2B,B, B,2B,B, B,2B,B, | G,2G,G, G,2G,G, G,2G,G, G,2G,G, | F,2F,F, F,2F,F, F,2F,F, F,2F,F, |
+% ===== 결 · Final Drop (29-36마디) : 화음 갤럽 — 더 크게! =====
+[V:1] !ff!"Bm""^더 크게!"[bd']2[bd'][bd'] [bd']2[bd'][bd'] [d'f']2[c'e']2 [bd']4 | "Bm"[bd']2[bd'][bd'] [bd']2[bd'][bd'] [fa]2[ac']2 [bd']4 | "G"[gb]2[gb][gb] [gb]2[gb][gb] [bd']2[ac']2 [gb]4 | "F#7"[f^a]2[fa][fa] [fa]2[fa][fa] [^ac']2[c'e']2 [fa]4 |
+[V:2] B,2B,B, B,2B,B, B,2B,B, B,2B,B, | B,2B,B, B,2B,B, B,2B,B, B,2B,B, | G,2G,G, G,2G,G, G,2G,G, G,2G,G, | F,2F,F, F,2F,F, F,2F,F, F,2F,F, |
+[V:1] "Bm"[bd']2[bd'][bd'] [bd']2[bd'][bd'] [d'f']2[c'e']2 [bd']4 | "G"[gb]2[gb][gb] [gb]2[gb][gb] "A"[ac']2[bd']2 [c'e']4 | "Bm"d'2z2 b2z2 f2z2 d4 | "Bm""^쾅!"b2z2 f2z2 H[Bdfb]8 |]
+[V:2] B,2B,B, B,2B,B, B,2B,B, B,2B,B, | G,2G,G, G,2G,G, A,2A,A, A,2A,A, | B,2z2 F,2z2 D,2z2 B,,4 | B,2z2 F,2z2 H[B,,F,B,]8 |]

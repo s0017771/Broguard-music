@@ -1,0 +1,39 @@
+X:1
+T:흐르는 밤
+T:(The Flowing Night)
+R:New Age
+M:4/4
+L:1/16
+Q:1/4=68
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Am
+% 피아노 뉴에이지 풍 오리지널(멜로디 창작): 멈추지 않는 왼손 물결(분산화음 파도),
+% Am-F-C-G 순환, 주제 회귀마다 16분음표 잔물결 장식, 셈여림만의 기승전결
+% ===== Intro (1-4마디) : 물결 위로 — 첫 음들이 떠오른다 =====
+[V:1] !pp!"Am""^물결처럼"z8 e4a4 | "F"z8 c'4a4 | "C"z8 g4e4 | "G"z8 e4g4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 |
+% ===== 기 · 주제 (5-12마디) : 노래하는 후렴 =====
+[V:1] !p!"Am""^주제"a4b4 c'6ba | "F"a6ag f4c4 | "C"g6ag e4c4 | "G"d6ed B4G4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 |
+[V:1] "Am"a4b4 c'6ba | "F"a6ag f4c4 | "C"g6ag e4g4 | "E7"a8 ^g4e4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | E,2B,2E2^G2 B2^G2E2B,2 |
+% ===== 승 · 잔물결 (13-20마디) : 같은 주제, 16분음표 장식이 반짝인다 =====
+[V:1] !mp!"Am""^잔물결"a4b4 c'4bc'ba | "F"a4agag f4c4 | "C"g4agag e4c4 | "G"d4eded B4G4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 |
+[V:1] "Am"a4b4 c'4bc'ba | "F"a4agag f4c4 | "C"g4agag e4g4 | "E7"a4b4 ^g4e4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | E,2B,2E2^G2 B2^G2E2B,2 |
+% ===== 전 · 깊은 물살 (21-28마디) : 옥타브 위에서 차오른다 =====
+[V:1] !mf!"Dm""^물살이 깊어진다"d'6c'd' f'4d'4 | "Am"e'6d'e' c'4a4 | !f!"F"f'6e'f' c'4a4 | "E7"e'8 b4^g4 |
+[V:2] D,2A,2D2F2 A2F2D2A,2 | A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | E,2B,2E2^G2 B2^G2E2B,2 |
+[V:1] "Dm"d'6c'd' f'4d'4 | "Am"e'6d'e' c'4a4 | "F"f'4e'4 d'4c'4 | "E7"b6c'b ^g4e4 |
+[V:2] D,2A,2D2F2 A2F2D2A,2 | A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | E,2B,2E2^G2 B2^G2E2B,2 |
+% ===== 결 · 주제의 귀환 (29-36마디) : 다시 잔잔히 =====
+[V:1] !p!"Am""^다시 잔잔히"a4b4 c'6ba | "F"a6ag f4c4 | "C"g6ag e4c4 | "G"d6ed B4G4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 |
+[V:1] "Am"a4b4 c'6ba | "F"a6ag f4c4 | "C"g6ag e4g4 | "E7"a8 ^g4e4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | E,2B,2E2^G2 B2^G2E2B,2 |
+% ===== Coda (37-40마디) : 물결이 잦아든다 =====
+[V:1] !pp!"Am""^물결이 잦아든다"e4a4 c'8 | "F"c'4b4 a8 | "E7""^rit."b4^g4 e8 | "Am"H[Ace]16 |]
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | E,2B,2E2^G2 B2^G2E2B,2 | H[A,,E,A,]16 |]
