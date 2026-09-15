@@ -21,12 +21,12 @@ K:G
 [V:1] "Em"e4e4 g4g3a | "C"a4a4 g4e3d | "G"d4e4 g4a4 | "D"a8 z8 |
 [V:2] E,4 B,4 E4 B,4 | C,4 G,4 C4 G,4 | G,,4 D,4 G,4 D,4 | D,8 z8 |
 % ===== 전 · Chorus (17-24마디) : 되튀는 훅 + 베이스 워킹 필인 =====
-[V:1] !f!"G""^Chorus"d'5d' b5b g4 | "D"a5a f5f d4 | "Em"b5b g5g e4 | "C"e4g4 a2b2a2b2 |
+[V:1] !f!"G""^Chorus"d'4-d'd' b4-bb g4 | "D"a4-aa f4-ff d4 | "Em"b4-bb g4-gg e4 | "C"e4g4 a2b2a2b2 |
 [V:2] G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 | E,2E2E,2E2 E,2E2E,2E2 | C,2C2C,2C2 C,2C2 D,E,F,G, |
-[V:1] "G"d'5d' b5b g4 | "D"a5a f5f a4 | "Em"b4b4 d'4d'3e' | "C"e'8 d'4 b4 |
+[V:1] "G"d'4-d'd' b4-bb g4 | "D"a4-aa f4-ff a4 | "Em"b4b4 d'4d'3e' | "C"e'8 d'4 b4 |
 [V:2] G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 | E,2E2E,2E2 E,2E2E,2E2 | C,2C2C,2C2 C,2C2 D,E,F,G, |
 % ===== 결 · Last Chorus & Outro (25-32마디) : 훅 한 번 더, 그리고 옥타브 아래로 =====
-[V:1] !mf!"G""^Last Chorus"d'5d' b5b g4 | "D"a5a f5f d4 | "Em"b5b g5g e4 | "C"e4g4 a2b2a2b2 |
+[V:1] !mf!"G""^Last Chorus"d'4-d'd' b4-bb g4 | "D"a4-aa f4-ff d4 | "Em"b4-bb g4-gg e4 | "C"e4g4 a2b2a2b2 |
 [V:2] G,,4 D,4 G,4 D,4 | D,4 A,4 D4 A,4 | E,4 B,4 E4 B,4 | C,4 G,4 C4 G,4 |
-[V:1] !mp!"G""^Outro"d5d B5B G4 | "D"A5A F5F D4 | "C""^rit."E4G4 A4B4 | "G"H[GBe]16 |]
+[V:1] !mp!"G""^Outro"d4-dd B4-BB G4 | "D"A4-AA F4-FF D4 | "C""^rit."E4G4 A4B4 | "G"H[GBe]16 |]
 [V:2] G,8 D,8 | D,8 A,8 | C,8 G,8 | H[G,,D,G,]16 |]
