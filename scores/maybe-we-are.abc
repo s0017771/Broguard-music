@@ -1,0 +1,36 @@
+X:1
+T:어쩌면 우리는
+T:(Maybe We Are)
+R:New Age
+M:4/4
+L:1/16
+Q:1/4=63
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:C
+% 피아노 뉴에이지 풍 오리지널(멜로디 창작): 여백 있는 분산화음(치고 숨쉬기),
+% 끝이 올라가는 물음표 프레이즈, 전에서만 내려오는 대답, add9로 떠 있는 엔딩
+% ===== Intro (1-4마디) : 숨을 고르듯 =====
+[V:1] !pp!"C""^숨을 고르듯"z8 e4g4 | "Am"z8 e4a4 | "F"z8 f4a4 | "G7"z8 d4g4 |
+[V:2] C,2G,2E2G,2 C4z4 | A,,2E,2C2E,2 A,4z4 | F,,2C,2A,2C,2 F,4z4 | G,,2D,2F,2D,2 G,4z4 |
+% ===== 기 · 질문들 (5-12마디) : 문장이 전부 물음표로 끝난다 =====
+[V:1] !p!"C""^질문들"e6de g8 | "G/B"d6cd a8 | "Am"c6Bc e8 | "Em"B6AB g8 |
+[V:2] C,2G,2E2G,2 C4z4 | B,,2G,2D2G,2 B,4z4 | A,,2E,2C2E,2 A,4z4 | E,2B,2G2B,2 E4z4 |
+[V:1] "F"a6ga c'8 | "C/E"g6fg e8 | "Dm7"f6ef a8 | "G7"d12 z4 |
+[V:2] F,,2C,2A,2C,2 F,4z4 | E,2G,2C2G,2 E4z4 | D,2A,2F2A,2 D4z4 | G,,2D,2F,2D,2 G,4z4 |
+% ===== 승 · 조금 더 간절하게 (13-20마디) : 같은 질문, 한 층 위에서 =====
+[V:1] !mp!"C""^조금 더 간절하게"g6fg c'8 | "G/B"f6ef d'8 | "Am"e6de a8 | "Em"d6cd b8 |
+[V:2] C,2G,2E2G,2 C4z4 | B,,2G,2D2G,2 B,4z4 | A,,2E,2C2E,2 A,4z4 | E,2B,2G2B,2 E4z4 |
+[V:1] "F"c'6bc' f'8 | "C/E"b6ab g8 | "Dm7"a6ga c'8 | "G7"b8 a4f4 |
+[V:2] F,,2C,2A,2C,2 F,4z4 | E,2G,2C2G,2 E4z4 | D,2A,2F2A,2 D4z4 | G,,2D,2F,2D,2 G,4z4 |
+% ===== 전 · 대답에 가까워지는 (21-28마디) : 처음으로, 프레이즈가 내려온다 =====
+[V:1] !mf!"Am""^대답처럼"e'8 c'4a4 | "F"d'8 a4f4 | "C"c'8 g4e4 | "G7"d'8 b4g4 |
+[V:2] A,,2E,2C2E,2 A,4z4 | F,,2C,2A,2C,2 F,4z4 | C,2G,2E2G,2 C4z4 | G,,2D,2F,2D,2 G,4z4 |
+[V:1] "Am"e'8 c'4a4 | "F"d'8 a4f4 | "F""^...그런데"c'4a4 "G7"b4d'4 | "G7"d'12 z4 |
+[V:2] A,,2E,2C2E,2 A,4z4 | F,,2C,2A,2C,2 F,4z4 | F,,2C,2A,2C,2 G,2D2F2D2 | G,,2D,2F,2D,2 G,4z4 |
+% ===== 결 · 질문이 대답이 된다 (29-36마디) =====
+[V:1] !p!"C""^질문이 대답이 된다"e6de g8 | "G/B"d6cd a8 | "Am"c6Bc e8 | "Em"B6AB g8 |
+[V:2] C,2G,2E2G,2 C4z4 | B,,2G,2D2G,2 B,4z4 | A,,2E,2C2E,2 A,4z4 | E,2B,2G2B,2 E4z4 |
+[V:1] "F"a6ga c'8 | "C/E"g6fg e8 | "Dm7""^rit."f4e4 "G7"d4B4 | !pp!"C""^어쩌면"Hd'16 |]
+[V:2] F,,2C,2A,2C,2 F,4z4 | E,2G,2C2G,2 E4z4 | D,2A,2F2A,2 G,2B,2D2B,2 | H[C,G,E]16 |]
