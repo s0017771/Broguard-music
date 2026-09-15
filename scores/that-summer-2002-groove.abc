@@ -1,0 +1,32 @@
+X:1
+T:그 해 여름 (16비트 그루브)
+T:(That Summer of 2002 — 16th-note Groove)
+R:Pop
+M:4/4
+L:1/16
+Q:1/4=96
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 16분음표 격자 리메이크: 부점 밀당(따.다), 16분음표 픽업 런, 베이스 워킹 필인
+% ===== 기 · Verse (1-8마디) : 부점으로 굴러가는 수다 =====
+[V:1] !mp!"G""^Verse"B3B B2B2 A6z2 | "D"A3A A2A2 F6z2 | "Em"G3G G2G2 E6z2 | "C"E2G2 AGAB A8 |
+[V:2] G,6 G,6 D,4 | D,6 D,6 A,4 | E,6 E,6 B,4 | C,6 C,6 G,4 |
+[V:1] "G"B3B B2B2 d6z2 | "D"d3d d2A2 F6z2 | "Em"G3G E2E2 G6z2 | "C"A8 z4 AGFE |
+[V:2] G,6 G,6 D,4 | D,6 D,6 A,4 | E,6 E,6 B,4 | C,6 C,6 G,4 |
+% ===== 승 · Pre-Chorus (9-16마디) : 16분음표 되받아치기로 밀어올리기 =====
+[V:1] !mf!"Em""^Pre-Chorus"E4E4 G4G3G | "C"A4A4 B4B3B | "G"B4B4 d4d3d | "D"e4e4 d4B4 |
+[V:2] E,4 B,4 E4 B,4 | C,4 G,4 C4 G,4 | G,,4 D,4 G,4 D,4 | D,4 A,4 D4 A,4 |
+[V:1] "Em"e4e4 g4g3a | "C"a4a4 g4e3d | "G"d4e4 g4a4 | "D"a8 z8 |
+[V:2] E,4 B,4 E4 B,4 | C,4 G,4 C4 G,4 | G,,4 D,4 G,4 D,4 | D,8 z8 |
+% ===== 전 · Chorus (17-24마디) : 되튀는 훅 + 베이스 워킹 필인 =====
+[V:1] !f!"G""^Chorus"d'5d' b5b g4 | "D"a5a f5f d4 | "Em"b5b g5g e4 | "C"e4g4 a2b2a2b2 |
+[V:2] G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 | E,2E2E,2E2 E,2E2E,2E2 | C,2C2C,2C2 C,2C2 D,E,F,G, |
+[V:1] "G"d'5d' b5b g4 | "D"a5a f5f a4 | "Em"b4b4 d'4d'3e' | "C"e'8 d'4 b4 |
+[V:2] G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 | E,2E2E,2E2 E,2E2E,2E2 | C,2C2C,2C2 C,2C2 D,E,F,G, |
+% ===== 결 · Last Chorus & Outro (25-32마디) : 훅 한 번 더, 그리고 옥타브 아래로 =====
+[V:1] !mf!"G""^Last Chorus"d'5d' b5b g4 | "D"a5a f5f d4 | "Em"b5b g5g e4 | "C"e4g4 a2b2a2b2 |
+[V:2] G,,4 D,4 G,4 D,4 | D,4 A,4 D4 A,4 | E,4 B,4 E4 B,4 | C,4 G,4 C4 G,4 |
+[V:1] !mp!"G""^Outro"d5d B5B G4 | "D"A5A F5F D4 | "C""^rit."E4G4 A4B4 | "G"H[GBe]16 |]
+[V:2] G,8 D,8 | D,8 A,8 | C,8 G,8 | H[G,,D,G,]16 |]
