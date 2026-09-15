@@ -1,0 +1,33 @@
+X:1
+T:구름 위의 정원
+T:(Garden Above the Clouds)
+R:Air
+M:4/4
+L:1/16
+Q:1/4=76
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Am
+% 하늘 모험 애니메이션 풍 오리지널(멜로디 창작): 그리움의 도약 주제,
+% 옥타브 위의 비상, 바람의 장면, 웅장하고 아련한 재현
+% ===== 기 · 주제 (1-8마디) : 구름 사이로 =====
+[V:1] !mp!"Am""^구름 사이로"e4a4 b6ab | "F"c'6ba a4f4 | "G"b6ab g4d4 | "C"g8 e4c4 |
+[V:2] A,,2E,2C2E,2 A,2E,2C2E,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "Am"e4a4 b6ab | "F"c'6ba a4f4 | "Dm"d4f4 a6ga | "E7"^g8 e4B4 |
+[V:2] A,,2E,2C2E,2 A,2E,2C2E,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D2A,2F2A,2 | E,2B,2^G2B,2 E2B,2^G2B,2 |
+% ===== 승 · 비상 (9-16마디) : 옥타브 위에서 =====
+[V:1] !mf!"Am""^비상"a4c'4 e'6d'e' | "F"f'6e'd' c'4a4 | "G"d'6c'd' b4g4 | "C"c'8 g4e4 |
+[V:2] A,,2E,2C2E,2 A,2E,2C2E,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "Am"a4c'4 e'6d'e' | "F"f'6e'd' c'4a4 | "Dm"f'8 d'4a4 | "E7"e'8 b4^g4 |
+[V:2] A,,2E,2C2E,2 A,2E,2C2E,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D2A,2F2A,2 | E,2B,2^G2B,2 E2B,2^G2B,2 |
+% ===== 전 · 바람의 장면 (17-24마디) : 가볍게 떠서 =====
+[V:1] !mp!"C""^바람의 장면"g4e4 g4c'4 | "G"d'4b4 d4g4 | "Am"c'4a4 e4a4 | "Em"b4g4 e4g4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | E,2B,2G2B,2 E2B,2G2B,2 |
+[V:1] "F"a4c'4 f'4c'4 | "C"g4c'4 e'4c'4 | "Dm"f4a4 d'4c'4 | "E7"b8 ^g4e4 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2F2A,2 D2A,2F2A,2 | E,2B,2^G2B,2 E2B,2^G2B,2 |
+% ===== 결 · 재현 (25-32마디) : 아련하게, 웅장하게 =====
+[V:1] !f!"Am""^재현"e4a4 b6ab | "F"c'6ba a4f4 | "G"b6ab g4d4 | "C"g8 e4c4 |
+[V:2] A,,2E,2C2E,2 A,2E,2C2E,2 | F,,2C,2A,2C,2 F,2C,2A,2C,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "Dm"d4f4 a6ga | "E7"^g8 e4B4 | !p!"Am""^rit."a8 e4c4 | "Am"H[Ace]16 |]
+[V:2] D,2A,2F2A,2 D2A,2F2A,2 | E,2B,2^G2B,2 E2B,2^G2B,2 | A,,2E,2C2E,2 A,2E,2C2E,2 | H[A,,E,A,]16 |]

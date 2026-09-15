@@ -1,0 +1,33 @@
+X:1
+T:비 오는 창가
+T:(Rainy Windowsill)
+R:New Age
+M:4/4
+L:1/16
+Q:1/4=60
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:F
+% 피아노 뉴에이지 풍 오리지널(멜로디 창작): 같은 음을 반복하는 빗방울 모티프,
+% 굵어지는 빗줄기(8분음표), 소나기(고음 캐스케이드), 비가 그친 뒤의 고요
+% ===== 기 · 빗방울 (1-8마디) : 똑, 똑, 똑 =====
+[V:1] !p!"F""^빗방울처럼"c'4c'4 c'4a4 | "Dm"a4a4 a4f4 | "Bb"f4f4 f4d4 | "C"g8 e4c4 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D2A,2F2A,2 | B,,2F,2D2F,2 B,2F,2D2F,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "F"c'4c'4 c'4a4 | "Dm"a4a4 a4f4 | "Gm"b4b4 b4g4 | "C"c'8 z4 g2a2 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+% ===== 승 · 빗줄기 (9-16마디) : 빗방울이 촘촘해진다 =====
+[V:1] !mp!"F""^빗줄기"a2a2 a2g2 a4c'4 | "Dm"f2f2 f2e2 f4a4 | "Bb"d2d2 d2c2 d4f4 | "C"e2e2 e2d2 e4g4 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D2A,2F2A,2 | B,,2F,2D2F,2 B,2F,2D2F,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "F"a2a2 c'2c'2 d'4c'4 | "Dm"d'2d'2 c'2a2 f4a4 | "Gm"b2b2 a2g2 d4g4 | "C"g8 e4g4 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D2A,2F2A,2 | G,,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+% ===== 전 · 소나기 (17-24마디) : 유리창 가득 =====
+[V:1] !mf!"Dm""^소나기"f'4d'4 a4d'4 | "Bb"f'4d'4 b4d'4 | "F/A"c'4a4 f4a4 | "C"e'4c'4 g4c'4 |
+[V:2] D,2A,2F2A,2 D2A,2F2A,2 | B,,2F,2D2F,2 B,2F,2D2F,2 | A,,2C,2F,2C,2 A,2C2F2C2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] !f!"Dm"f'6e'd' d'4a4 | "Bb"d'6c'b b4f4 | "Gm"b4g4 "C"g4e4 | "C7"c'8 b4g4 |
+[V:2] D,2A,2F2A,2 D2A,2F2A,2 | B,,2F,2D2F,2 B,2F,2D2F,2 | G,,2D,2B,2D,2 C,2G,2E2G,2 | C,2G,2B,2G,2 C2G,2E2G,2 |
+% ===== 결 · 비가 그치고 (25-32마디) : 처마 끝 마지막 몇 방울 =====
+[V:1] !p!"F""^비가 그치고"c'4c'4 c'4a4 | "Dm"a4a4 a4f4 | "Bb"f4f4 f4d4 | "C"g8 e4c4 |
+[V:2] F,,2C,2A,2C,2 F,2C,2A,2C,2 | D,2A,2F2A,2 D2A,2F2A,2 | B,,2F,2D2F,2 B,2F,2D2F,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "Gm"b4b4 b4g4 | "C"g8 e4d4 | !pp!"C7""^rit."g4f4 e4d4 | "F""^마지막 한 방울"H[Acf]16 |]
+[V:2] G,,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 | C,2G,2B,2G,2 C2G,2E2G,2 | H[F,,C,F,]16 |]

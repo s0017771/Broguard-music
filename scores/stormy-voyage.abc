@@ -1,0 +1,33 @@
+X:1
+T:폭풍의 항해
+T:(Stormy Voyage)
+R:Adventure
+M:6/8
+L:1/8
+Q:3/8=120
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Dm
+% 해양 모험 활극 풍 오리지널(멜로디 창작): 질주하는 6/8, 상승 시퀀스,
+% 크게 휘몰아치는 주제, 쾅 하고 닻을 내리는 엔딩
+% ===== 기 · 출항 리프 (1-8마디) =====
+[V:1] !f!"Dm""^출항!"d2ef g2 | "Dm"a2gf e2 | "C"e2fg a2 | "Dm"d4 z2 |
+[V:2] D,2A,2D2 | D,2A,2D2 | C,2G,2C2 | D,2A,2D2 |
+[V:1] "Dm"d2ef g2 | "Bb"b2ag f2 | "C"g2fe d2 | "A"^c4 z2 |
+[V:2] D,2A,2D2 | B,,2F,2B,2 | C,2G,2C2 | A,,2E,2A,2 |
+% ===== 승 · 파도를 넘어 (9-16마디) : 상승 시퀀스 =====
+[V:1] "Dm""^파도를 넘어"f2ga b2 | "C"e2fg a2 | "Bb"d2ef g2 | "A"e4 ^c2 |
+[V:2] D,2A,2D2 | C,2G,2C2 | B,,2F,2B,2 | A,,2E,2A,2 |
+[V:1] "Dm"a2bc' d'2 | "Bb"b2c'd' f'2 | "C"e'2d'c' a2 | "A"^c'4 z2 |
+[V:2] D,2A,2D2 | B,,2F,2B,2 | C,2G,2C2 | A,,2E,2A,2 |
+% ===== 전 · 큰 물마루 (17-24마디) : 휘몰아치는 주제 =====
+[V:1] !ff!"Dm""^큰 물마루"d'4 c'2 | "Bb"b4 a2 | "Gm"g4 a2 | "A"a4 e2 |
+[V:2] D,2A,2D2 | B,,2F,2B,2 | G,,2D,2G,2 | A,,2E,2A,2 |
+[V:1] "Dm"d'4 c'2 | "Bb"b4 a2 | "Gm"g2f2e2 | "Dm"d4 z2 |
+[V:2] D,2A,2D2 | B,,2F,2B,2 | G,,2D,2G,2 | D,2A,2D2 |
+% ===== 결 · 귀항 (25-32마디) : 리프 재현 — 닻을 내린다 =====
+[V:1] !f!"Dm""^귀항"d2ef g2 | "Dm"a2gf e2 | "C"e2fg a2 | "Dm"d4 z2 |
+[V:2] D,2A,2D2 | D,2A,2D2 | C,2G,2C2 | D,2A,2D2 |
+[V:1] "Bb"b2ag f2 | "C"g2fe d2 | "A"^c2A2E2 | "Dm""^닻!"H[dfa]6 |]
+[V:2] B,,2F,2B,2 | C,2G,2C2 | A,,2E,2A,2 | H[D,A,D]6 |]
