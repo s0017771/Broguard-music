@@ -135,7 +135,7 @@
         </ol>
       </div>
     </details>
-    <p class="note" style="margin-top:8px">🔒 <b>drive.file</b> 권한만 사용 — 이 앱이 만든 <b>파일 하나(브로가드-내악보집.json)</b>만 접근합니다(드라이브에서 직접 보고 관리 가능). 드라이브의 다른 파일은 볼 수 없습니다.</p>
+    <p class="note" style="margin-top:8px">🔒 <b>drive.file</b> 권한만 사용 — 이 앱이 만든 <b>파일 하나(브로가드-내악보집.json)</b>만 접근합니다(드라이브에서 직접 보고 관리 가능). 드라이브의 다른 파일은 볼 수 없습니다.<br>♻️ <b>저장·불러오기 모두 "합치기(누적)"</b> — 여러 기기에서 저장해도 서로의 곡을 덮어쓰지 않고, 같은 곡(같은 제목+내용)은 중복 없이 하나만 남습니다.</p>
   </div>
 </main>
 <footer>Broguard Music Lab · 내 악보집 · 개인 소장용(공유 금지) · 악보는 이 브라우저에 저장됩니다(정기 백업 권장)</footer>
@@ -198,7 +198,26 @@ var LibraryCore = (function () {
       return { title: title, abc: abc };
     });
   }
-  return { indexKey: indexKey, sortEntries: sortEntries, indexOrder: indexOrder, group: group, serialize: serialize, parse: parse, BASE: BASE, CATS: CATS, normCat: normCat, splitAbcTunes: splitAbcTunes };
+  // 두 악보집 합치기(중복 없이 누적): id가 같거나 (제목+악보 내용)이 완전히 같으면 건너뜀. 추가된 곡 수 반환.
+  function mergeEntries(existing, incoming, newIdFn) {
+    var byId = {}, byBody = {};
+    existing.forEach(function (e) {
+      if (!e) return;
+      if (e.id) byId[e.id] = 1;
+      byBody[(e.title || '') + ' ' + (e.abc || '')] = 1;
+    });
+    var added = 0;
+    (incoming || []).forEach(function (e) {
+      if (!e || !e.title || !e.abc) return;
+      if (e.id && byId[e.id]) return;
+      var bk = (e.title || '') + ' ' + (e.abc || '');
+      if (byBody[bk]) return;   /* 다른 기기에서 각자 저장해 id가 달라도, 같은 곡이면 중복 방지 */
+      if (!e.id) e.id = newIdFn ? newIdFn() : 'm' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+      existing.push(e); byId[e.id] = 1; byBody[bk] = 1; added++;
+    });
+    return added;
+  }
+  return { indexKey: indexKey, sortEntries: sortEntries, indexOrder: indexOrder, group: group, serialize: serialize, parse: parse, BASE: BASE, CATS: CATS, normCat: normCat, splitAbcTunes: splitAbcTunes, mergeEntries: mergeEntries };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = LibraryCore;
 if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
@@ -458,7 +477,20 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
     if (!driveToken) { driveConnect(); return; }
     try {
       setDrive('드라이브에 저장 중…', false);
-      var id = await driveFindId(), body = LibraryCore.serialize(entries);
+      var id = await driveFindId(), merged = 0;
+      if (id) {
+        /* 덮어쓰기 전에 드라이브 내용을 먼저 로컬에 합침 — 다른 기기에서 저장한 곡이 지워지지 않게(누적 저장) */
+        var remote = null;
+        try {
+          var r0 = await driveApi('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media');
+          remote = LibraryCore.parse(await r0.text());
+        } catch (e0) {
+          setDrive('드라이브 내용을 읽지 못해 저장을 중단했어요(다른 기기 곡 덮어쓰기 방지). 잠시 후 다시 시도해주세요.', true);
+          return;
+        }
+        if (remote) { merged = LibraryCore.mergeEntries(entries, remote, newId); if (merged) { save(); render(); } }
+      }
+      var body = LibraryCore.serialize(entries);
       if (id) {
         await driveApi('https://www.googleapis.com/upload/drive/v3/files/' + id + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: body });
       } else {
@@ -468,7 +500,7 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
           '\r\nContent-Type: application/json\r\n\r\n' + body + '\r\n--' + boundary + '--';
         await driveApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + boundary }, body: multipart });
       }
-      setDrive('드라이브에 저장됨 ✓ (' + entries.length + '곡)', false);
+      setDrive('드라이브에 합쳐 저장됨 ✓ (총 ' + entries.length + '곡' + (merged ? ' · 드라이브에서 ' + merged + '곡 받아 합침' : '') + ')', false);
     } catch (e) { setDrive('저장 실패: ' + e.message, true); }
   }
   async function driveLoad() {
@@ -480,9 +512,7 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
       var r = await driveApi('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media');
       var incoming = LibraryCore.parse(await r.text());
       if (!incoming) { setDrive('드라이브 파일을 읽을 수 없습니다.', true); return; }
-      var byId = {}; entries.forEach(function (e) { byId[e.id] = 1; });
-      var added = 0;
-      incoming.forEach(function (e) { if (!e || !e.title || !e.abc) return; if (e.id && byId[e.id]) return; if (!e.id) e.id = newId(); entries.push(e); byId[e.id] = 1; added++; });
+      var added = LibraryCore.mergeEntries(entries, incoming, newId);
       save(); render(); setDrive(added + '곡 불러와 합쳤습니다 ✓ (총 ' + entries.length + '곡)', false);
     } catch (e) { setDrive('불러오기 실패: ' + e.message, true); }
   }

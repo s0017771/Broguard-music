@@ -92,3 +92,32 @@ test('splitAbcTunes: T: 없으면 파일명, X: 없으면 헤더 보강', () => 
   assert.ok(/^X:1/m.test(noX[0].abc), 'X: 헤더 보강');
   assert.deepEqual(LibraryCore.splitAbcTunes('   ', 'x'), []);  // 빈 파일
 });
+
+test('mergeEntries: 누적 합치기 — id·(제목+내용) 중복은 건너뜀', () => {
+  const local = [
+    { id: 'a', title: '곡A', abc: 'X:1\nK:C\nC4' },
+    { id: 'b', title: '곡B', abc: 'X:1\nK:C\nD4' }
+  ];
+  const remote = [
+    { id: 'a', title: '곡A', abc: 'X:1\nK:C\nC4' },              // 같은 id → 건너뜀
+    { id: 'z', title: '곡B', abc: 'X:1\nK:C\nD4' },              // id 다르지만 제목+내용 동일(다른 기기 저장) → 건너뜀
+    { id: 'c', title: '곡C', abc: 'X:1\nK:C\nE4' },              // 새 곡 → 추가
+    { title: '곡D', abc: 'X:1\nK:C\nF4' },                        // id 없음 → id 부여 후 추가
+    { title: '', abc: 'X:1\nK:C\nG4' },                           // 제목 없음 → 무시
+    { id: 'e', title: '곡E', abc: '' }                            // 내용 없음 → 무시
+  ];
+  let n = 0;
+  const added = LibraryCore.mergeEntries(local, remote, () => 'new' + (++n));
+  assert.equal(added, 2, '곡C·곡D만 추가');
+  assert.equal(local.length, 4);
+  assert.deepEqual(local.map(e => e.title), ['곡A', '곡B', '곡C', '곡D']);
+  assert.equal(local[3].id, 'new1', 'id 없던 곡에 id 부여');
+});
+
+test('mergeEntries: 같은 제목이라도 내용이 다르면 둘 다 보존(편곡 버전)', () => {
+  const local = [{ id: 'a', title: '곡A', abc: 'X:1\nK:C\nC4' }];
+  const remote = [{ id: 'b', title: '곡A', abc: 'X:1\nK:G\nG4' }];
+  const added = LibraryCore.mergeEntries(local, remote);
+  assert.equal(added, 1);
+  assert.equal(local.length, 2, '다른 편곡은 삭제하지 않고 둘 다 유지');
+});
