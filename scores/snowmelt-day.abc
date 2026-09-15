@@ -1,0 +1,39 @@
+X:1
+T:눈 녹는 날
+T:(The Day the Snow Melts — 16th Groove)
+R:Alt-Pop Ballad
+M:4/4
+L:1/16
+Q:1/4=76
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:F
+% 봄날 풍 오리지널(멜로디 창작): 겨울(Dm)→봄(F)→완연한 봄(G) 서사, 종소리 리프, 반복음 앤섬 훅
+% ===== Intro (1-4마디) : 겨울의 리프 — 종소리처럼 =====
+[V:1] !p!"Dm""^겨울의 리프"d'4a4 f4a4 | "Bb"d'4b4 f4b4 | "F"c'4a4 f4a4 | "C"c'4g4 e4g4 |
+[V:2] D,8 [DF]8 | B,,8 [DF]8 | F,8 [A,C]8 | C,8 [G,E]8 |
+% ===== 기 · Verse (5-12마디) : 눈길을 걷듯 — 단조로운 맥박 위에서 =====
+[V:1] !mp!"Dm""^Verse"d3d d2e2 f6z2 | "Bb"d3d d2c2 d6z2 | "F"c3c c2A2 c6z2 | "C"c3c c2d2 e6z2 |
+[V:2] D,2D,2D,2D,2 A,2A,2A,2A,2 | B,,2B,,2B,,2B,,2 F,2F,2F,2F,2 | F,2F,2F,2F,2 C2C2C2C2 | C,2C,2C,2C,2 G,2G,2G,2G,2 |
+[V:1] "Dm"f3f g2f2 d6z2 | "Bb"f3f f2g2 a6z2 | "F"a3a a2g2 f6z2 | "C"g3g g2a2 g4 efga |
+[V:2] D,2D,2D,2D,2 A,2A,2A,2A,2 | B,,2B,,2B,,2B,,2 F,2F,2F,2F,2 | F,2F,2F,2F,2 C2C2C2C2 | C,2C,2C,2C,2 G,2G,2G,2G,2 |
+% ===== 승 · Pre-Chorus (13-16마디) : 기다림이 차오르고 — 정적 =====
+[V:1] !mf!"Bb""^Pre-Chorus"f2f2 g2g2 a4a3a | "C"g2g2 a2a2 b4b3b | "Dm"a2a2 c'2c'2 d'4d'3d' | "C"c'8 z8 |
+[V:2] B,,4[DF]4 B,4[DF]4 | C,4[G,E]4 C4[G,E]4 | D,4[FA]4 D4[FA]4 | C,8 z8 |
+% ===== 전 · Chorus (17-24마디) : 봄이 터진다 — 반복음 앤섬 훅 =====
+[V:1] !f!"F""^봄"c'6c'c' c'4a4 | "C"c'6c'c' g4e4 | "Dm"d'6d'd' d'4a4 | "Bb"c'6ba b4f4 |
+[V:2] F,2F2F,2F2 F,2F2F,2F2 | C,2C2C,2C2 C,2C2C,2C2 | D,2D2D,2D2 D,2D2D,2D2 | B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 |
+[V:1] "F"c'6c'c' c'4a4 | "C"c'6c'c' g4e4 | "Dm"d'4d'4 f'4e'4 | "Bb"d'6c'b c'4a4 |
+[V:2] F,2F2F,2F2 F,2F2F,2F2 | C,2C2C,2C2 C,2C2C,2C2 | D,2D2D,2D2 D,2D2D,2D2 | B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 |
+% ===== 그늘 · Bridge (25-28마디) : 눈이 녹는다 — 단조가 장조로 바뀌는 순간 =====
+[V:1] !p!"Bb""^눈이 녹는다"f8 d4c4 | "C"e8 c4A4 | "Dm"d8 e4f4 | !mf!"D7""^겨울이 장조로!"a4^f4 a4c'4 |
+[V:2] B,,8 [DF]8 | C,8 [G,E]8 | D,8 [FA]8 | D,4[^F,C]4 D,4[^F,C]4 |
+% ===== 결 · Final Chorus (29-36마디) : G장조 — 완연한 봄 =====
+[V:1] [K:G] !ff!"G""^완연한 봄"d'6d'd' d'4b4 | "D"d'6d'd' a4f4 | "Em"e'6e'e' e'4b4 | "C"d'6c'b c'4g4 |
+[V:2] [K:G] G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 | E,2E2E,2E2 E,2E2E,2E2 | C,2C2C,2C2 C,2C2C,2C2 |
+[V:1] "G"d'6d'd' d'4b4 | "D"d'6d'd' a4f4 | "Em"e'4e'4 g'4f'4 | "C"e'6d'c' d'4b4 |
+[V:2] G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 | E,2E2E,2E2 E,2E2E,2E2 | C,2C2C,2C2 C,2C2C,2C2 |
+% ===== Outro (37-40마디) : 겨울의 리프가 봄의 조성으로 =====
+[V:1] !mp!"C""^Outro - 리프의 귀환"d'4b4 g4b4 | "D"d'4a4 f4a4 | !p!"G""^rit."b4a4 g4d4 | "G"H[GBd]16 |]
+[V:2] C,8 [G,E]8 | D,8 [F,A,]8 | G,8 [B,D]8 | H[G,,D,G,]16 |]
