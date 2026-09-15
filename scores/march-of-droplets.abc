@@ -1,0 +1,32 @@
+X:1
+T:물방울 행진곡
+T:(March of the Water Droplets — 16th Groove)
+R:Polka
+M:4/4
+L:1/16
+Q:1/4=126
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:F
+% 포뇨 풍 오리지널(멜로디 창작): 붕-짝 폴카 반주, 폴짝폴짝 도약 멜로디, 보글보글 16분음표 파도 런
+% ===== 기 (1-8마디) : 폴짝폴짝 — 물방울들의 행진 =====
+[V:1] !mf!"F""^통통 튀게"c2A2 c2A2 f4z4 | "C"e2c2 e2c2 g4z4 | "F"a2f2 a2f2 c'4z4 | "C"g2e2 c2e2 g4z4 |
+[V:2] F,4[A,C]4 C,4[A,C]4 | C,4[G,E]4 G,,4[G,E]4 | F,4[A,C]4 C,4[A,C]4 | C,4[G,E]4 G,,4[G,E]4 |
+[V:1] "F"c2A2 c2A2 f4z4 | "Bb"d2B2 d2B2 f4z4 | "C7"e2d2 c2d2 e2f2 g2e2 | "F"f8 z4 cdef |
+[V:2] F,4[A,C]4 C,4[A,C]4 | B,,4[DF]4 F,4[DF]4 | C,4[G,E]4 G,,4[B,E]4 | F,4[A,C]4 C,4[A,C]4 |
+% ===== 승 (9-16마디) : 파도 — 보글보글 굴러가는 물방울 런 =====
+[V:1] "F""^파도처럼"cdef gfed c4z4 | "C"defg agfe g4z4 | "F"efga bagf f4z4 | "C7"gabc' bagf e4z4 |
+[V:2] F,4[A,C]4 C,4[A,C]4 | C,4[G,E]4 G,,4[G,E]4 | F,4[A,C]4 C,4[A,C]4 | C,4[G,E]4 G,,4[B,E]4 |
+[V:1] "F"cdef gfed c4z4 | "Bb"defg fedc d4z4 | "C7"efga gfed e4c4 | "C7"gabc' d'8 z4 |
+[V:2] F,4[A,C]4 C,4[A,C]4 | B,,4[DF]4 F,4[DF]4 | C,4[G,E]4 G,,4[B,E]4 | C,4[G,E]4 G,,4[B,E]4 |
+% ===== 전 (17-24마디) : 물마루 위에서 — 한 옥타브 위의 합창 =====
+[V:1] !f!"F""^물마루 위"c'2a2 c'2a2 f4z4 | "C"e'2c'2 e'2c'2 g4z4 | "F"fgab c'd'e'f' f'4z4 | "C7"e'd'c'b agfe g4z4 |
+[V:2] F,4[A,C]4 C,4[A,C]4 | C,4[G,E]4 G,,4[G,E]4 | F,4[A,C]4 C,4[A,C]4 | C,4[G,E]4 G,,4[B,E]4 |
+[V:1] "F"c'2a2 c'2a2 f4z4 | "Bb"d'2b2 d'2b2 f4z4 | "C7"e'2c'2 d'2b2 c'2a2 g2e2 | "F"f8 z4 cdef |
+[V:2] F,4[A,C]4 C,4[A,C]4 | B,,4[DF]4 F,4[DF]4 | C,4[G,E]4 G,,4[B,E]4 | F,4[A,C]4 C,4[A,C]4 |
+% ===== 결 (25-32마디) : 다시 행진 — 그리고 첨벙! =====
+[V:1] !mf!"F"c2A2 c2A2 f4z4 | "C"e2c2 e2c2 g4z4 | "F"a2f2 a2f2 c'4z4 | "C"g2e2 c2e2 g4z4 |
+[V:2] F,4[A,C]4 C,4[A,C]4 | C,4[G,E]4 G,,4[G,E]4 | F,4[A,C]4 C,4[A,C]4 | C,4[G,E]4 G,,4[G,E]4 |
+[V:1] "F"cdef gabc' d'4c'4 | "Bb"d'2b2 f'2d'2 b4z4 | "C7"e'2d'2 c'2b2 a2g2 e2c2 | !ff!"F""^첨벙!"f2z2 c2z2 H[FAcf]8 |]
+[V:2] F,4[A,C]4 C,4[A,C]4 | B,,4[DF]4 F,4[DF]4 | C,4[G,E]4 G,,4[B,E]4 | F,2z2 C,2z2 H[F,,C,F,]8 |]
