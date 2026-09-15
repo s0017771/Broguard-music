@@ -162,6 +162,13 @@ try {
     console.log('SKIP - 로컬 abcjs 없음: 재생 엔진 검증 생략(UI 검증만 수행)');
   }
 
+  // 8.5) 같은 음 슬러 → 붙임줄 정규화(재생 시 두 번 소리 안 나게)
+  const tied = await page.evaluate(() =>
+    window.__player.slurSameToTie('X:1\nK:C\n"C" (B2 B2) A2 B2 | (d2 d2) c2 |'));
+  assert.ok(/\(B2- B2\)/.test(tied), '같은 음 슬러에 붙임줄 삽입: ' + tied.split('\n').pop());
+  assert.ok(/\(d2- d2\)/.test(tied), '둘째 마디도 처리');
+  ok('이음줄(같은 음 슬러)이 붙임줄로 정규화되어 한 번만 소리난다');
+
   // 9) 섞기·비우기
   await page.click('#shuffleBtn');
   st = await page.evaluate(() => window.__player.getState());

@@ -119,11 +119,15 @@ await (async () => { try {
 } catch (e) { bad('5트랙 합주', e); } })();
 
 await (async () => { try {
-  // 멜로디 소리(악기) 선택 — 7종 목록 + 바이올린 선택 후 솔로
+  // 멜로디 소리(악기) 선택 — 12종 목록 + 바이올린 선택 후 솔로
   const voices = await page.$$eval('#melodyVoice option', els => els.map(o => o.textContent));
-  assert.equal(voices.length, 7, '소리 7종: ' + voices.join(','));
+  assert.equal(voices.length, 12, '소리 12종: ' + voices.join(','));
   assert.ok(voices.some(v => /바이올린/.test(v)) && voices.some(v => /남성 보컬/.test(v)), '바이올린·허밍 포함');
-  await page.selectOption('#melodyVoice', '2');   // 바이올린
+  assert.ok(voices.some(v => /현악 앙상블/.test(v)) && voices.some(v => /합창/.test(v)) && voices.some(v => /첼로/.test(v)), '풍성한 음색 추가');
+  // 베이스 소리 목록도 확인
+  const bvoices = await page.$$eval('#bassVoice option', els => els.map(o => o.textContent));
+  assert.ok(bvoices.length >= 5 && /핑거/.test(bvoices[0]), '베이스 기타 음색: ' + bvoices.join(','));
+  await page.selectOption('#melodyVoice', { label: '바이올린(솔로)' });
   await page.click('#btnSoloMelody');
   await page.waitForFunction(() => /바이올린/.test(document.getElementById('mixStatus').textContent), undefined, { timeout: 4000 });
   ok('멜로디 소리 선택(바이올린) → 솔로 반영');
@@ -243,8 +247,8 @@ await (async () => { try {
   // 멜로디 생성 버튼 비활성화(불러온 멜로디 사용 중)
   assert.equal(await page.isDisabled('#btnGenMelody'), true, '멜로디 생성 비활성화');
   assert.equal(await page.isDisabled('#btnRegenMelody'), true, '다시 생성 비활성화');
-  // 소리는 고를 수 있음 → 바이올린 솔로
-  await page.selectOption('#melodyVoice', '2');
+  // 소리는 고를 수 있음 → 바이올린 솔로 (목록이 늘어 라벨로 선택)
+  await page.selectOption('#melodyVoice', { label: '바이올린(솔로)' });
   await page.click('#btnSoloMelody');
   await page.waitForFunction(() => /바이올린/.test(document.getElementById('mixStatus').textContent), undefined, { timeout: 4000 });
   // 합주 → 멜로디 채널(0) 존재 = 내 멜로디가 실림
@@ -285,6 +289,28 @@ await (async () => { try {
   assert.ok(abc && /L:1\/8/.test(abc) && /\|\]/.test(abc), '연구소용 ABC 저장: ' + (abc || '').slice(0, 40));
   ok('스튜디오 멜로디 → 연구소로(ABC)');
 } catch (e) { bad('멜로디 연구소로', e); } })();
+
+await (async () => { try {
+  // 📚 악보집에서 불러오기 + 2성부 곡이면 원곡 베이스 유지
+  await page.evaluate(() => {
+    localStorage.setItem('broguard_library', JSON.stringify({ entries: [{
+      id: 'st1', title: '스튜디오행 곡', cat: 'K-가요', added: 9,
+      abc: ['X:1', 'T:스튜디오행 곡', 'M:4/4', 'L:1/8', 'Q:1/4=90',
+        '%%score {RH LH}', 'V:RH clef=treble', 'V:LH clef=bass', 'K:C',
+        '[V:RH] "C"C2 E2 G2 c2 | "F"F2 A2 c2 f2 | "G"G2 B2 d2 g2 | "C"c2 G2 E2 C2 |',
+        '[V:LH] C,4 G,4 | F,4 C,4 | G,4 D,4 | C,8 |'].join('\n')
+    }] }));
+    window.dispatchEvent(new Event('focus'));   // fillLibSel 갱신
+  });
+  const opts = await page.$$eval('#libSel option', els => els.map(o => o.textContent));
+  assert.ok(opts.some(t => /스튜디오행 곡/.test(t)), '악보집 곡이 목록에: ' + opts.join(','));
+  await page.selectOption('#libSel', 'lib:st1');
+  await page.evaluate(() => document.getElementById('libSel').dispatchEvent(new Event('change')));
+  await page.waitForFunction(() => /스튜디오행 곡 불러옴/.test(document.getElementById('importStatus').textContent), undefined, { timeout: 4000 });
+  const bs = await page.textContent('#bassStatus');
+  assert.ok(/원곡 베이스 그대로 유지/.test(bs), '2성부 곡은 베이스 재구성 안 함: ' + bs);
+  ok('악보집에서 불러오기 + 원곡 베이스 유지');
+} catch (e) { bad('악보집 불러오기/베이스 유지', e); } })();
 
 await (async () => { try { assert.deepEqual(errors, []); ok('심각한 JS 오류 없음'); } catch (e) { bad('JS 오류', e); } })();
 
