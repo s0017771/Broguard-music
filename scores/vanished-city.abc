@@ -1,0 +1,33 @@
+X:1
+T:사라진 도시
+T:(The Vanished City)
+R:Melodic EDM
+M:4/4
+L:1/16
+Q:1/4=90
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Em
+% 멜랑콜리 EDM 풍 오리지널(멜로디 창작): 메아리 같은 성긴 벌스,
+% 빌드업과 정적, 플럭 화음이 멜로디를 연주하는 드롭
+% ===== 기 · 메아리 (1-8마디) : 텅 빈 거리에서 =====
+[V:1] !p!"Em""^메아리처럼"e4z4 g4e4 | "C"g8 e4z4 | "G"d4z4 g4d4 | "D"f8 d4z4 |
+[V:2] E,8 [G,B,]8 | C,8 [E,G,]8 | G,8 [B,D]8 | D,8 [F,A,]8 |
+[V:1] "Em"e4z4 g4e4 | "C"g8 a4b4 | "G"b8 a4g4 | "D"f8 z8 |
+[V:2] E,8 [G,B,]8 | C,8 [E,G,]8 | G,8 [B,D]8 | D,8 [F,A,]8 |
+% ===== 승 · 높은 메아리 (9-16마디) =====
+[V:1] !mp!"Em"b4z4 e'4b4 | "C"c'8 b4z4 | "G"b4a4 g4a4 | "D"a8 f4d4 |
+[V:2] E,8 [G,B,]8 | C,8 [E,G,]8 | G,8 [B,D]8 | D,8 [F,A,]8 |
+[V:1] "Em"b4z4 e'4b4 | "C"c'8 b4a4 | "G"b4c'4 d'4b4 | "D"a8 z8 |
+[V:2] E,8 [G,B,]8 | C,8 [E,G,]8 | G,8 [B,D]8 | D,8 [F,A,]8 |
+% ===== 전 · 빌드업과 드롭 (17-28마디) : 플럭이 노래한다 =====
+[V:1] !mf!"Em""^빌드업"e2e2 e2e2 g4g4 | "C"g2g2 g2g2 a4a4 | "G"b2b2 b2b2 c'4c'4 | "D""^정적"d'8 z8 |
+[V:2] E,2E2E,2E2 E,2E2E,2E2 | C,2C2C,2C2 C,2C2C,2C2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 z8 |
+[V:1] !f!"Em""^드롭 - 플럭"[eg]2z2[eg]2z2 [gb]2z2[eg]2z2 | "C"[eg]2z2[eg]2z2 [ac']2z2[eg]2z2 | "G"[gb]2z2[gb]2z2 [bd']2z2[gb]2z2 | "D"[fa]2z2[fa]2z2 [ad']2z2[fa]2z2 |
+[V:2] E,2E2E,2E2 E,2E2E,2E2 | C,2C2C,2C2 C,2C2C,2C2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 |
+[V:1] "Em"[eg]2z2[eg]2z2 [gb]2z2[eg]2z2 | "C"[eg]2z2[eg]2z2 [ac']2z2[eg]2z2 | "G"[gb]2z2[gb]2z2 [bd']2z2[gb]2z2 | "D"[fa]2z2[fa]2z2 [ad']2z2[fa]2z2 |
+[V:2] E,2E2E,2E2 E,2E2E,2E2 | C,2C2C,2C2 C,2C2C,2C2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 |
+% ===== 결 · 남은 메아리 (29-32마디) =====
+[V:1] !p!"Em""^남은 메아리"e'8 b4g4 | "C"g8 e4z4 | !pp!"D""^rit."f8 d4B4 | "Em"H[Beg]16 |]
+[V:2] E,8 [G,B,]8 | C,8 [E,G,]8 | D,8 [F,A,]8 | H[E,B,E]16 |]
