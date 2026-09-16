@@ -1,0 +1,25 @@
+X:1
+T:나라는 사람
+T:(The Person I Am)
+R:Lyrical
+M:4/4
+L:1/16
+Q:1/4=66
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:A
+% 서정 피아노 풍 오리지널(멜로디 창작): 잔잔한 1인칭의 고백처럼,
+% 흐르는 왼손 위에서 노래하는 오른손 — 조용한 자화상
+% ===== 기 · 자화상 (1-8마디) : 노래하듯 =====
+[V:1] !mp!"A""^노래하듯"c'4e'4 e'6d'c' | "E"b6ag a4e4 | "F#m"c'4a4 a6gf | "D"f6ga f4d4 | "A"c'4e'4 e'6d'c' | "E"b6ag a4b4 | "D"f4a4 "E"g4b4 | "A"a8 z4 e2f2 |
+[V:2] A,2E,2C2E,2 A,2E,2C2E,2 | E,2B,2G,2B,2 E,2B,2G,2B,2 | F,2C2A,2C2 F,2C2A,2C2 | D,2A,2F,2A,2 D,2A,2F,2A,2 | A,2E,2C2E,2 A,2E,2C2E,2 | E,2B,2G,2B,2 E,2B,2G,2B,2 | D,2A,2F,2A,2 E,2B,2G,2B,2 | A,2E,2C2E,2 A,2E,2C2E,2 |
+% ===== 승 · 조금 높이 (9-16마디) : 지나온 날들 =====
+[V:1] !mf!"F#m"c'4e'4 f'6e'c' | "D"d'6c'a f4a4 | "Bm"b6ab d'4b4 | "E"c'6ba b4g4 | "F#m"c'4e'4 f'6e'c' | "D"d'6c'a f4d4 | "Bm"b4d'4 "E"c'4b4 | "A"a8 e4c4 |
+[V:2] F,2C2A,2C2 F,2C2A,2C2 | D,2A,2F,2A,2 D,2A,2F,2A,2 | B,,2F,2D,2F,2 B,,2F,2D,2F,2 | E,2B,2G,2B,2 E,2B,2G,2B,2 | F,2C2A,2C2 F,2C2A,2C2 | D,2A,2F,2A,2 D,2A,2F,2A,2 | B,,2F,2D,2F,2 E,2B,2G,2B,2 | A,2E,2C2E,2 A,2E,2C2E,2 |
+% ===== 전 · 클라이맥스 (17-24마디) : 마음을 다해 =====
+[V:1] !f!"D""^마음을 다해"a6bc' d'4f'4 | "A"e'6c'a c'4e'4 | "Bm"d'6bf b4d'4 | "E"e'6d'b b4g4 | "D"a6bc' d'4f'4 | "A"e'6c'a c'4e'4 | "F#m"f'4e'4 "E"d'4b4 | "E"b8 z4 e2g2 |
+[V:2] D,2A,2F,2A,2 D2A,2F2A,2 | A,2E,2C2E,2 A2E2C2E2 | B,,2F,2D,2F,2 B,2F,2D2F,2 | E,2B,2G,2B,2 E2B,2G2B,2 | D,2A,2F,2A,2 D2A,2F2A,2 | A,2E,2C2E,2 A2E2C2E2 | F,2C2A,2C2 E,2B,2G,2B,2 | E,2B,2G,2B,2 E,2B,2G,2B,2 |
+% ===== 결 · 처음의 나에게 (25-32마디) =====
+[V:1] !mp!"A""^처음의 나에게"c'4e'4 e'6d'c' | "E"b6ag a4e4 | "F#m"c'4a4 a6gf | "D"f6ga f4d4 | "A"c'4e'4 e'6d'c' | "D"d'6c'a "E"b6ag | !pp!"E""^rit."b4a4 g4e4 | "A""^나라는 사람"a8 H[Ace]8 |]
+[V:2] A,2E,2C2E,2 A,2E,2C2E,2 | E,2B,2G,2B,2 E,2B,2G,2B,2 | F,2C2A,2C2 F,2C2A,2C2 | D,2A,2F,2A,2 D,2A,2F,2A,2 | A,2E,2C2E,2 A,2E,2C2E,2 | D,2A,2F,2A,2 E,2B,2G,2B,2 | E,2B,2G,2B,2 E,2B,2G,2B,2 | A,,2E,2A,2C2 H[A,,E,A,]8 |]

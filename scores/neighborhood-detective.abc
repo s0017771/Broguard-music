@@ -1,0 +1,25 @@
+X:1
+T:우리 동네 형사
+T:(Neighborhood Detective)
+R:Synth Funk
+M:4/4
+L:1/16
+Q:1/4=118
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Dm
+% 80년대 신스 펑크 풍 오리지널(멜로디 창작): 당김음 신스 리프,
+% 잠복 근무의 B섹션, 추격전의 16분음표 런
+% ===== 기 · 리프 (1-8마디) : 신스 리프 =====
+[V:1] !mf!"Dm""^신스 리프"d2z2 f2g2 a4 f2g2 | "C"e2z2 g2a2 g4 e2d2 | "Bb"f2z2 a2b2 a4 f2d2 | "C"e2z2 g2e2 c4 z4 | "Dm"d2z2 f2g2 a4 f2g2 | "C"e2z2 g2a2 g4 e2d2 | "Bb"f2z2 a2b2 "C"c'4 b2g2 | "Dm"d'2a2 f2d2 a8 |
+[V:2] D,2D,2z2D2 z2D,2D2z2 | C,2C,2z2C2 z2C,2C2z2 | B,,2B,,2z2B,2 z2B,,2B,2z2 | C,2C,2z2C2 z2C,2C2z2 | D,2D,2z2D2 z2D,2D2z2 | C,2C,2z2C2 z2C,2C2z2 | B,,2B,,2z2B,2 C,2C,2z2C2 | D,2D,2z2D2 z2D,2D2z2 |
+% ===== 승 · 잠복 근무 (9-16마디) : 낮은 목소리로 =====
+[V:1] !mp!"Dm""^잠복 근무"a4a4 g2f2 g4 | "C"g4g4 e2d2 e4 | "Bb"f4f4 d2c2 d4 | "C"e4g4 e2d2 e4 | "Dm"a4a4 g2f2 g4 | "C"g4g4 e2d2 e4 | "Bb"f4a4 c'2d'2 c'4 | "C""^출동!"e'2e'2 e'2e'2 d'2c'2 g2e2 |
+[V:2] D,2D,2z2D2 z2D,2D2z2 | C,2C,2z2C2 z2C,2C2z2 | B,,2B,,2z2B,2 z2B,,2B,2z2 | C,2C,2z2C2 z2C,2C2z2 | D,2D,2z2D2 z2D,2D2z2 | C,2C,2z2C2 z2C,2C2z2 | B,,2B,,2z2B,2 z2B,,2B,2z2 | C,2C2C,2C2 C,2C2C,2C2 |
+% ===== 전 · 리프와 추격전 (17-24마디) =====
+[V:1] !f!"Dm""^다시 리프"d2z2 f2g2 a4 f2g2 | "C"e2z2 g2a2 g4 e2d2 | "Bb"f2z2 a2b2 a4 f2d2 | "C"e2z2 g2e2 c4 z4 | "Dm""^추격전"d2ef g2ab a2gf g2a2 | "C"e2fg a2gf e2dc d2e2 | "Bb"f2ga b2ag f2ed f2g2 | "C"e'2d'2 c'2g2 e2c2 g4 |
+[V:2] D,2D,2z2D2 z2D,2D2z2 | C,2C,2z2C2 z2C,2C2z2 | B,,2B,,2z2B,2 z2B,,2B,2z2 | C,2C,2z2C2 z2C,2C2z2 | D,2D2D,2D2 D,2D2D,2D2 | C,2C2C,2C2 C,2C2C,2C2 | B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 | C,2C2C,2C2 C,2C2C,2C2 |
+% ===== 결 · 사건 종결 (25-32마디) =====
+[V:1] !mf!"Dm"d2z2 f2g2 a4 f2g2 | "C"e2z2 g2a2 g4 e2d2 | "Bb"f2z2 a2b2 a4 f2d2 | "C"e2z2 g2e2 c4 z4 | "Dm"d'2z2 a2f2 "C"g2e2 c2e2 | "Bb"f2a2 b2a2 "C"g2e2 c2d2 | "C""^rit."g4e4 "A7"^c4e4 | "Dm""^사건 종결"d8 H[dfa]8 |]
+[V:2] D,2D,2z2D2 z2D,2D2z2 | C,2C,2z2C2 z2C,2C2z2 | B,,2B,,2z2B,2 z2B,,2B,2z2 | C,2C,2z2C2 z2C,2C2z2 | D,2D,2z2D2 C,2C,2z2C2 | B,,2B,,2z2B,2 C,2C,2z2C2 | C,8 A,,8 | D,2F,2A,2D2 H[D,A,D]8 |]
