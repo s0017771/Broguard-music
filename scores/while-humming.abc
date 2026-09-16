@@ -1,0 +1,33 @@
+X:1
+T:흥얼거리다 보면
+T:(While Humming)
+R:Ballad
+M:4/4
+L:1/16
+Q:1/4=72
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% C-pop 피아노 발라드 풍 오리지널(멜로디 창작): 하강 베이스의 담담한 벌스,
+% 도약하는 후렴, 고요한 브릿지, 흥얼거림처럼 끝나는 엔딩
+% ===== 기 · Verse (1-8마디) : 흥얼거림에서 시작된 노래 =====
+[V:1] !mp!"G""^Verse"d3d d2e2 d6z2 | "D/F#"c3c c2B2 A6z2 | "Em"B3B B2G2 E6z2 | "C"A3A A2B2 c4B2A2 |
+[V:2] G,,2D,2B,2D,2 G,2D,2B,2D,2 | F,2D2A,2D2 F,2D2A,2D2 | E,2B,2G2B,2 E2B,2G2B,2 | C,2G,2E2G,2 C2G,2E2G,2 |
+[V:1] "G"d3d d2e2 d6z2 | "D/F#"c3c c2B2 A6z2 | "Em"g3g g2f2 e6z2 | "C"e3e e2f2 "D"g4a4 |
+[V:2] G,,2D,2B,2D,2 G,2D,2B,2D,2 | F,2D2A,2D2 F,2D2A,2D2 | E,2B,2G2B,2 E2B,2G2B,2 | C,2G,2E2G,2 D,2A,2F2A,2 |
+% ===== 승 · Chorus (9-16마디) : 도약하는 후렴 =====
+[V:1] !mf!"C""^Chorus"g4b4 d'6e'd' | "D"d'6c'b a4f4 | "Bm"b4d'4 f'6e'd' | "Em"e'8 b4g4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2F2A,2 D2A,2F2A,2 | B,,2F,2D2F,2 B,2F,2D2F,2 | E,2B,2G2B,2 E2B,2G2B,2 |
+[V:1] "C"g4b4 d'6e'd' | "D"d'6c'b a4f4 | "C"b4b4 c'4e'4 | "D"d'8 z8 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2F2A,2 D2A,2F2A,2 | C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2F2A,2 D2A,2F2A,2 |
+% ===== 전 · Bridge (17-24마디) : 노래 속에 남은 사람 =====
+[V:1] !p!"Em""^노래 속에"e8 g4b4 | "C"c'8 b4g4 | "G/B"b8 a4g4 | "D"a8 f4d4 |
+[V:2] E,8 B,8 | C,8 G,8 | B,,8 G,8 | D,8 A,8 |
+[V:1] "Em"e4g4 b4c'4 | "C"c'4b4 a4b4 | !mf!"Am7"c'4d'4 "D7"e'4f'4 | "D7"e'8 d'4c'4 |
+[V:2] E,8 B,8 | C,8 G,8 | A,,2E,2C2E,2 D,2A,2C2A,2 | D,2A,2C2A,2 D2A,2C2A,2 |
+% ===== 결 · Last Chorus (25-32마디) : 더 크게, 그리고 흥얼거림으로 =====
+[V:1] !f!"C""^Last Chorus"g4b4 d'6e'd' | "D"d'6c'b a4f4 | "Bm"b4d'4 f'6e'd' | "Em"e'8 b4g4 |
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2F2A,2 D2A,2F2A,2 | B,,2F,2D2F,2 B,2F,2D2F,2 | E,2B,2G2B,2 E2B,2G2B,2 |
+[V:1] "C"g4b4 d'6e'd' | "D"d'6c'b a4f4 | !p!"C""^rit."e'4d'4 "D"b4a4 | "G""^흥얼흥얼"g8 H[dgb]8 |]
+[V:2] C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2F2A,2 D2A,2F2A,2 | C,2G,2E2G,2 D,2A,2F2A,2 | G,,2D,2B,2D,2 H[G,,D,G,]8 |]

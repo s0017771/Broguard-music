@@ -1,0 +1,33 @@
+X:1
+T:처음 맞는 아침
+T:(The First Morning)
+R:Musical Pop
+M:4/4
+L:1/16
+Q:1/4=104
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:C
+% 브로드웨이 팝 풍 오리지널(멜로디 창작): 재잘재잘 패터 벌스, 부점 스킵 빌드,
+% 활짝 열리는 코러스, A7 피벗으로 D장조 전조 피날레
+% ===== 기 · 패터 (1-8마디) : 재잘재잘 — 설렘이 말을 앞지른다 =====
+[V:1] !mf!"C""^재잘재잘"e2ee e2ee g2e2 c4 | "G"d2dd d2dd f2d2 B4 | "Am"c2cc c2cc e2c2 A4 | "F"A2AA c2cc d4c4 |
+[V:2] C,2C2C,2C2 C,2C2C,2C2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | F,,2F,2F,,2F,2 F,,2F,2F,,2F,2 |
+[V:1] "C"e2ee e2ee g2e2 c4 | "G"d2dd d2dd f2d2 B4 | "Am"c2cc c2cc e2c2 A4 | "F"d4e4 "G"g4b4 |
+[V:2] C,2C2C,2C2 C,2C2C,2C2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | F,,2F,2F,,2F,2 G,,2G,2G,,2G,2 |
+% ===== 승 · 스킵 (9-16마디) : 복도를 뛰어간다 =====
+[V:1] "C""^뛰어간다"g3g e3e g2e2 c4 | "Em"g3g b3b g2e2 B4 | "F"a3a f3f a2f2 c4 | "G"b3b g3g d4z4 |
+[V:2] C,4G,4 C4G,4 | E,4B,4 E4B,4 | F,,4C,4 F,4C,4 | G,,4D,4 G,4D,4 |
+[V:1] "C"g3g e3e g2e2 c4 | "Em"g3g b3b g2e2 B4 | "F"a4b4 c'4d'4 | "G"d'8 z8 |
+[V:2] C,4G,4 C4G,4 | E,4B,4 E4B,4 | F,,4C,4 F,4C,4 | G,,4D,4 G,4D,4 |
+% ===== 전 · 코러스 (17-24마디) : 창문이 활짝 =====
+[V:1] !f!"C""^활짝!"g4c'4 e'6d'c' | "G"d'6c'b b4g4 | "Am"a4c'4 e'6f'e' | "F"f'6e'd' c'4a4 |
+[V:2] C,2C2C,2C2 C,2C2C,2C2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | F,,2F,2F,,2F,2 F,,2F,2F,,2F,2 |
+[V:1] "C"g4c'4 e'6d'c' | "G"d'6c'b b4g4 | "F"a4c'4 f'4e'4 | "A7"e'4^c'4 a4b4 |
+[V:2] C,2C2C,2C2 C,2C2C,2C2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | F,,2F,2F,,2F,2 F,,2F,2F,,2F,2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 |
+% ===== 결 · 전조 피날레 (25-32마디) : D장조 — 처음 맞는 아침 =====
+[V:1] [K:D] !ff!"D""^한 음 위의 아침"a4d'4 f'6e'd' | "A"e'6d'c' c'4a4 | "Bm"b4d'4 f'6g'f' | "G"g'6f'e' d'4b4 |
+[V:2] [K:D] D,2D2D,2D2 D,2D2D,2D2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 |
+[V:1] "D"a4d'4 f'6e'd' | "A"e'6d'c' c'4a4 | "G"b4d'4 "A"e'4g'4 | "D"d'8 H[ad'f']8 |]
+[V:2] D,2D2D,2D2 D,2D2D,2D2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | G,,2G,2G,,2G,2 A,,2A,2A,,2A,2 | D,2D2D,2D2 H[D,,A,,D,]8 |]

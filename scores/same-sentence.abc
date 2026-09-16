@@ -1,0 +1,33 @@
+X:1
+T:같은 문장을 말했어
+T:(We Said the Same Sentence)
+R:Duet Pop
+M:4/4
+L:1/16
+Q:1/4=112
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 뮤지컬 듀엣 팝 풍 오리지널(멜로디 창작): 서로의 문장을 이어받는 두 목소리,
+% 엇박 반주, 3도 화음의 합창, 문 닫히는 '탁, 탁' 엔딩
+% ===== 기 · 번갈아 (1-8마디) : 그가 말하면, 그녀가 받는다 =====
+[V:1] !mf!"G""^그"d3d B2d2 g4z4 | "D""^그녀"a3a f2a2 d'4z4 | "Em""^그"e3e g2e2 b4z4 | "C""^그녀"c'3c' a2c'2 e'4z4 |
+[V:2] G,2[GB]2 z2[GB]2 G,2[GB]2 z2[GB]2 | D,2[FA]2 z2[FA]2 D,2[FA]2 z2[FA]2 | E,2[GB]2 z2[GB]2 E,2[GB]2 z2[GB]2 | C,2[EG]2 z2[EG]2 C,2[EG]2 z2[EG]2 |
+[V:1] "G"d3d B2d2 g4z4 | "D"a3a f2a2 d'4z4 | "Em""^함께"b2b2 a2g2 e4g4 | "C"a4b4 "D"a8 |
+[V:2] G,2[GB]2 z2[GB]2 G,2[GB]2 z2[GB]2 | D,2[FA]2 z2[FA]2 D,2[FA]2 z2[FA]2 | E,2[GB]2 z2[GB]2 E,2[GB]2 z2[GB]2 | C,2[EG]2 z2[EG]2 D,2[FA]2 z2[FA]2 |
+% ===== 승 · 문장 이어받기 (9-16마디) : 반 마디씩 주고받는다! =====
+[V:1] "G""^반 마디씩!"b2a2g2z2 d'2c'2b2z2 | "D"a2g2f2z2 e'2d'2a2z2 | "Em"g2f2e2z2 b2c'2b2z2 | "C"c'2b2a2z2 e'4d'4 |
+[V:2] G,2[GB]2 z2[GB]2 G,2[GB]2 z2[GB]2 | D,2[FA]2 z2[FA]2 D,2[FA]2 z2[FA]2 | E,2[GB]2 z2[GB]2 E,2[GB]2 z2[GB]2 | C,2[EG]2 z2[EG]2 C,2[EG]2 z2[EG]2 |
+[V:1] "G"b2a2g2z2 d'2c'2b2z2 | "D"a2g2f2z2 e'2d'2a2z2 | "Em"g2f2e2z2 b2c'2b2z2 | "C"c'4d'4 "D"e'8 |
+[V:2] G,2[GB]2 z2[GB]2 G,2[GB]2 z2[GB]2 | D,2[FA]2 z2[FA]2 D,2[FA]2 z2[FA]2 | E,2[GB]2 z2[GB]2 E,2[GB]2 z2[GB]2 | C,2[EG]2 z2[EG]2 D,2[FA]2 z2[FA]2 |
+% ===== 전 · 3도 합창 (17-24마디) : 목소리가 겹친다 =====
+[V:1] !f!"G""^겹치는 목소리"[bd']3[bd'] [gb]2[bd']2 [dg]4z4 | "D"[ac']3[ac'] [fa]2[ac']2 [df]4z4 | "Em"[gb]3[gb] [eg]2[gb]2 [Be]4z4 | "C"[c'e']3[c'e'] [ac']2[c'e']2 [eg]4z4 |
+[V:2] G,2[GB]2 z2[GB]2 G,2[GB]2 z2[GB]2 | D,2[FA]2 z2[FA]2 D,2[FA]2 z2[FA]2 | E,2[GB]2 z2[GB]2 E,2[GB]2 z2[GB]2 | C,2[EG]2 z2[EG]2 C,2[EG]2 z2[EG]2 |
+[V:1] "G"[bd']3[bd'] [gb]2[bd']2 [dg]4z4 | "D"[ac']3[ac'] [fa]2[ac']2 [df]4z4 | "Em"[gb]4[ac']4 "C"[bd']4[c'e']4 | "D"[ad']8 z8 |
+[V:2] G,2[GB]2 z2[GB]2 G,2[GB]2 z2[GB]2 | D,2[FA]2 z2[FA]2 D,2[FA]2 z2[FA]2 | E,2[GB]2 z2[GB]2 C,2[EG]2 z2[EG]2 | D,2[FA]2 z2[FA]2 D,2[FA]2 z2[FA]2 |
+% ===== 결 · 마지막 합창 (25-32마디) : 그리고 문이 닫힌다 — 탁, 탁 =====
+[V:1] !mf!"G"d3d B2d2 g4z4 | "D"a3a f2a2 d'4z4 | "Em"b2b2 a2g2 e4g4 | "C"a4b4 c'8 |
+[V:2] G,2[GB]2 z2[GB]2 G,2[GB]2 z2[GB]2 | D,2[FA]2 z2[FA]2 D,2[FA]2 z2[FA]2 | E,2[GB]2 z2[GB]2 E,2[GB]2 z2[GB]2 | C,2[EG]2 z2[EG]2 C,2[EG]2 z2[EG]2 |
+[V:1] !f!"G"[bd']4[bd']4 [gb]4[bd']4 | "D"[ac']4[ac']4 [fa]4[ac']4 | "C"[c'e']4[bd']4 "D"[ac']4[bd']4 | "G""^탁, 탁!"[gbd']4 z4 .[gb]2.[gb]2 z4 |]
+[V:2] G,2[GB]2 z2[GB]2 G,2[GB]2 z2[GB]2 | D,2[FA]2 z2[FA]2 D,2[FA]2 z2[FA]2 | C,2[EG]2 z2[EG]2 D,2[FA]2 z2[FA]2 | [G,,D,G,]4 z4 .G,2.G,2 z4 |]
