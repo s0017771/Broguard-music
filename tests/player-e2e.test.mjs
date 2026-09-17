@@ -198,6 +198,20 @@ try {
     assert.ok(!st.paused && st.playing, '이어서 재생');
     ok('⏸ 일시정지/이어서가 오디오 요소로 정확히 동작한다');
 
+    // 8.25) 📞 전화 시뮬레이션: 밖에서(OS) 오디오를 멈추면 일시정지 상태로 전환, 자동으로 다시 살아나지 않는다
+    await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
+    await page.evaluate(() => document.getElementById('audioEl').pause());   // 전화가 소리를 가져감
+    await page.waitForFunction(() => window.__player.getState().paused, undefined, { timeout: 4000 });
+    assert.ok(/전화/.test(await page.textContent('#status')), '전화 일시정지 안내: ' + await page.textContent('#status'));
+    // 통화 중 화면을 다시 켜도(visibilitychange) 재생이 살아나면 안 됨
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForTimeout(250);
+    st = await page.evaluate(() => window.__player.getState());
+    assert.ok(st.paused && !st.audioPlaying, '통화 중엔 계속 일시정지');
+    await page.click('#playBtn');   // 통화 끝 → 이어서
+    await page.waitForFunction(() => window.__player.getState().audioPlaying && !window.__player.getState().paused, undefined, { timeout: 6000 });
+    ok('📞 전화가 오면 일시정지되고, 통화 중 다시 살아나지 않는다');
+
     // 8.3) 잠금화면 미디어 세션 등록
     const msTitle = await page.evaluate(() => (navigator.mediaSession && navigator.mediaSession.metadata) ? navigator.mediaSession.metadata.title : null);
     assert.ok(msTitle, '미디어 세션 제목: ' + msTitle);

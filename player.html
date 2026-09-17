@@ -336,11 +336,27 @@
     if (!isPlaying || isPaused) return;
     advance(playToken);
   });
+  /* 📞 전화·다른 앱이 소리를 가져가면 폰이 오디오를 멈춘다(pause 이벤트).
+     우리가 멈춘 게 아니면 '일시정지' 상태로 전환해 통화 중 다시 살아나지 않게 한다. */
+  var internalPause = false;
+  audioEl.addEventListener("pause", function () {
+    if (!isPlaying || audioEl.ended) return;
+    if (internalPause) { internalPause = false; return; }
+    isPaused = true;
+    $("pauseBtn").textContent = "▶ 계속";
+    setMediaSession(null, "paused");
+    setStatus("📞 전화(또는 다른 앱 소리) 때문에 일시정지했어요 — 끝나면 ▶ 계속을 눌러 이어 들으세요.");
+  });
+  audioEl.addEventListener("play", function () {
+    if (isPlaying && isPaused) { isPaused = false; $("pauseBtn").textContent = "⏸ 일시정지"; setMediaSession(null, "playing"); }
+  });
 
   function stopAll() {
     playToken++;
     isPlaying = false; isPaused = false;
+    internalPause = true;
     try { audioEl.pause(); audioEl.currentTime = 0; } catch (e) {}
+    internalPause = false;
     try { if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "none"; } catch (e) {}
     $("stopBtn").disabled = true; $("pauseBtn").disabled = true; $("pauseBtn").textContent = "⏸ 일시정지";
     $("playBtn").disabled = false;
@@ -385,6 +401,7 @@
     var url = r.url;
     var old = curUrl; curUrl = url;
     if (old && old !== url) revokeUrl(old);
+    internalPause = true;   /* 곡 교체로 나는 pause 이벤트는 전화가 아님 */
     if (audioEl.src !== url) audioEl.src = url;
     try { audioEl.currentTime = 0; } catch (e) {}
     try {
@@ -396,6 +413,8 @@
       return skipNext(token, "오디오 재생 실패");
     }
     if (token !== playToken) return;
+    internalPause = false;   /* 곡 교체 pause가 안 났더라도 다음 '진짜' 중단(전화)을 놓치지 않게 */
+    isPaused = false;
     failStreak = 0;
     setMediaSession(it.title, "playing");
     setStatus("♪ 재생 중 — " + it.title + ($("chordAccChk").checked ? "" : " (코드 반주 없음)"));
@@ -423,6 +442,7 @@
     if (!isPlaying) return;
     if (!isPaused) {
       isPaused = true;
+      internalPause = true;   /* 사용자가 직접 멈춤 — 전화 감지 안내와 구분 */
       try { audioEl.pause(); } catch (e) {}
       $("pauseBtn").textContent = "▶ 계속"; setStatus("일시정지");
       setMediaSession(null, "paused");
