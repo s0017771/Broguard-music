@@ -221,6 +221,46 @@ try {
     console.log('SKIP - 로컬 abcjs 없음: 재생 엔진 검증 생략(UI 검증만 수행)');
   }
 
+  // 8.7) 💾 플레이리스트 저장/불러오기/이어담기/삭제/영속
+  await page.fill('#plName', '감상코스');
+  await page.click('#plSaveBtn');
+  let sets = await page.evaluate(() => window.__player.getSets());
+  assert.deepEqual(sets, [{ name: '감상코스', n: 3 }], '3곡 저장');
+  assert.ok(/'감상코스'.*저장/.test(await page.textContent('#status')), '저장 안내');
+  // 비우고 📥 불러오기 → 복원
+  await page.click('#clearBtn');
+  st = await page.evaluate(() => window.__player.getState());
+  assert.equal(st.count, 0);
+  await page.click('#plsets li:nth-child(1) button.pl-load');
+  st = await page.evaluate(() => window.__player.getState());
+  assert.deepEqual(st.titles, ['곡 하나', '곡 둘', '곡 셋'], '플레이리스트로 재생목록 복원');
+  // 한 곡 빼고 ➕ 이어 담기 → 빠진 곡만 추가(중복 제외)
+  await page.click('#plist li:nth-child(3) button[title="빼기"]');
+  await page.click('#plsets li:nth-child(1) button.pl-add');
+  st = await page.evaluate(() => window.__player.getState());
+  assert.equal(st.count, 3, '빠졌던 1곡만 이어 담김');
+  // 같은 이름 저장 = 덮어쓰기(목록 수 그대로)
+  await page.fill('#plName', '감상코스');
+  await page.click('#plSaveBtn');
+  sets = await page.evaluate(() => window.__player.getSets());
+  assert.equal(sets.length, 1, '같은 이름은 덮어쓰기');
+  // 새 이름으로 하나 더
+  await page.fill('#plName', '드라이브');
+  await page.click('#plSaveBtn');
+  sets = await page.evaluate(() => window.__player.getSets());
+  assert.equal(sets.length, 2, '두 번째 플레이리스트');
+  // 새로고침 후에도 유지
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  sets = await page.evaluate(() => window.__player.getSets());
+  assert.deepEqual(sets.map(s => s.name), ['감상코스', '드라이브'], '플레이리스트 영속');
+  st = await page.evaluate(() => window.__player.getState());
+  assert.equal(st.count, 3, '재생목록도 유지');
+  // 삭제
+  await page.click('#plsets li:nth-child(2) button.pl-del');
+  sets = await page.evaluate(() => window.__player.getSets());
+  assert.deepEqual(sets.map(s => s.name), ['감상코스'], '삭제');
+  ok('💾 플레이리스트 저장·불러오기·이어담기·덮어쓰기·영속·삭제');
+
   // 8.5) 같은 음 슬러 → 붙임줄 정규화(재생 시 두 번 소리 안 나게)
   const tied = await page.evaluate(() =>
     window.__player.slurSameToTie('X:1\nK:C\n"C" (B2 B2) A2 B2 | (d2 d2) c2 |'));
