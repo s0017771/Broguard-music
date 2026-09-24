@@ -180,6 +180,31 @@ try {
     }, undefined, { timeout: 6000 });
     ok('🎸 코드 반주 끔·🔊 고음질이 재생에 즉시 반영된다');
 
+    // 8.15) 🎻 멜로디 악기: 멜로디 성부만 선택 악기, 베이스는 피아노 (실제 MIDI 프로그램으로 검증)
+    const progs2 = await page.evaluate(() => {
+      const abc = ['X:1', 'M:4/4', 'L:1/8', '%%score {RH LH}', 'V:RH clef=treble', 'V:LH clef=bass', 'K:C',
+        '[V:RH] C4 E4 |', '[V:LH] C,4 G,4 |'].join('\n');
+      const inj = window.__player.injectMelodyProgram(abc, 40);
+      const bin = ABCJS.synth.getMidiFile(inj, { midiOutputType: 'binary' });
+      const bytes = Array.from(bin[0] || bin), out = [];
+      for (let i = 0; i < bytes.length - 1; i++) if ((bytes[i] & 0xF0) === 0xC0) out.push(bytes[i + 1]);
+      return out;
+    });
+    assert.deepEqual(progs2, [40, 0], '2성부: 멜로디=바이올린(40) · 베이스=피아노(0)');
+    const progs1 = await page.evaluate(() => {
+      const inj = window.__player.injectMelodyProgram('X:1\nM:4/4\nL:1/8\nK:C\nC4 E4 |', 48);
+      const bin = ABCJS.synth.getMidiFile(inj, { midiOutputType: 'binary' });
+      const bytes = Array.from(bin[0] || bin), out = [];
+      for (let i = 0; i < bytes.length - 1; i++) if ((bytes[i] & 0xF0) === 0xC0) out.push(bytes[i + 1]);
+      return out;
+    });
+    assert.deepEqual(progs1, [48], '단선율: 전역 적용(현악 앙상블)');
+    // 재생 중 악기 변경 → 새 음원으로 다시 만들어 반영
+    const nInit = await page.evaluate(() => window.__inits.length);
+    await page.selectOption('#instSel', '40');
+    await page.waitForFunction(n => window.__inits.length > n, nInit, { timeout: 6000 });
+    ok('🎻 멜로디 악기 선택(베이스는 피아노 유지)이 동작한다');
+
     // 8.2) ⏸ 일시정지 — 가짜 '곡 끝' 이벤트가 와도 다음 곡으로 튀지 않는다
     await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
     const idxBefore = (await page.evaluate(() => window.__player.getState())).curIdx;
@@ -255,6 +280,7 @@ try {
   assert.deepEqual(sets.map(s => s.name), ['감상코스', '드라이브'], '플레이리스트 영속');
   st = await page.evaluate(() => window.__player.getState());
   assert.equal(st.count, 3, '재생목록도 유지');
+  if (abcjsSrc) assert.equal(await page.$eval('#instSel', e => e.value), '40', '🎻 멜로디 악기 선택도 유지');
   // 삭제
   await page.click('#plsets li:nth-child(2) button.pl-del');
   sets = await page.evaluate(() => window.__player.getSets());
