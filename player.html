@@ -528,6 +528,11 @@
     setStatus("'" + name + "' 플레이리스트로 " + (idx >= 0 ? "덮어써 저장했어요" : "저장했어요") + " (" + items.length + "곡).");
   });
   renderSets();
+  /* 다른 탭(악보집 드라이브 동기화 등)에서 플레이리스트가 바뀌었을 수 있음 → 창 복귀 시 다시 읽기 */
+  window.addEventListener("focus", function () {
+    try { var p = JSON.parse(localStorage.getItem(SETS_KEY) || "[]"); if (Array.isArray(p)) plSets = p; } catch (e) {}
+    renderSets();
+  });
   $("addAllBtn").addEventListener("click", function () {
     var es = libEntries().filter(function (e) { return e && e.abc; })
       .sort(function (a, b) { return (b.added || 0) - (a.added || 0); });

@@ -121,3 +121,35 @@ test('mergeEntries: 같은 제목이라도 내용이 다르면 둘 다 보존(�
   assert.equal(added, 1);
   assert.equal(local.length, 2, '다른 편곡은 삭제하지 않고 둘 다 유지');
 });
+
+test('serialize/parsePlaylists: 플레이리스트 포함 왕복 + 예전 파일 호환', () => {
+  const entries = [{ id: 'a', title: '곡', abc: 'X:1\nK:C\nC4' }];
+  const sets = [{ name: '감상코스', items: [{ id: 'a', title: '곡' }], saved: 100 }];
+  const json = LibraryCore.serialize(entries, sets);
+  assert.deepEqual(LibraryCore.parse(json), entries, '곡 목록은 기존과 동일하게 읽힘');
+  assert.deepEqual(LibraryCore.parsePlaylists(json), sets, '플레이리스트도 함께 실림');
+  // 예전 형식(플레이리스트 없음) → null (에러 없이)
+  assert.equal(LibraryCore.parsePlaylists(LibraryCore.serialize(entries)), null);
+  assert.equal(LibraryCore.parsePlaylists('깨진{'), null);
+});
+
+test('mergePlaylists: 이름 기준 — 새 이름 추가, 같은 이름은 최근 저장본이 이김', () => {
+  const local = [
+    { name: '감상코스', items: [{ id: 'a', title: 'A' }], saved: 200 },
+    { name: '드라이브', items: [{ id: 'b', title: 'B' }], saved: 100 }
+  ];
+  const incoming = [
+    { name: '감상코스', items: [{ id: 'x', title: 'X' }], saved: 150 },          // 더 오래됨 → 무시
+    { name: '드라이브', items: [{ id: 'y', title: 'Y' }, { id: 'z', title: 'Z' }], saved: 300 }, // 더 최근 → 교체
+    { name: '댄스곡', items: [{ id: 'd', title: 'D' }], saved: 50 },              // 새 이름 → 추가
+    { name: '망가진것' },                                                          // items 없음 → 무시
+    { items: [{ id: 'q' }] }                                                       // 이름 없음 → 무시
+  ];
+  const ch = LibraryCore.mergePlaylists(local, incoming);
+  assert.deepEqual(ch, { added: 1, updated: 1 });
+  assert.equal(local.length, 3);
+  assert.deepEqual(local[0].items.map(i => i.id), ['a'], '더 오래된 원격은 무시');
+  assert.deepEqual(local[1].items.map(i => i.id), ['y', 'z'], '더 최근 원격이 교체');
+  assert.equal(local[1].saved, 300);
+  assert.equal(local[2].name, '댄스곡', '새 이름 추가');
+});
