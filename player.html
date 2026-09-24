@@ -85,6 +85,16 @@
           <option value="musyng">고음질 피아노 (첫 로딩 느림)</option>
         </select>
       </label>
+      <label title="멜로디 성부만 다른 악기로 — 베이스·반주는 피아노 그대로">🎻 멜로디 악기
+        <select id="instSel">
+          <option value="">피아노 (기본)</option>
+          <option value="48">현악 앙상블 (풍성 ✨)</option>
+          <option value="40">바이올린</option>
+          <option value="42">첼로</option>
+          <option value="73">플루트</option>
+          <option value="71">클라리넷</option>
+        </select>
+      </label>
     </div>
     <div id="status">악보집에서 곡을 담고 ▶ 재생을 누르세요.</div>
     <p class="hint" style="margin-top:8px">🎵 곡을 통째로 <b>음원으로 만든 뒤</b> 일반 음악처럼 재생해요 — <b>재생 중에는 아무 작업도 하지 않아</b> 끊기지 않고, <b>화면을 꺼도 계속</b> 이어지며, 잠금화면에서 조절할 수 있어요. 곡이 바뀔 때 "준비 중…"이 잠깐 보이는 건 정상입니다. <span style="opacity:.6">· 재생 엔진 v3</span></p>
@@ -200,11 +210,11 @@
   })();
   function saveList() { try { localStorage.setItem(LIST_KEY, JSON.stringify(playlist)); } catch (e) {} }
   function savePrefs() {
-    try { localStorage.setItem(PREF_KEY, JSON.stringify({ loop: $("loopChk").checked, chord: $("chordAccChk").checked, sound: $("soundSel").value })); } catch (e) {}
+    try { localStorage.setItem(PREF_KEY, JSON.stringify({ loop: $("loopChk").checked, chord: $("chordAccChk").checked, sound: $("soundSel").value, inst: $("instSel").value })); } catch (e) {}
   }
   try {
     var p = JSON.parse(localStorage.getItem(PREF_KEY) || "");
-    if (p) { $("loopChk").checked = !!p.loop; $("chordAccChk").checked = p.chord !== false; if (p.sound) $("soundSel").value = p.sound; }
+    if (p) { $("loopChk").checked = !!p.loop; $("chordAccChk").checked = p.chord !== false; if (p.sound) $("soundSel").value = p.sound; if (p.inst != null) $("instSel").value = p.inst; }
   } catch (e) {}
 
   /* ── 상태 ── */
@@ -308,6 +318,30 @@
   var audioEl = $("audioEl");
   var curUrl = null;
   function revokeUrl(u) { if (u) { try { URL.revokeObjectURL(u); } catch (e) {} } }
+  /* 🎻 멜로디 악기: 첫 성부에만 선택 악기를, 나머지 성부(베이스 등)에는 피아노(0)를 지정.
+     (K: 다음 줄에 성부 재선언 + %%MIDI program — abcjs가 성부별 악기로 합성) */
+  function injectMelodyProgram(abc, prog) {
+    if (prog == null) return abc;
+    var lines = String(abc).split("\n");
+    var tags = [], seen = {};
+    lines.forEach(function (l) {
+      var m = l.match(/^V:\s*(\S+)/) || l.match(/^\[V:([^\]\s]+)\]/);
+      if (m && !seen[m[1]]) { seen[m[1]] = 1; tags.push(m[1]); }
+    });
+    var kIdx = -1;
+    for (var i = 0; i < lines.length; i++) if (/^K:/.test(lines[i].trim())) { kIdx = i; break; }
+    if (tags.length > 1) {   /* 다성부: 멜로디=선택 악기, 나머지=피아노 */
+      if (kIdx < 0) return abc;
+      var inj = [];
+      tags.forEach(function (t, ti) { inj.push("V:" + t, "%%MIDI program " + (ti === 0 ? prog : 0)); });
+      lines.splice(kIdx + 1, 0, inj.join("\n"));
+      return lines.join("\n");
+    }
+    /* 단선율: 전역 지정 */
+    if (kIdx >= 0) lines.splice(kIdx, 0, "%%MIDI program " + prog);
+    else lines.unshift("%%MIDI program " + prog);
+    return lines.join("\n");
+  }
   /* 재생 중에는 아무 작업도 하지 않는다 — 합성·변환 같은 무거운 일은 곡 시작 전에만.
      (재생 중 다음 곡을 미리 만들던 방식은 일부 폰에서 재생을 뚝뚝 끊어 제거) */
   function restCtx() { try { if (audioCtx && audioCtx.state === "running") audioCtx.suspend(); } catch (e) {} }
@@ -316,8 +350,11 @@
     var it = playlist[idx];
     var entry = it && findEntry(it);
     if (!entry || !entry.abc) return { err: "악보집에서 찾지 못함" };
+    var abcSrc = slurSameToTie(entry.abc);
+    var ip = $("instSel").value;
+    if (ip !== "") abcSrc = injectMelodyProgram(abcSrc, +ip);
     var vo = null;
-    try { vo = ABCJS.renderAbc("holder", slurSameToTie(entry.abc), { add_classes: false })[0]; } catch (e) {}
+    try { vo = ABCJS.renderAbc("holder", abcSrc, { add_classes: false })[0]; } catch (e) {}
     if (!vo) return { err: "악보 해석 실패" };
     var sy = new ABCJS.synth.CreateSynth();
     var o = { chordsOff: !$("chordAccChk").checked };
@@ -552,6 +589,10 @@
     savePrefs();
     if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
   });
+  $("instSel").addEventListener("change", function () {
+    savePrefs();
+    if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
+  });
   window.addEventListener("focus", renderLibrary);
 
   renderLibrary();
@@ -561,7 +602,7 @@
   if (typeof window !== "undefined") window.__player = {
     getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "" }; },
     getSets: function () { return plSets.map(function (s) { return { name: s.name, n: s.items.length }; }); },
-    playAt: playAt, slurSameToTie: slurSameToTie
+    playAt: playAt, slurSameToTie: slurSameToTie, injectMelodyProgram: injectMelodyProgram
   };
 })();
 </script>
