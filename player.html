@@ -102,6 +102,17 @@
   </div>
 
   <div class="card">
+    <h2>💾 내 플레이리스트</h2>
+    <div class="row-btns" style="align-items:center">
+      <input type="text" id="plName" placeholder="이름 붙이기 (예: 추천 감상코스, 댄스곡 모음)" style="flex:1;min-width:180px;font:inherit;font-size:.88rem;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)">
+      <button class="act btn-go" id="plSaveBtn">💾 지금 재생목록 저장</button>
+    </div>
+    <ul class="list" id="plsets"></ul>
+    <div class="empty" id="plsetsEmpty">저장된 플레이리스트가 없어요. 재생목록을 꾸민 뒤 이름을 붙여 저장해보세요.</div>
+    <p class="hint">▶ = 그 플레이리스트로 바로 재생 · 📥 = 재생목록으로 불러오기 · ➕ = 지금 목록 뒤에 이어 담기(중복 제외) · 같은 이름으로 저장하면 덮어써요.</p>
+  </div>
+
+  <div class="card">
     <h2>📚 내 악보집</h2>
     <div class="row-btns">
       <button class="act btn-ghost" id="addAllBtn">➕ 전체 담기</button>
@@ -461,6 +472,62 @@
     playlist = []; curIdx = -1; stopAll(); saveList(); renderNow();
     setStatus("재생목록을 비웠어요.");
   });
+
+  /* ── 💾 내 플레이리스트: 지금 재생목록을 이름 붙여 저장 → 나중에 한 번에 불러오기 ── */
+  var SETS_KEY = "broguard_player_playlists";
+  var plSets = [];
+  try { plSets = JSON.parse(localStorage.getItem(SETS_KEY) || "[]") || []; } catch (e) { plSets = []; }
+  function saveSets() { try { localStorage.setItem(SETS_KEY, JSON.stringify(plSets)); } catch (e) {} }
+  function renderSets() {
+    var ul = $("plsets"); ul.innerHTML = "";
+    $("plsetsEmpty").style.display = plSets.length ? "none" : "block";
+    plSets.forEach(function (s, i) {
+      var li = document.createElement("li");
+      var t = document.createElement("span"); t.className = "t"; t.textContent = s.name; li.appendChild(t);
+      var c = document.createElement("span"); c.className = "cat"; c.textContent = s.items.length + "곡"; li.appendChild(c);
+      [["▶", "pl-play", "이 플레이리스트로 바로 재생", function () { loadSet(i, true); }],
+       ["📥", "pl-load", "재생목록으로 불러오기", function () { loadSet(i, false); }],
+       ["➕", "pl-add", "지금 재생목록 뒤에 이어 담기(중복 제외)", function () { appendSet(i); }],
+       ["✕", "pl-del", "플레이리스트 삭제", function () {
+         var nm = plSets[i].name;
+         plSets.splice(i, 1); saveSets(); renderSets();
+         setStatus("'" + nm + "' 플레이리스트를 삭제했어요. (재생목록의 곡은 그대로)");
+       }]].forEach(function (b) {
+        var btn = document.createElement("button"); btn.type = "button"; btn.textContent = b[0]; btn.className = b[1]; btn.title = b[2];
+        btn.addEventListener("click", b[3]); li.appendChild(btn);
+      });
+      ul.appendChild(li);
+    });
+  }
+  function loadSet(i, andPlay) {
+    var s = plSets[i]; if (!s) return;
+    stopAll();
+    playlist = s.items.map(function (x) { return { id: x.id || "", title: x.title || "(제목 없음)" }; });
+    curIdx = -1; saveList(); renderNow();
+    setStatus("'" + s.name + "' 플레이리스트를 불러왔어요 (" + playlist.length + "곡)." + (andPlay ? "" : " ▶ 재생을 누르세요."));
+    if (andPlay) playAt(0);
+  }
+  function appendSet(i) {
+    var s = plSets[i]; if (!s) return;
+    var got = 0;
+    s.items.forEach(function (x) { if (addToList(x, true)) got++; });
+    saveList(); renderNow();
+    setStatus("'" + s.name + "'에서 " + got + "곡을 이어 담았어요." + (got < s.items.length ? " (이미 있던 " + (s.items.length - got) + "곡 제외)" : "") + " (총 " + playlist.length + "곡)");
+  }
+  $("plSaveBtn").addEventListener("click", function () {
+    var name = $("plName").value.trim();
+    if (!playlist.length) { setStatus("재생목록이 비어 있어요 — 먼저 곡을 담고 저장하세요.", true); return; }
+    if (!name) { setStatus("플레이리스트 이름을 입력해주세요. (예: 추천 감상코스)", true); $("plName").focus(); return; }
+    var items = playlist.map(function (x) { return { id: x.id, title: x.title }; });
+    var idx = -1;
+    plSets.forEach(function (s, k) { if (s.name === name) idx = k; });
+    if (idx >= 0) { plSets[idx].items = items; plSets[idx].saved = Date.now(); }
+    else plSets.push({ name: name, items: items, saved: Date.now() });
+    saveSets(); renderSets();
+    $("plName").value = "";
+    setStatus("'" + name + "' 플레이리스트로 " + (idx >= 0 ? "덮어써 저장했어요" : "저장했어요") + " (" + items.length + "곡).");
+  });
+  renderSets();
   $("addAllBtn").addEventListener("click", function () {
     var es = libEntries().filter(function (e) { return e && e.abc; })
       .sort(function (a, b) { return (b.added || 0) - (a.added || 0); });
@@ -488,6 +555,7 @@
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__player = {
     getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "" }; },
+    getSets: function () { return plSets.map(function (s) { return { name: s.name, n: s.items.length }; }); },
     playAt: playAt, slurSameToTie: slurSameToTie
   };
 })();
