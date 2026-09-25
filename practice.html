@@ -1191,7 +1191,11 @@
   function currentAbc() {
     var sel = $("songSel").value;
     if (sel === "custom") return $("abcInput").value.trim();
-    if (/^lib:/.test(sel)) return libMap[sel] || "";
+    if (/^lib:/.test(sel)) {
+      var e = libFind(sel);
+      if (e) return e.abc;
+      return libMap[sel] || "";
+    }
     return SONGS[sel];
   }
   /* ── 악보집(broguard_library)에서 불러오기 ── */
@@ -1200,6 +1204,18 @@
     var lib = null;
     try { lib = JSON.parse(localStorage.getItem("broguard_library") || ""); } catch (e) {}
     return (lib && lib.entries) ? lib.entries : (Array.isArray(lib) ? lib : []);
+  }
+  /* 재생 시점에 악보집에서 직접 다시 찾는다 — 목록을 만든 뒤 악보집이 바뀌어도(동기화·백업 복원 등) 안전.
+     id로 먼저 찾고, id가 바뀌었으면 화면에 보이는 제목으로 한 번 더 찾는다. */
+  function libFind(sel) {
+    var id = String(sel).slice(4);
+    var es = libEntries().filter(function (e) { return e && e.abc; })
+      .sort(function (a, b) { return (b.added || 0) - (a.added || 0); });   /* populate와 같은 순서(색인 id 대비) */
+    for (var i = 0; i < es.length; i++) if (String(es[i].id || i) === id) return es[i];
+    var op = $("songSel").options[$("songSel").selectedIndex];
+    var title = op ? op.textContent : "";
+    for (var j = 0; j < es.length; j++) if (es[j].title === title) return es[j];
+    return null;
   }
   function populateLibrary() {
     var sel = $("songSel");
@@ -1241,7 +1257,12 @@
     /* 텍스트 상자 등에 포커스가 남아 있으면 첫 키 입력이 그리로 가서 무시됨 → 포커스 해제 */
     try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
     var abc = currentAbc();
-    if (!abc) { setStatus("악보가 비어 있어요. 곡을 고르거나 ABC를 붙여넣어주세요."); return; }
+    if (!abc) {
+      setStatus(/^lib:/.test($("songSel").value)
+        ? "이 곡을 악보집에서 찾지 못했어요. 악보집 페이지에 곡이 있는지(같은 브라우저인지) 확인하고 이 페이지를 새로고침해주세요."
+        : "악보가 비어 있어요. 곡을 고르거나 ABC를 붙여넣어주세요.");
+      return;
+    }
     song = parseSong(abc);
     song.seq.forEach(function (n) { n.hit = false; });
     totalNotes = song.seq.filter(function (n) { return !n.rest; }).length;
@@ -1289,7 +1310,12 @@
   function listen() {
     stopAll();
     var abc = currentAbc();
-    if (!abc) { setStatus("들려드릴 악보가 없어요."); return; }
+    if (!abc) {
+      setStatus(/^lib:/.test($("songSel").value)
+        ? "이 곡을 악보집에서 찾지 못했어요. 악보집 페이지에 곡이 있는지 확인하고 새로고침해주세요."
+        : "들려드릴 악보가 없어요.");
+      return;
+    }
     song = parseSong(abc);
     renderScore(); buildKeyboard();
     var bpm = parseInt($("bpmInput").value, 10) || song.bpm;
@@ -1456,7 +1482,7 @@
   $("songSel").addEventListener("change", function () {
     $("abcInput").style.display = $("songSel").value === "custom" ? "block" : "none";
     var sel = $("songSel").value;
-    var src = sel === "custom" ? null : (/^lib:/.test(sel) ? libMap[sel] : SONGS[sel]);
+    var src = sel === "custom" ? null : (/^lib:/.test(sel) ? ((libFind(sel) || {}).abc || libMap[sel]) : SONGS[sel]);
     if (src) {
       var qm = src.match(/Q:[^=]*=\s*(\d+)/);
       if (qm) $("bpmInput").value = qm[1];

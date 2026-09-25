@@ -151,6 +151,38 @@ await check('악보집(broguard_library)에서 불러오기 목록이 생긴다'
   await page.click('#stopBtn');
 });
 
+await check('악보집이 나중에 바뀌어도(동기화로 id 변경) 곡을 제목으로 다시 찾아 시작한다', async () => {
+  await page.evaluate(() => {
+    localStorage.setItem('broguard_library', JSON.stringify({ entries: [
+      { id: 'old1', title: '동기화곡', abc: 'X:1\nT:동기화곡\nM:4/4\nL:1/8\nK:C\n"C" C2 E2 G2 c2 |', added: 5 }
+    ] }));
+    window.__practice.populateLibrary();   // 목록 생성: lib:old1
+  });
+  await page.selectOption('#songSel', 'lib:old1');
+  // 선택 뒤 드라이브 동기화/백업 복원으로 같은 곡의 id가 바뀐 상황
+  await page.evaluate(() => {
+    localStorage.setItem('broguard_library', JSON.stringify({ entries: [
+      { id: 'new9', title: '동기화곡', abc: 'X:1\nT:동기화곡\nM:4/4\nL:1/8\nK:C\n"C" C2 E2 G2 c2 |', added: 5 }
+    ] }));
+  });
+  await page.click('#startBtn');
+  await page.waitForFunction(() => {
+    const st = window.__practice.getState();
+    return st.playing && st.song && st.song.title === '동기화곡';
+  }, undefined, { timeout: 4000 });
+  await page.click('#stopBtn');
+  // 저장소에서 곡이 사라져도(목록은 그대로) 마지막으로 읽어둔 악보로 이어서 연습 가능
+  await page.evaluate(() => { localStorage.setItem('broguard_library', JSON.stringify({ entries: [] })); });
+  await page.click('#startBtn');
+  await page.waitForFunction(() => {
+    const st = window.__practice.getState();
+    return st.playing && st.song && st.song.title === '동기화곡';
+  }, undefined, { timeout: 4000 });
+  await page.click('#stopBtn');
+  ok2('곡이 저장소에서 사라져도 읽어둔 악보로 계속 연습');
+});
+function ok2(m) { /* 세부 확인용 표기 */ console.log('   - ' + m); }
+
 await check('레인이 일정한 속도로 흐른다(rAF 등속 구동)', async () => {
   await page.evaluate(() => {
     localStorage.setItem('broguard_library', JSON.stringify({ entries: [
