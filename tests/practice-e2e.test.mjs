@@ -52,6 +52,27 @@ await check('parseSong(테스트 훅)이 ABC를 음표로 파싱한다', async (
   assert.equal(n, 4, '4음(C E G c) 파싱');
 });
 
+await check('parseSong: 성부 표기 형식이 달라도 멜로디를 찾는다', async () => {
+  const cases = await page.evaluate(() => {
+    const P = window.__practice.parseSong;
+    const count = s => ({ n: s.seq.filter(x => !x.rest).length, midis: s.seq.filter(x => !x.rest).map(x => x.midi) });
+    return {
+      // ① 마커만 있는 줄 + 다음 줄들에 음표 (멜로디 2음, 베이스 2음)
+      markerLine: count(P('X:1\nM:4/4\nL:1/8\nK:C\n[V:RH]\n"C"C4 E4 |\n[V:LH]\nC,4 G,4 |')),
+      // ② V:xx 단독 줄 블록
+      voiceBlock: count(P('X:1\nM:4/4\nL:1/8\n%%score {RH LH}\nK:C\nV:RH\nC4 E4 |\nV:LH\nC,4 G,4 |')),
+      // ③ RH가 아닌 성부 이름
+      otherNames: count(P('X:1\nM:4/4\nL:1/8\nK:C\n[V:1] C4 E4 |\n[V:2] C,4 G,4 |')),
+      // ④ 기존 인라인 형식(회귀)
+      inline: count(P('X:1\nM:4/4\nL:1/8\nK:C\n[V:RH] C4 E4 |\n[V:LH] C,4 G,4 |'))
+    };
+  });
+  for (const [k, v] of Object.entries(cases)) {
+    assert.equal(v.n, 2, k + ': 멜로디 2음만 (베이스 제외): ' + JSON.stringify(v));
+    assert.deepEqual(v.midis, [60, 64], k + ': 음정은 멜로디 성부의 것');
+  }
+});
+
 await check('다른 랩 → 연습 핸드오프: broguard_practice_abc를 읽어 직접입력에 채운다', async () => {
   const song = 'X:1\nT:handoff\nM:4/4\nL:1/8\nK:C\n[V:RH] G2 A2 B2 c2 |';
   await page.evaluate((s) => localStorage.setItem('broguard_practice_abc', s), song);
