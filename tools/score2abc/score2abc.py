@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
 import zipfile
 from collections import Counter
 from fractions import Fraction
@@ -171,12 +172,55 @@ def read_mxl(path):
         return z.read(root)
 
 
-def to_abc(xml2abc, mxl_path):
-    xml_bytes = read_mxl(mxl_path)
+def to_abc(xml2abc, xml_bytes):
     abc, info = xml2abc.vertaal(xml_bytes, b=BARS_PER_LINE, u=1 if UNFOLD_REPEATS else 0, p="")
     if not abc.strip():
         raise RuntimeError("MusicXML을 ABC로 바꾸지 못했어요: %s" % info.strip())
     return abc
+
+
+def measure_length(measure):
+    """마디 안 첫 번째 성부 음표 길이의 합 (MusicXML duration 단위)."""
+    total, voice = 0.0, None
+    for n in measure.findall("note"):
+        if n.find("chord") is not None or n.find("grace") is not None:
+            continue
+        v = n.findtext("voice", "1")
+        voice = voice or v
+        if v == voice:
+            total += float(n.findtext("duration", "0") or 0)
+    return total
+
+
+def missing_line_start_chords(xml_bytes):
+    """원본 악보에서 줄이 시작되는 마디 중 코드 이름이 없는 마디 번호(첫 마디부터 센 번호).
+
+    Audiveris는 두 번째 줄부터 각 줄 첫 마디의 코드를 자주 놓칩니다. 코드가 원래 없던
+    마디(앞 마디 코드가 이어지는 경우)도 걸릴 수 있어서 '의심'으로만 알립니다.
+    """
+    if UNFOLD_REPEATS:
+        return []
+    try:
+        root = ET.fromstring(xml_bytes)
+    except ET.ParseError:
+        return []
+    part = root.find("part")
+    if root.tag != "score-partwise" or part is None:
+        return []
+    measures = part.findall("measure")
+    if sum(1 for m in measures if m.find("harmony") is not None) < 2:
+        return []
+    pickup = len(measures) > 1 and measure_length(measures[0]) < measure_length(measures[1])
+    missing = []
+    for i, m in enumerate(measures, 1):
+        pr = m.find("print")
+        starts_line = i == 1 or (pr is not None and "yes" in (pr.get("new-system"), pr.get("new-page")))
+        if not starts_line or m.get("implicit") == "yes" or (i == 1 and pickup):
+            continue
+        has_notes = any(n.find("rest") is None for n in m.findall("note"))
+        if has_notes and m.find("harmony") is None:
+            missing.append(i)
+    return missing
 
 
 # ------------------------------------------------------------
@@ -346,7 +390,7 @@ def meter_from_length(total):
     return "%d/8" % (total * 8)
 
 
-def tidy_abc(abc, title):
+def tidy_abc(abc, title, missing_chords=()):
     lines = abc.replace("\r\n", "\n").split("\n")
     header, music = [], []
     in_header = True
@@ -414,6 +458,10 @@ def tidy_abc(abc, title):
     if odd:
         notes.append("% ?확인: 박자가 다른 마디 (첫 마디부터 센 번호): " + ", ".join(odd))
         messages.append("[확인] 박자가 다른 마디: " + ", ".join(odd))
+    if missing_chords:
+        nums = ", ".join(map(str, missing_chords))
+        notes.append("% ?확인: 원본에서 줄이 시작되는 마디인데 코드가 없어요 (빠졌을 수 있음): " + nums)
+        messages.append("[확인] 줄 첫 마디 코드 빠짐 의심: " + nums)
     x = next((i for i, h in enumerate(header) if h.startswith("X:")), -1)
     header[x + 1:x + 1] = notes
     return "\n".join(header + cleaned).rstrip() + "\n", messages
@@ -446,10 +494,11 @@ def process(src, audiveris, xml2abc):
         results = []
         for idx, mxl in enumerate(mxls, 1):
             say("  2/3 ABC로 바꾸는 중...")
-            abc = to_abc(xml2abc, mxl)
+            xml_bytes = read_mxl(mxl)
+            abc = to_abc(xml2abc, xml_bytes)
             suffix = "" if len(mxls) == 1 else " - %d" % idx
             say("  3/3 정리하는 중...")
-            tidy, messages = tidy_abc(abc, stem + suffix)
+            tidy, messages = tidy_abc(abc, stem + suffix, missing_line_start_chords(xml_bytes))
             out = unique_path(OUTPUT, stem + suffix, ".abc")
             out.write_text(tidy, encoding="utf-8")
             results.append((out, messages))
