@@ -55,6 +55,11 @@ REMOVE_TEXT_NOTES = True
 # 가사 줄(w:)을 지울지. 가사 인식은 틀리는 경우가 많아서 멜로디+코드만 쓸 때 편합니다.
 REMOVE_LYRICS = False
 
+# 성부가 여러 개로 인식되면 첫 번째 성부(맨 위 멜로디)만 남길지.
+# 뮤직랩의 줄별 듣기·커서 4마디는 멜로디 한 줄짜리 악보에서만 동작합니다.
+# 피아노 왼손까지 살리고 싶으면 False로 바꾸세요.
+MELODY_ONLY = True
+
 # 폴더를 몇 초마다 확인할지 (지켜보기 모드)
 POLL_SECONDS = 5
 
@@ -292,14 +297,47 @@ def check_bars(music_lines, unit):
 def group_by_voice(lines):
     groups, current = {}, "1"
     for line in lines:
-        m = re.match(r"^V:\s*(\S+)", line)
-        if m:
-            current = m.group(1)
+        vid = voice_id(line)
+        if vid:
+            current = vid
             groups.setdefault(current, [])
             continue
         if line.strip() and not FIELD_RE.match(line) and not line.startswith("%"):
             groups.setdefault(current, []).append(line)
     return {k: v for k, v in groups.items() if v}
+
+
+VOICE_RE = re.compile(r"^V:\s*(\S+)")
+CHORD_SYMBOL_RE = re.compile(r'"[A-G][^"]*"')
+
+
+def voice_id(line):
+    m = VOICE_RE.match(line)
+    return m.group(1) if m else None
+
+
+def keep_melody_voice(header, music):
+    """첫 번째 성부만 남기고 %%score 줄과 나머지 성부를 지웁니다. (남긴 머리말, 남긴 본문, 지운 성부 번호, 지운 줄)"""
+    ids = []
+    for line in header + music:
+        vid = voice_id(line)
+        if vid and vid not in ids:
+            ids.append(vid)
+    if len(ids) < 2:
+        return header, music, [], []
+    melody = ids[0]
+    is_layout = lambda l: l.startswith(("%%score", "%%staves"))
+    new_header = [h for h in header
+                  if not is_layout(h) and voice_id(h) in (None, melody)]
+    kept, dropped, current = [], [], melody
+    for line in music:
+        vid = voice_id(line)
+        if vid:
+            current = vid
+        if is_layout(line):
+            continue
+        (kept if current == melody else dropped).append(line)
+    return new_header, kept, ids[1:], dropped
 
 
 def meter_from_length(total):
@@ -344,6 +382,20 @@ def tidy_abc(abc, title):
         else:
             cleaned.append(clean_music_line(line))
 
+    messages, notes = [], ["% score2abc 자동 변환본 — 원본 악보와 비교해서 확인하세요."]
+    if MELODY_ONLY:
+        header, cleaned, removed, dropped = keep_melody_voice(header, cleaned)
+        if removed:
+            msg = "멜로디 성부만 남겼어요 (지운 성부: %s)" % ", ".join(removed)
+            notes.append("% " + msg)
+            messages.append("[정리] " + msg)
+            chords_kept = sum(len(CHORD_SYMBOL_RE.findall(l)) for l in cleaned if not FIELD_RE.match(l))
+            chords_lost = sum(len(CHORD_SYMBOL_RE.findall(l)) for l in dropped if not FIELD_RE.match(l))
+            if chords_lost and not chords_kept:
+                warn = "코드 이름이 지운 성부에만 있었어요. MELODY_ONLY = False로 바꿔 다시 변환해 보세요."
+                notes.append("% ?확인: " + warn)
+                messages.append("[확인] " + warn)
+
     unit_line = next((h for h in header if h.startswith("L:")), "L:1/8")
     unit = Fraction(unit_line[2:].strip())
     voices = group_by_voice(cleaned)
@@ -359,12 +411,12 @@ def tidy_abc(abc, title):
         if h.strip() in ("M:none", "M:") and expected:
             header[i] = "M:" + meter_from_length(expected)
 
-    notes = ["% score2abc 자동 변환본 — 원본 악보와 비교해서 확인하세요."]
     if odd:
         notes.append("% ?확인: 박자가 다른 마디 (첫 마디부터 센 번호): " + ", ".join(odd))
+        messages.append("[확인] 박자가 다른 마디: " + ", ".join(odd))
     x = next((i for i, h in enumerate(header) if h.startswith("X:")), -1)
     header[x + 1:x + 1] = notes
-    return "\n".join(header + cleaned).rstrip() + "\n", odd
+    return "\n".join(header + cleaned).rstrip() + "\n", messages
 
 
 # ------------------------------------------------------------
@@ -397,15 +449,15 @@ def process(src, audiveris, xml2abc):
             abc = to_abc(xml2abc, mxl)
             suffix = "" if len(mxls) == 1 else " - %d" % idx
             say("  3/3 정리하는 중...")
-            tidy, odd = tidy_abc(abc, stem + suffix)
+            tidy, messages = tidy_abc(abc, stem + suffix)
             out = unique_path(OUTPUT, stem + suffix, ".abc")
             out.write_text(tidy, encoding="utf-8")
-            results.append((out, odd))
+            results.append((out, messages))
         shutil.move(str(src), str(unique_path(DONE, stem, src.suffix)))
-        for out, odd in results:
+        for out, messages in results:
             say("  [완료] 저장: %s" % out)
-            if odd:
-                say("    [확인] 박자가 다른 마디: %s" % ", ".join(odd))
+            for m in messages:
+                say("    " + m)
         shutil.rmtree(job_dir, ignore_errors=True)
         return True
     except Exception as e:
