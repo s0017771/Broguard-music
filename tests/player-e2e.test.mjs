@@ -205,6 +205,84 @@ try {
     await page.waitForFunction(n => window.__inits.length > n, nInit, { timeout: 6000 });
     ok('🎻 멜로디 악기 선택(베이스는 피아노 유지)이 동작한다');
 
+    // 8.17) 🎹 반주 스타일 '한번에(블록 코드)': 코드 자리에서 베이스 화음을 한 번에 — 실제 MIDI 틱으로 검증
+    await page.evaluate(() => {
+      window.__midiNoteOns = function (bin) {
+        const b = Array.from(bin[0] || bin), ons = [];
+        let i = 0;
+        const str = n => { let s = ''; for (let k = 0; k < n; k++) s += String.fromCharCode(b[i + k]); return s; };
+        if (str(4) !== 'MThd') return ons;
+        i += 8 + 6;
+        while (i < b.length) {
+          if (str(4) !== 'MTrk') break;
+          i += 4;
+          const len = (b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]; i += 4;
+          const end = i + len;
+          let tick = 0, run = 0, c;
+          while (i < end) {
+            let d = 0; do { c = b[i++]; d = (d << 7) | (c & 0x7F); } while (c & 0x80);
+            tick += d;
+            let st = b[i];
+            if (st & 0x80) i++; else st = run;
+            if (st === 0xFF) { i++; let l = 0; do { c = b[i++]; l = (l << 7) | (c & 0x7F); } while (c & 0x80); i += l; continue; }
+            if (st === 0xF0 || st === 0xF7) { let l = 0; do { c = b[i++]; l = (l << 7) | (c & 0x7F); } while (c & 0x80); i += l; continue; }
+            run = st;
+            const hi = st & 0xF0, n1 = b[i++];
+            let n2 = 0;
+            if (hi !== 0xC0 && hi !== 0xD0) n2 = b[i++];
+            if (hi === 0x90 && n2 > 0) ons.push(tick + ':' + n1);
+          }
+          i = end;
+        }
+        return ons;
+      };
+    });
+    // (a) 한 마디에 코드 둘(첫박 C·셋째박 G) + 다음 마디 F → 각 자리에서 화음 한 번에 (240틱 = 8분음표)
+    const blk = await page.evaluate(() => {
+      const abc = 'X:1\nM:4/4\nL:1/8\nK:C\n"C" C2 E2 "G" G2 E2 | "F" A4 c4 |';
+      const out = window.__player.addBlockChords(abc);
+      return { out, ons: window.__midiNoteOns(ABCJS.synth.getMidiFile(out, { midiOutputType: 'binary' })) };
+    });
+    assert.ok(/V:BG clef=bass/.test(blk.out), 'BG 베이스 성부 추가됨');
+    assert.ok(/\[V:M\]/.test(blk.out), '단선율은 성부 표기로 바꿔 동시에 연주');
+    for (const want of ['0:48', '0:52', '0:55', '960:55', '960:59', '960:62', '1920:53', '1920:57', '1920:60'])
+      assert.ok(blk.ons.includes(want), '블록 코드 타격 ' + want + ' / 실제: ' + blk.ons.join(' '));
+    assert.ok(blk.ons.includes('0:60'), '멜로디(가온도)도 그대로 연주');
+    // (b) 마디를 넘어온 코드는 새 마디 첫박에 다시 한 번
+    const blk2 = await page.evaluate(() => {
+      const out = window.__player.addBlockChords('X:1\nM:4/4\nL:1/8\nK:C\n"C" C8 | E8 |');
+      return window.__midiNoteOns(ABCJS.synth.getMidiFile(out, { midiOutputType: 'binary' }));
+    });
+    for (const want of ['0:48', '1920:48']) assert.ok(blk2.includes(want), '마디 첫박 재타격 ' + want + ' / 실제: ' + blk2.join(' '));
+    // (c) 다성부 악보에도 BG 성부가 나란히 붙는다
+    const blk3 = await page.evaluate(() => {
+      const abc = ['X:1', 'M:4/4', 'L:1/8', '%%score {RH LH}', 'V:RH clef=treble', 'V:LH clef=bass', 'K:C',
+        '[V:RH] "C" C4 "G" E4 |', '[V:LH] C,4 G,4 |'].join('\n');
+      const out = window.__player.addBlockChords(abc);
+      return { out, ons: window.__midiNoteOns(ABCJS.synth.getMidiFile(out, { midiOutputType: 'binary' })) };
+    });
+    assert.ok(/V:BG clef=bass/.test(blk3.out) && !/\[V:M\]/.test(blk3.out), '다성부엔 BG만 추가');
+    for (const want of ['0:48', '960:55']) assert.ok(blk3.ons.includes(want), '다성부 블록 코드 ' + want + ' / 실제: ' + blk3.ons.join(' '));
+    // (d) 코드 없는 악보는 그대로
+    const same = await page.evaluate(() => {
+      const abc = 'X:1\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 E2 |';
+      return window.__player.addBlockChords(abc) === abc;
+    });
+    assert.ok(same, '코드 기호가 없으면 악보를 건드리지 않음');
+    // (e) UI: 코드 반주 켬 + '한번에' 선택 → 쿵짝(gchord)은 꺼지고(chordsOff:true) 새 음원으로 재생
+    await page.check('#chordAccChk');
+    await page.selectOption('#accSel', 'block');
+    await page.waitForFunction(() => {
+      const a = window.__inits; return a.length && a[a.length - 1].chordsOff === true;
+    }, undefined, { timeout: 6000 });
+    await page.selectOption('#accSel', 'strum');
+    await page.waitForFunction(() => {
+      const a = window.__inits; return a.length && a[a.length - 1].chordsOff === false;
+    }, undefined, { timeout: 6000 });
+    await page.selectOption('#accSel', 'block');   // 이후 영속 검사용으로 '한번에' 유지
+    await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
+    ok('🎹 반주 스타일 "한번에": 코드 자리마다 베이스 화음 한 번에 + 쿵짝 자동 끔');
+
     // 8.2) ⏸ 일시정지 — 가짜 '곡 끝' 이벤트가 와도 다음 곡으로 튀지 않는다
     await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
     const idxBefore = (await page.evaluate(() => window.__player.getState())).curIdx;
@@ -281,6 +359,7 @@ try {
   st = await page.evaluate(() => window.__player.getState());
   assert.equal(st.count, 3, '재생목록도 유지');
   if (abcjsSrc) assert.equal(await page.$eval('#instSel', e => e.value), '40', '🎻 멜로디 악기 선택도 유지');
+  if (abcjsSrc) assert.equal(await page.$eval('#accSel', e => e.value), 'block', '🎹 반주 스타일 선택도 유지');
   // 삭제
   await page.click('#plsets li:nth-child(2) button.pl-del');
   sets = await page.evaluate(() => window.__player.getSets());
