@@ -78,7 +78,13 @@
     </div>
     <div class="opts">
       <label title="목록 끝나면 처음부터 다시"><input type="checkbox" id="loopChk"> 🔁 전체 반복</label>
-      <label title="끄면 코드 기호의 자동 기타 반주 없이 멜로디·베이스만"><input type="checkbox" id="chordAccChk" checked> 🎸 코드 반주</label>
+      <label title="끄면 코드 기호의 자동 반주 없이 멜로디·베이스만"><input type="checkbox" id="chordAccChk" checked> 🎸 코드 반주</label>
+      <label title="쿵짝: 기본 기타 스트럼 · 한번에: 코드 위치에서 베이스 화음을 한 번에 눌러 지속">반주 스타일
+        <select id="accSel">
+          <option value="strum">쿵짝 (기본)</option>
+          <option value="block">한번에 (블록 코드)</option>
+        </select>
+      </label>
       <label>🔊 음질
         <select id="soundSel">
           <option value="fluid">기본 피아노</option>
@@ -210,11 +216,11 @@
   })();
   function saveList() { try { localStorage.setItem(LIST_KEY, JSON.stringify(playlist)); } catch (e) {} }
   function savePrefs() {
-    try { localStorage.setItem(PREF_KEY, JSON.stringify({ loop: $("loopChk").checked, chord: $("chordAccChk").checked, sound: $("soundSel").value, inst: $("instSel").value })); } catch (e) {}
+    try { localStorage.setItem(PREF_KEY, JSON.stringify({ loop: $("loopChk").checked, chord: $("chordAccChk").checked, sound: $("soundSel").value, inst: $("instSel").value, acc: $("accSel").value })); } catch (e) {}
   }
   try {
     var p = JSON.parse(localStorage.getItem(PREF_KEY) || "");
-    if (p) { $("loopChk").checked = !!p.loop; $("chordAccChk").checked = p.chord !== false; if (p.sound) $("soundSel").value = p.sound; if (p.inst != null) $("instSel").value = p.inst; }
+    if (p) { $("loopChk").checked = !!p.loop; $("chordAccChk").checked = p.chord !== false; if (p.sound) $("soundSel").value = p.sound; if (p.inst != null) $("instSel").value = p.inst; if (p.acc) $("accSel").value = p.acc; }
   } catch (e) {}
 
   /* ── 상태 ── */
@@ -342,6 +348,173 @@
     else lines.unshift("%%MIDI program " + prog);
     return lines.join("\n");
   }
+  /* 🎹 '한번에(블록 코드)' 반주: 쿵짝 패턴 대신, 코드 기호가 있는 자리에서
+     베이스 화음을 통째로 한 번 눌러 다음 코드까지 지속한다.
+     한 마디에 코드 하나면 첫박에 한 번, 둘이면 적힌 자리(예: 첫박·셋째박)마다 한 번.
+     마디를 넘어온 코드는 새 마디 첫박에 다시 한 번 짚는다.
+     구현: 악보를 분석해 베이스 성부(V:BG)를 만들어 붙이고, 기본 쿵짝 반주는 끈다. */
+  var PC_ABC = ["C", "^C", "D", "^D", "E", "F", "^F", "G", "^G", "A", "^A", "B"];
+  function chordRootKind(name) {
+    var m = /^([A-G])([#b♯♭]?)(.*)$/.exec(String(name).trim());
+    if (!m) return null;
+    var pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]];
+    if (m[2] === "#" || m[2] === "♯") pc = (pc + 1) % 12;
+    else if (m[2] === "b" || m[2] === "♭") pc = (pc + 11) % 12;
+    var rest = m[3];
+    var kind = /^(dim|°|º)/.test(rest) ? 2 : (/^m(?!aj)/.test(rest) ? 1 : 0);
+    return { pc: pc, kind: kind };
+  }
+  /* ticks = 기본음길이(L:)의 1/4 단위 정수 */
+  function tickLenStr(ticks) {
+    if (ticks % 4 === 0) { var n = ticks / 4; return n === 1 ? "" : String(n); }
+    var g = (ticks % 2 === 0) ? 2 : 1;
+    return (ticks / g) + "/" + (4 / g);
+  }
+  function blockChordToken(name, ticks) {
+    var rk = chordRootKind(name), L = tickLenStr(ticks);
+    if (!rk) return "z" + L;
+    var third = (rk.pc + (rk.kind ? 3 : 4)) % 12;
+    var fifth = (rk.pc + (rk.kind === 2 ? 6 : 7)) % 12;
+    function up(pc) { return PC_ABC[pc] + (pc > rk.pc ? "," : ""); } /* 근음(낮은 옥타브) 위로 가까운 자리 */
+    return "[" + PC_ABC[rk.pc] + "," + up(third) + up(fifth) + "]" + L;
+  }
+  /* 첫 성부의 음악만 모은다 (practice와 같은 방식: V:/[V:x] 표기 모두 지원) */
+  function firstVoiceMusic(bodyLines) {
+    var firstTag = null, cur = null, out = [];
+    for (var i = 0; i < bodyLines.length; i++) {
+      var ln = bodyLines[i];
+      if (/^\s*%/.test(ln) || /^w:/i.test(ln.trim())) continue;
+      var mv = ln.match(/^V:\s*(\S+)/);
+      if (mv) { cur = mv[1]; if (firstTag === null) firstTag = cur; continue; }
+      var mi = ln.match(/^\[V:([^\]\s]+)\]\s*(.*)$/);
+      if (mi) {
+        cur = mi[1]; if (firstTag === null) firstTag = cur;
+        if (cur === firstTag && mi[2]) out.push(mi[2]);
+        continue;
+      }
+      if (/^[A-Za-z]:/.test(ln.trim())) continue;
+      if (!ln.trim()) continue;
+      if (firstTag === null || cur === firstTag || cur === null) out.push(ln);
+    }
+    return out.join("\n");
+  }
+  /* 음악 문자열 → 마디별 길이(ticks)와 코드 위치. 틱 = L: 음길이의 1/4 */
+  function parseChordBars(music) {
+    var bars = [], cur = 0, chords = [], hasChords = false;
+    var tupLeft = 0, tupFactor = 1, lastDur = 0, brokenNext = 1;
+    function pushBar() {
+      var d = Math.round(cur * 4);
+      if (d > 0 || chords.length) bars.push({ dur: d, chords: chords });
+      cur = 0; chords = [];
+    }
+    var s = String(music).replace(/\n/g, " "), i = 0, n = s.length;
+    while (i < n) {
+      var c = s[i];
+      if (c === '"') {
+        var j = s.indexOf('"', i + 1); if (j < 0) j = n - 1;
+        var txt = s.slice(i + 1, j);
+        if (/^[A-G]/.test(txt)) { chords.push({ at: Math.round(cur * 4), name: txt }); hasChords = true; }
+        i = j + 1; continue;
+      }
+      if (c === "{") { var j2 = s.indexOf("}", i + 1); i = (j2 < 0 ? n : j2 + 1); continue; }
+      if (c === "!") { var j3 = s.indexOf("!", i + 1); i = (j3 < 0 ? n : j3 + 1); continue; }
+      if (c === "|" || (c === ":" && s[i + 1] === "|") || (c === "[" && s[i + 1] === "|")) {
+        pushBar();
+        i++;
+        while (i < n && (s[i] === "|" || s[i] === "]" || s[i] === ":")) i++;
+        while (i < n && /\d/.test(s[i])) i++;                                       /* |1 |2 되돌이 번호 */
+        if (s[i] === "[" && /\d/.test(s[i + 1] || "")) { i += 2; while (i < n && /[\d,\-]/.test(s[i])) i++; }
+        continue;
+      }
+      if (c === "[") {
+        if (/^\[[A-Za-z]:/.test(s.slice(i))) { var j4 = s.indexOf("]", i + 1); i = (j4 < 0 ? n : j4 + 1); continue; }
+        var j5 = s.indexOf("]", i + 1);
+        if (j5 < 0) { i++; continue; }
+        var inner = s.slice(i + 1, j5), maxIn = 0, re = /[_^=]*[A-Ga-g][,']*(\d+)?(\/+)(\d+)?|[_^=]*[A-Ga-g][,']*(\d+)?/g, mm;
+        while ((mm = re.exec(inner))) {
+          var num0 = +(mm[1] || mm[4] || 1), den0 = 1;
+          if (mm[2]) den0 = mm[3] ? +mm[3] : Math.pow(2, mm[2].length);
+          if (num0 / den0 > maxIn) maxIn = num0 / den0;
+        }
+        if (!maxIn) maxIn = 1;
+        var k = j5 + 1, num1 = "", den1 = 1;
+        while (k < n && /\d/.test(s[k])) { num1 += s[k]; k++; }
+        var slashes = 0; while (k < n && s[k] === "/") { slashes++; k++; }
+        var dd = "";
+        while (k < n && /\d/.test(s[k])) { dd += s[k]; k++; }
+        if (slashes) den1 = dd ? +dd : Math.pow(2, slashes);
+        var durC = maxIn * (num1 ? +num1 : 1) / den1;
+        if (tupLeft > 0) { durC *= tupFactor; tupLeft--; }
+        durC *= brokenNext; brokenNext = 1;
+        lastDur = durC; cur += durC; i = k; continue;
+      }
+      if (c === "(" && /\d/.test(s[i + 1] || "")) {
+        var mt = /^\((\d+)(?::(\d*))?(?::(\d*))?/.exec(s.slice(i));
+        var p = +mt[1], q = mt[2] ? +mt[2] : ((p === 3 || p === 6) ? 2 : (p === 2 || p === 4 || p === 8) ? 3 : 2);
+        tupLeft = mt[3] ? +mt[3] : p; tupFactor = q / p;
+        i += mt[0].length; continue;
+      }
+      if (c === ">") { cur += lastDur * 0.5; brokenNext = 0.5; i++; continue; }
+      if (c === "<") { cur -= lastDur * 0.5; brokenNext = 1.5; i++; continue; }
+      var mn = /^([_^=]*)([A-Ga-gzx])([,']*)(\d*)/.exec(s.slice(i));
+      if (mn) {
+        i += mn[0].length;
+        var num = mn[4] ? +mn[4] : 1, den = 1, sl = 0;
+        while (i < n && s[i] === "/") { sl++; i++; }
+        var d2 = "";
+        while (i < n && /\d/.test(s[i])) { d2 += s[i]; i++; }
+        if (sl) den = d2 ? +d2 : Math.pow(2, sl);
+        var dur = num / den;
+        if (tupLeft > 0) { dur *= tupFactor; tupLeft--; }
+        dur *= brokenNext; brokenNext = 1;
+        lastDur = dur; cur += dur; continue;
+      }
+      i++;
+    }
+    pushBar();
+    return { bars: bars, hasChords: hasChords };
+  }
+  function addBlockChords(abc) {
+    var lines = String(abc).split("\n"), kIdx = -1;
+    for (var i = 0; i < lines.length; i++) if (/^K:/.test(lines[i].trim())) { kIdx = i; break; }
+    if (kIdx < 0) return abc;
+    var body = lines.slice(kIdx + 1);
+    var parsed = parseChordBars(firstVoiceMusic(body));
+    if (!parsed.hasChords || !parsed.bars.length) return abc;
+    /* 마디별 베이스 생성: 마디 시작(넘어온 코드 재타격) + 코드 자리마다 한 번씩 */
+    var active = null, bgBars = [];
+    parsed.bars.forEach(function (bar) {
+      if (bar.dur <= 0) return;
+      var evs = bar.chords.slice().sort(function (a, b) { return a.at - b.at; });
+      var cuts = [0];
+      evs.forEach(function (e) { if (e.at > 0 && e.at < bar.dur && cuts.indexOf(e.at) < 0) cuts.push(e.at); });
+      cuts.sort(function (a, b) { return a - b; });
+      var segs = [];
+      for (var ci = 0; ci < cuts.length; ci++) {
+        var st = cuts[ci], en = (ci + 1 < cuts.length) ? cuts[ci + 1] : bar.dur;
+        evs.forEach(function (e) { if (e.at <= st) active = e.name; });
+        if (en > st) segs.push(active ? blockChordToken(active, en - st) : "z" + tickLenStr(en - st));
+      }
+      evs.forEach(function (e) { active = e.name; });
+      bgBars.push(segs.join(""));
+    });
+    if (!bgBars.length) return abc;
+    var bgLines = [];
+    for (var b = 0; b < bgBars.length; b += 4) bgLines.push("[V:BG] " + bgBars.slice(b, b + 4).join(" | ") + " |");
+    var hasVoices = lines.some(function (l) { return /^V:\s*\S/.test(l) || /^\[V:[^\]\s]+\]/.test(l); });
+    if (hasVoices) {
+      lines.splice(kIdx + 1, 0, "V:BG clef=bass");
+      return lines.concat(bgLines).join("\n");
+    }
+    /* 단선율: 성부 표기로 바꿔야 베이스와 나란히(동시에) 연주된다 */
+    var out = lines.slice(0, kIdx + 1).concat(["V:M", "V:BG clef=bass"]);
+    for (var li = kIdx + 1; li < lines.length; li++) {
+      var ln = lines[li];
+      if (!ln.trim() || /^\s*%/.test(ln) || /^[A-Za-z]:/.test(ln.trim())) out.push(ln);
+      else out.push("[V:M] " + ln);
+    }
+    return out.concat(bgLines).join("\n");
+  }
   /* 재생 중에는 아무 작업도 하지 않는다 — 합성·변환 같은 무거운 일은 곡 시작 전에만.
      (재생 중 다음 곡을 미리 만들던 방식은 일부 폰에서 재생을 뚝뚝 끊어 제거) */
   function restCtx() { try { if (audioCtx && audioCtx.state === "running") audioCtx.suspend(); } catch (e) {} }
@@ -351,13 +524,15 @@
     var entry = it && findEntry(it);
     if (!entry || !entry.abc) return { err: "악보집에서 찾지 못함" };
     var abcSrc = slurSameToTie(entry.abc);
+    var block = $("chordAccChk").checked && $("accSel").value === "block";
+    if (block) abcSrc = addBlockChords(abcSrc);                     /* 블록 코드 베이스 성부를 먼저 붙인다 */
     var ip = $("instSel").value;
     if (ip !== "") abcSrc = injectMelodyProgram(abcSrc, +ip);
     var vo = null;
     try { vo = ABCJS.renderAbc("holder", abcSrc, { add_classes: false })[0]; } catch (e) {}
     if (!vo) return { err: "악보 해석 실패" };
     var sy = new ABCJS.synth.CreateSynth();
-    var o = { chordsOff: !$("chordAccChk").checked };
+    var o = { chordsOff: !$("chordAccChk").checked || block };      /* 블록 코드일 땐 쿵짝 자동 반주 끔 */
     if ($("soundSel").value === "musyng") o.soundFontUrl = MUSYNG;
     await sy.init({ audioContext: audioCtx, visualObj: vo, options: o });
     await sy.prime();
@@ -589,6 +764,10 @@
     savePrefs();
     if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
   });
+  $("accSel").addEventListener("change", function () {
+    savePrefs();
+    if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
+  });
   $("instSel").addEventListener("change", function () {
     savePrefs();
     if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
@@ -602,7 +781,7 @@
   if (typeof window !== "undefined") window.__player = {
     getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "" }; },
     getSets: function () { return plSets.map(function (s) { return { name: s.name, n: s.items.length }; }); },
-    playAt: playAt, slurSameToTie: slurSameToTie, injectMelodyProgram: injectMelodyProgram
+    playAt: playAt, slurSameToTie: slurSameToTie, injectMelodyProgram: injectMelodyProgram, addBlockChords: addBlockChords
   };
 })();
 </script>

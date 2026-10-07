@@ -58,12 +58,16 @@ await check('ABC 붙여넣기 → 변환 버튼 → 타브 출력', async () => 
 });
 
 await check('옵션 변경(카포) 시 자동 재변환', async () => {
+  // 자동 편곡(auto)은 카포를 스스로 정하므로, 수동 카포는 '원조 유지'에서 적용된다
+  await page.selectOption('#optArrange', 'off');
   const before = await page.textContent('#tabOut');
   await page.selectOption('#optCapo', '3');
   await page.waitForFunction(
     prev => document.getElementById('tabOut').textContent !== prev, before, { timeout: 3000 });
   const after = await page.textContent('#tabOut');
   assert.ok(after.includes('카포 3프렛'));
+  await page.selectOption('#optCapo', '0');
+  await page.selectOption('#optArrange', 'auto');
 });
 
 await check('멀티보이스 입력 시 보이스 목록이 채워지고 LH 선택 가능', async () => {
@@ -107,8 +111,9 @@ await check('코드 없는 멜로디 + 쿵짝 → 자동 코드 삽입 후 베�
   await page.waitForFunction(() =>
     document.getElementById('tabOut').textContent.includes('자동코드곡'), undefined, { timeout: 5000 });
   await page.selectOption('#optBass', 'boomchick');
+  // '자동 코드' 안내는 타브 본문이 아니라 metaLine에 표시된다
   await page.waitForFunction(() =>
-    document.getElementById('tabOut').textContent.includes('자동 코드'), undefined, { timeout: 5000 });
+    document.getElementById('metaLine').textContent.includes('자동 코드'), undefined, { timeout: 5000 });
   const tab = await page.textContent('#tabOut');
   const lowRows = tab.split('\n').filter(l => /^[EA]\|/.test(l));
   assert.ok(lowRows.some(l => /\d/.test(l.slice(2))), '자동 코드로 만든 베이스가 낮은 줄에 있어야 함');
