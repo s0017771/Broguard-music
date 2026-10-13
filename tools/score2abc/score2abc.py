@@ -38,6 +38,11 @@ from pathlib import Path
 # Audiveris 실행 파일 위치. 비워두면 흔한 설치 위치에서 자동으로 찾습니다.
 AUDIVERIS_PATH = r""
 
+# 무엇으로 저장할지
+#   "abc" : ABC 악보까지 만들고 자동 정리 (뮤직랩에 바로 붙여넣기)
+#   "mxl" : 악보 인식 결과(MusicXML)까지만 저장 (EasyABC 등에서 직접 고칠 때)
+SAVE_AS = "abc"
+
 # 변환 결과에 템포 표시가 없을 때 넣을 기본 빠르기 (4분음표 기준, 1분에 몇 번)
 DEFAULT_TEMPO = 80
 
@@ -145,7 +150,8 @@ def run_audiveris(audiveris, src, job_dir):
     with open(log_path, "w", encoding="utf-8", errors="replace") as log:
         try:
             subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT,
-                           timeout=AUDIVERIS_TIMEOUT, check=False)
+                           timeout=AUDIVERIS_TIMEOUT, check=False,
+                           creationflags=0x08000000 if os.name == "nt" else 0)  # CREATE_NO_WINDOW
         except subprocess.TimeoutExpired:
             raise RuntimeError("악보 인식이 %d초 안에 끝나지 않았어요." % AUDIVERIS_TIMEOUT)
     mxls = sorted(out_dir.rglob("*.mxl"))
@@ -484,41 +490,71 @@ def unique_path(folder, stem, ext):
     return p
 
 
-def process(src, audiveris, xml2abc):
+class ConversionError(Exception):
+    def __init__(self, message, log_path=None):
+        super().__init__(message)
+        self.log_path = log_path
+
+
+def convert_file(src, audiveris, xml2abc, out_dir, save_as=None, log=say):
+    """악보 한 개를 변환해 out_dir에 저장하고 [(저장한 파일, 안내 메시지들)]을 돌려줍니다.
+
+    원본 파일은 옮기거나 지우지 않습니다. 실패하면 ConversionError를 냅니다.
+    """
+    save_as = save_as or SAVE_AS
     stem = safe_stem(src.stem)
-    say("\n[시작] %s" % src.name)
-    job_dir = WORK / ("%s_%d" % (time.strftime("%Y%m%d-%H%M%S"), os.getpid()))
+    job_dir = WORK / ("%s_%d_%d" % (time.strftime("%Y%m%d-%H%M%S"), os.getpid(), id(src)))
+    steps = 2 if save_as == "mxl" else 3
     try:
-        say("  1/3 악보 인식 중 (Audiveris, 수십 초~몇 분 걸려요)...")
+        log("  1/%d 악보 인식 중 (Audiveris, 수십 초~몇 분 걸려요)..." % steps)
         mxls = run_audiveris(audiveris, src, job_dir)
         results = []
         for idx, mxl in enumerate(mxls, 1):
-            say("  2/3 ABC로 바꾸는 중...")
-            xml_bytes = read_mxl(mxl)
-            abc = to_abc(xml2abc, xml_bytes)
             suffix = "" if len(mxls) == 1 else " - %d" % idx
-            say("  3/3 정리하는 중...")
-            tidy, messages = tidy_abc(abc, stem + suffix, missing_line_start_chords(xml_bytes))
-            out = unique_path(OUTPUT, stem + suffix, ".abc")
-            out.write_text(tidy, encoding="utf-8")
+            xml_bytes = read_mxl(mxl)
+            missing = missing_line_start_chords(xml_bytes)
+            if save_as == "mxl":
+                log("  2/2 MusicXML 저장 중...")
+                out = unique_path(out_dir, stem + suffix, ".mxl")
+                shutil.copy2(mxl, out)
+                messages = []
+                if missing:
+                    messages.append("[확인] 줄 첫 마디 코드 빠짐 의심: " + ", ".join(map(str, missing)))
+            else:
+                log("  2/3 ABC로 바꾸는 중...")
+                abc = to_abc(xml2abc, xml_bytes)
+                log("  3/3 정리하는 중...")
+                tidy, messages = tidy_abc(abc, stem + suffix, missing)
+                out = unique_path(out_dir, stem + suffix, ".abc")
+                out.write_text(tidy, encoding="utf-8")
             results.append((out, messages))
-        shutil.move(str(src), str(unique_path(DONE, stem, src.suffix)))
-        for out, messages in results:
-            say("  [완료] 저장: %s" % out)
-            for m in messages:
-                say("    " + m)
-        shutil.rmtree(job_dir, ignore_errors=True)
-        return True
     except Exception as e:
+        raise ConversionError(str(e), job_dir / "audiveris.log") from e
+    shutil.rmtree(job_dir, ignore_errors=True)
+    return results
+
+
+def process(src, audiveris, xml2abc, save_as=None):
+    """inbox의 악보를 변환하고, 원본을 done(성공) 또는 failed(실패) 폴더로 옮깁니다."""
+    stem = safe_stem(src.stem)
+    say("\n[시작] %s" % src.name)
+    try:
+        results = convert_file(src, audiveris, xml2abc, OUTPUT, save_as)
+    except ConversionError as e:
         say("  [실패] %s" % e)
         dest = unique_path(FAILED, stem, src.suffix)
         shutil.move(str(src), str(dest))
-        log = job_dir / "audiveris.log"
-        if log.exists():
-            shutil.copy2(log, dest.with_suffix(".log"))
-        (dest.with_suffix(".error.txt")).write_text(str(e), encoding="utf-8")
+        if e.log_path and e.log_path.exists():
+            shutil.copy2(e.log_path, dest.with_suffix(".log"))
+        dest.with_suffix(".error.txt").write_text(str(e), encoding="utf-8")
         say("    원본과 로그를 failed 폴더로 옮겼어요.")
         return False
+    shutil.move(str(src), str(unique_path(DONE, stem, src.suffix)))
+    for out, messages in results:
+        say("  [완료] 저장: %s" % out)
+        for m in messages:
+            say("    " + m)
+    return True
 
 
 def pending_files():
@@ -538,7 +574,9 @@ def is_stable(path, wait=1.0):
 def main():
     ap = argparse.ArgumentParser(description="악보 이미지/PDF → ABC 자동 변환")
     ap.add_argument("--once", action="store_true", help="지금 있는 악보만 변환하고 종료")
+    ap.add_argument("--mxl", action="store_true", help="ABC 대신 MusicXML(.mxl)까지만 저장")
     args = ap.parse_args()
+    save_as = "mxl" if args.mxl else SAVE_AS
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
@@ -548,12 +586,13 @@ def main():
         say("Audiveris를 찾지 못했어요. score2abc.py 위쪽의 AUDIVERIS_PATH에 설치 위치를 적어주세요.")
         return 1
     xml2abc = load_xml2abc()
-    if not xml2abc:
+    if not xml2abc and save_as != "mxl":
         say("같은 폴더에 xml2abc.py가 없어요. score2abc.py와 같은 폴더에 넣어주세요.")
         return 1
 
     say("score2abc 준비 완료")
     say("  Audiveris : %s" % audiveris)
+    say("  저장 형식  : %s" % ("MusicXML(.mxl)까지만" if save_as == "mxl" else "ABC 악보"))
     say("  악보 넣는 곳: %s" % INBOX)
     say("  결과 저장  : %s" % OUTPUT)
 
@@ -561,7 +600,7 @@ def main():
         files = pending_files()
         if not files:
             say("inbox 폴더가 비어 있어요.")
-        ok = sum(process(f, audiveris, xml2abc) for f in files if is_stable(f, 0.2))
+        ok = sum(process(f, audiveris, xml2abc, save_as) for f in files if is_stable(f, 0.2))
         say("\n완료: %d개 중 %d개 성공" % (len(files), ok))
         return 0
 
@@ -570,7 +609,7 @@ def main():
         while True:
             for f in pending_files():
                 if is_stable(f):
-                    process(f, audiveris, xml2abc)
+                    process(f, audiveris, xml2abc, save_as)
             time.sleep(POLL_SECONDS)
     except KeyboardInterrupt:
         say("\n종료합니다.")

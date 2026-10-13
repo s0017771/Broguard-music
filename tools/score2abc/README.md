@@ -1,11 +1,17 @@
 # score2abc — 악보 사진·PDF를 ABC 악보로 자동 변환
 
-`inbox` 폴더에 악보를 넣으면 알아서 **ABC 악보**로 바꿔 `output` 폴더에 저장해 주는 프로그램입니다.
-뮤직랩(`lab.html`)에 바로 붙여넣을 수 있도록 자동 정리까지 해 줍니다.
+악보 사진이나 PDF를 **ABC 악보**(뮤직랩용) 또는 **MXL 파일**(EasyABC에서 고칠 때)로 바꿔 주는 프로그램입니다.
+ABC로 만들 때는 뮤직랩(`lab.html`)에 바로 붙여넣을 수 있도록 자동 정리까지 해 줍니다.
 
 ```
-악보(PDF·사진) → [Audiveris] 악보 인식 → MusicXML → [xml2abc] ABC 변환 → 자동 정리 → .abc
+악보(PDF·사진) → [Audiveris] 악보 인식 → MusicXML(.mxl) ─┬→ 여기서 멈추면: MXL 파일
+                                                        └→ [xml2abc] ABC 변환 → 자동 정리 → .abc
 ```
+
+| 만들 형식 | 이럴 때 고르세요 |
+|---|---|
+| **ABC 악보** | 깨끗한 인쇄 악보(PDF)라서 인식이 잘 될 때. 결과를 뮤직랩에 바로 붙여넣습니다. |
+| **MXL 파일까지만** | 사진(JPG)처럼 인식이 어려운 악보일 때. EasyABC의 **File → Import and add…**로 열어서 악보를 보며 직접 고친 뒤 ABC로 옮기면 편합니다. 이 형식에는 자동 정리(멜로디만 남기기, 템포 추가 등)가 적용되지 않아요. |
 
 ## 준비물
 
@@ -13,18 +19,30 @@
 |---|---|
 | **Python 3.8 이상** | [python.org](https://www.python.org/downloads/)에서 설치. 설치 첫 화면에서 **"Add python.exe to PATH"를 꼭 체크**하세요. |
 | **Audiveris 5.x** | [공식 GitHub 배포 페이지](https://github.com/Audiveris/audiveris/releases)에서 설치. OCR 언어팩(영어)도 설치되어 있어야 코드 이름을 읽습니다. |
-| **이 폴더** | `score2abc.py`, `xml2abc.py`, `convert_once.bat`, `start_watch.bat`를 한 폴더에 두세요. |
+| **이 폴더** | 압축을 푼 파일들(`score2abc_gui.pyw`, `score2abc.py`, `xml2abc.py`, `.bat` 파일들)을 한 폴더에 그대로 두세요. |
 
 EasyABC는 없어도 됩니다. EasyABC 안에서 변환을 맡는 `xml2abc.py`를 이 폴더에 함께 넣어 두었습니다.
 
-## 사용법 (Windows)
+## 사용법 1 — 창 프로그램 (추천)
+
+1. **`score2abc_gui.pyw`를 더블클릭**하면 변환기 창이 열립니다. 창이 안 뜨면 `start_gui.bat`를 실행하세요. 오류가 있으면 그 내용이 보여요.
+2. **악보 파일 추가…** 버튼으로 악보를 고릅니다. 여러 개를 한꺼번에 골라도 돼요.
+3. **ABC 악보**와 **MXL 파일까지만** 중에서 만들 형식을 고릅니다. ABC를 고르면 멜로디만 남기기, 가사 지우기, 기본 템포도 정할 수 있어요.
+4. **▶ 변환 시작**을 누르면 아래 기록 창에 진행 상황과 확인할 마디(박자, 줄 첫 마디 코드)가 표시됩니다.
+5. 끝나면 **폴더 열기**로 결과를 확인하세요. 기본 저장 위치는 이 폴더 안의 `output`이고, **바꾸기…**로 다른 폴더를 고를 수도 있어요.
+
+창 프로그램은 **고른 원본 파일을 옮기거나 지우지 않습니다.** 성공한 악보는 목록에서 빠지고, 실패한 악보는 목록에 남아서 다시 시도할 수 있어요. 고른 설정은 다음에 열 때도 기억합니다.
+
+## 사용법 2 — 폴더 방식
 
 1. **`convert_once.bat`를 더블클릭**하면 처음 한 번 `inbox`, `output` 같은 폴더가 만들어집니다.
 2. 악보 PDF나 사진을 **`inbox` 폴더**에 넣습니다.
-3. 다시 **`convert_once.bat`를 더블클릭**하면 변환이 시작됩니다. 한 장에 수십 초~몇 분 걸려요.
-4. 결과는 **`output` 폴더**의 `.abc` 파일입니다. 메모장으로 열어 전체 복사 → 뮤직랩에 붙여넣기.
+3. 다시 **`convert_once.bat`를 더블클릭**하면 변환이 시작됩니다. 한 장에 수십 초~몇 분 걸려요. MXL 파일까지만 만들려면 **`convert_to_mxl.bat`**를 쓰세요.
+4. 결과는 **`output` 폴더**에 저장됩니다. `.abc`는 메모장으로 열어 전체 복사 → 뮤직랩에 붙여넣기, `.mxl`은 EasyABC로 여세요.
 
 악보를 자주 넣을 거라면 **`start_watch.bat`**를 켜 두세요. 창을 열어 두는 동안 `inbox`에 악보가 들어올 때마다 자동으로 변환합니다. 끝낼 때는 창을 닫거나 Ctrl+C.
+
+폴더 방식에서는 변환이 끝난 원본을 `inbox`에서 `done`(성공) 또는 `failed`(실패) 폴더로 옮깁니다. 같은 악보를 다시 변환하지 않게 하기 위해서예요.
 
 | 폴더 | 용도 |
 |---|---|
@@ -58,11 +76,12 @@ EasyABC는 없어도 됩니다. EasyABC 안에서 변환을 맡는 `xml2abc.py`�
 
 ## 설정 바꾸기
 
-`score2abc.py`를 메모장으로 열면 맨 위에 설정이 있습니다.
+창 프로그램에서는 화면에서 바로 고르면 됩니다. 폴더 방식의 설정은 `score2abc.py`를 **오른쪽 클릭 → 연결 프로그램 → 메모장**으로 열면 맨 위에 있습니다.
 
 | 설정 | 기본값 | 뜻 |
 |---|---|---|
 | `AUDIVERIS_PATH` | `""` (자동) | Audiveris를 못 찾을 때 실행 파일 위치를 적습니다. 예: `r"C:\Program Files\Audiveris\Audiveris.exe"` |
+| `SAVE_AS` | `"abc"` | 폴더 방식의 기본 저장 형식. `"mxl"`로 바꾸면 MusicXML까지만 저장 |
 | `DEFAULT_TEMPO` | `80` | 템포가 없을 때 넣을 빠르기 |
 | `BARS_PER_LINE` | `4` | 한 줄의 마디 수 |
 | `UNFOLD_REPEATS` | `False` | 도돌이표를 펼쳐 쓸지 |
@@ -73,7 +92,7 @@ EasyABC는 없어도 됩니다. EasyABC 안에서 변환을 맡는 `xml2abc.py`�
 
 ## 문제가 생기면
 
-- **"Audiveris를 찾지 못했어요"**: 위 표의 `AUDIVERIS_PATH`에 설치 위치를 적어 주세요.
+- **"Audiveris를 찾지 못했어요"**: 창 프로그램에서는 **Audiveris 위치 지정…** 버튼으로 `Audiveris.exe`를 골라 주세요. 폴더 방식에서는 위 표의 `AUDIVERIS_PATH`에 설치 위치를 적어 주세요.
 - **"Python이 없습니다" 류의 메시지**: Python을 설치할 때 "Add python.exe to PATH"를 체크했는지 확인하고, 필요하면 다시 설치하세요.
 - **뮤직랩에서 줄별 듣기 버튼이 안 보이고, 커서 4마디가 "처음부터"로 재생돼요**: 악보에 성부가 여러 개 남아 있다는 뜻이에요. `MELODY_ONLY = True`인지 확인하고 다시 변환하세요.
 - **변환이 실패했어요**: `failed` 폴더에 원본과 로그가 있습니다. 로그를 보여 주시면 원인을 같이 찾아볼 수 있어요.
@@ -87,4 +106,4 @@ EasyABC는 없어도 됩니다. EasyABC 안에서 변환을 맡는 `xml2abc.py`�
 ## 포함된 파일의 라이선스
 
 - `xml2abc.py` — © W.G. Vree 외, **LGPL** 라이선스. [EasyABC 저장소](https://github.com/jwdj/EasyABC)의 버전 157(commit `e6ee9f8`)을 수정 없이 포함했습니다.
-- `score2abc.py` — 이 저장소의 도구입니다.
+- `score2abc.py`, `score2abc_gui.pyw` — 이 저장소의 도구입니다.
