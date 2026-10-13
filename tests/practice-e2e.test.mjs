@@ -52,6 +52,27 @@ await check('parseSong(테스트 훅)이 ABC를 음표로 파싱한다', async (
   assert.equal(n, 4, '4음(C E G c) 파싱');
 });
 
+await check('parseSong: 성부 표기 형식이 달라도 멜로디를 찾는다', async () => {
+  const cases = await page.evaluate(() => {
+    const P = window.__practice.parseSong;
+    const count = s => ({ n: s.seq.filter(x => !x.rest).length, midis: s.seq.filter(x => !x.rest).map(x => x.midi) });
+    return {
+      // ① 마커만 있는 줄 + 다음 줄들에 음표 (멜로디 2음, 베이스 2음)
+      markerLine: count(P('X:1\nM:4/4\nL:1/8\nK:C\n[V:RH]\n"C"C4 E4 |\n[V:LH]\nC,4 G,4 |')),
+      // ② V:xx 단독 줄 블록
+      voiceBlock: count(P('X:1\nM:4/4\nL:1/8\n%%score {RH LH}\nK:C\nV:RH\nC4 E4 |\nV:LH\nC,4 G,4 |')),
+      // ③ RH가 아닌 성부 이름
+      otherNames: count(P('X:1\nM:4/4\nL:1/8\nK:C\n[V:1] C4 E4 |\n[V:2] C,4 G,4 |')),
+      // ④ 기존 인라인 형식(회귀)
+      inline: count(P('X:1\nM:4/4\nL:1/8\nK:C\n[V:RH] C4 E4 |\n[V:LH] C,4 G,4 |'))
+    };
+  });
+  for (const [k, v] of Object.entries(cases)) {
+    assert.equal(v.n, 2, k + ': 멜로디 2음만 (베이스 제외): ' + JSON.stringify(v));
+    assert.deepEqual(v.midis, [60, 64], k + ': 음정은 멜로디 성부의 것');
+  }
+});
+
 await check('다른 랩 → 연습 핸드오프: broguard_practice_abc를 읽어 직접입력에 채운다', async () => {
   const song = 'X:1\nT:handoff\nM:4/4\nL:1/8\nK:C\n[V:RH] G2 A2 B2 c2 |';
   await page.evaluate((s) => localStorage.setItem('broguard_practice_abc', s), song);
@@ -150,6 +171,38 @@ await check('악보집(broguard_library)에서 불러오기 목록이 생긴다'
   assert.ok(laneChords >= 1, '악보집 곡의 코드가 레인에 표시: ' + laneChords);
   await page.click('#stopBtn');
 });
+
+await check('악보집이 나중에 바뀌어도(동기화로 id 변경) 곡을 제목으로 다시 찾아 시작한다', async () => {
+  await page.evaluate(() => {
+    localStorage.setItem('broguard_library', JSON.stringify({ entries: [
+      { id: 'old1', title: '동기화곡', abc: 'X:1\nT:동기화곡\nM:4/4\nL:1/8\nK:C\n"C" C2 E2 G2 c2 |', added: 5 }
+    ] }));
+    window.__practice.populateLibrary();   // 목록 생성: lib:old1
+  });
+  await page.selectOption('#songSel', 'lib:old1');
+  // 선택 뒤 드라이브 동기화/백업 복원으로 같은 곡의 id가 바뀐 상황
+  await page.evaluate(() => {
+    localStorage.setItem('broguard_library', JSON.stringify({ entries: [
+      { id: 'new9', title: '동기화곡', abc: 'X:1\nT:동기화곡\nM:4/4\nL:1/8\nK:C\n"C" C2 E2 G2 c2 |', added: 5 }
+    ] }));
+  });
+  await page.click('#startBtn');
+  await page.waitForFunction(() => {
+    const st = window.__practice.getState();
+    return st.playing && st.song && st.song.title === '동기화곡';
+  }, undefined, { timeout: 4000 });
+  await page.click('#stopBtn');
+  // 저장소에서 곡이 사라져도(목록은 그대로) 마지막으로 읽어둔 악보로 이어서 연습 가능
+  await page.evaluate(() => { localStorage.setItem('broguard_library', JSON.stringify({ entries: [] })); });
+  await page.click('#startBtn');
+  await page.waitForFunction(() => {
+    const st = window.__practice.getState();
+    return st.playing && st.song && st.song.title === '동기화곡';
+  }, undefined, { timeout: 4000 });
+  await page.click('#stopBtn');
+  ok2('곡이 저장소에서 사라져도 읽어둔 악보로 계속 연습');
+});
+function ok2(m) { /* 세부 확인용 표기 */ console.log('   - ' + m); }
 
 await check('레인이 일정한 속도로 흐른다(rAF 등속 구동)', async () => {
   await page.evaluate(() => {

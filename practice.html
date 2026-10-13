@@ -260,38 +260,62 @@
     }
     var acc = KEY_ACCIDENTALS[keyName] || {};
     var bodyLines = lines.slice(bodyStart);
-    var rh = bodyLines.filter(function (l) { return /\[V:RH\]/.test(l); });
-    var useLines = rh.length ? rh.map(function (l) { return l.replace(/\[V:RH\]/g, ""); })
-      : bodyLines.filter(function (l) { return !/\[V:LH\]/.test(l) && !/^%%/.test(l) && !/^[A-Za-z]:/.test(l.trim()); });
-    var body = useLines.join(" ").replace(/\[V:[^\]]*\]/g, "").replace(/%[^\n]*/g, "");
-    var seq = [];
-    /* 코드 기호("C" "Am7" 등)는 위치(cell)와 함께 캡처 — 레인에 음표와 같이 흘려보내기 위함 */
-    var abcChords = [];
-    var re = /"([^"]*)"|([_^=]?)([A-Ga-gz])([,']*)(\d*)(\/(\d+))?/g, m;
-    var cellCursor = 0;
-    while ((m = re.exec(body)) !== null) {
-      if (m[1] !== undefined) {
-        var cn = m[1].trim();
-        /* ^…, _… 등은 주석(annotation)이라 코드가 아님 */
-        if (cn && !/^[\^_<>@]/.test(cn)) abcChords.push({ cell: cellCursor, name: cn });
-        continue;
-      }
-      var len = m[5] ? parseInt(m[5], 10) : 1;
-      if (m[7]) len = Math.max(1, Math.round(len / parseInt(m[7], 10)));
-      if (m[3] === "z") { seq.push({ rest: true, len: len, start: cellCursor }); cellCursor += len; continue; }
-      var upper = m[3].toUpperCase();
-      var midi = 60 + LETTER_PC[upper];
-      if (m[3] !== upper) midi += 12;
-      for (var c = 0; c < m[4].length; c++) midi += (m[4][c] === "'" ? 12 : -12);
-      var writtenPc = ((midi % 12) + 12) % 12;
-      if (m[2] === "^") midi += 1;
-      else if (m[2] === "_") midi -= 1;
-      else if (m[2] !== "=" && acc[writtenPc]) midi += acc[writtenPc];
-      var pc12 = ((midi % 12) + 12) % 12;
-      var oct = Math.floor(midi / 12) - 1;
-      seq.push({ midi: midi, name: solfaName(pc12, keyName) + oct, len: len, rest: false, start: cellCursor });
-      cellCursor += len;
+    /* 멜로디 성부 추출 — 어떤 표기든 지원:
+       ① [V:RH] 음표…  (줄머리 마커)   ② [V:RH] 마커만 있는 줄 + 다음 줄들에 음표
+       ③ V:RH 단독 줄 블록   ④ RH가 아닌 임의 성부 이름   ⑤ 성부 표기가 없는 단선율.
+       첫 번째로 등장하는 성부를 멜로디로 본다. */
+    function melodyLines() {
+      var firstVoice = null, cur = null, parts = [];
+      bodyLines.forEach(function (l) {
+        var t = l.trim();
+        var m = t.match(/^\[V:([^\]]+)\]\s*(.*)$/);
+        if (m) { cur = m[1]; if (!firstVoice) firstVoice = cur; if (cur === firstVoice && m[2]) parts.push(m[2]); return; }
+        var m2 = t.match(/^V:\s*(\S+)/);
+        if (m2) { cur = m2[1]; if (!firstVoice) firstVoice = cur; return; }
+        if (!t || /^%/.test(t) || /^[A-Za-z]:/.test(t)) return;
+        if (cur === null || cur === firstVoice) parts.push(l);
+      });
+      return parts;
     }
+    function allMusicLines() {
+      return bodyLines.filter(function (l) { var t = l.trim(); return t && !/^%/.test(t) && !/^[A-Za-z]:/.test(t); });
+    }
+    function parseBody(useLines) {
+      var body = useLines.join(" ").replace(/\[V:[^\]]*\]/g, "").replace(/%[^\n]*/g, "");
+      var seq = [];
+      /* 코드 기호("C" "Am7" 등)는 위치(cell)와 함께 캡처 — 레인에 음표와 같이 흘려보내기 위함 */
+      var abcChords = [];
+      var re = /"([^"]*)"|([_^=]?)([A-Ga-gz])([,']*)(\d*)(\/(\d+))?/g, m;
+      var cellCursor = 0;
+      while ((m = re.exec(body)) !== null) {
+        if (m[1] !== undefined) {
+          var cn = m[1].trim();
+          /* ^…, _… 등은 주석(annotation)이라 코드가 아님 */
+          if (cn && !/^[\^_<>@]/.test(cn)) abcChords.push({ cell: cellCursor, name: cn });
+          continue;
+        }
+        var len = m[5] ? parseInt(m[5], 10) : 1;
+        if (m[7]) len = Math.max(1, Math.round(len / parseInt(m[7], 10)));
+        if (m[3] === "z") { seq.push({ rest: true, len: len, start: cellCursor }); cellCursor += len; continue; }
+        var upper = m[3].toUpperCase();
+        var midi = 60 + LETTER_PC[upper];
+        if (m[3] !== upper) midi += 12;
+        for (var c = 0; c < m[4].length; c++) midi += (m[4][c] === "'" ? 12 : -12);
+        var writtenPc = ((midi % 12) + 12) % 12;
+        if (m[2] === "^") midi += 1;
+        else if (m[2] === "_") midi -= 1;
+        else if (m[2] !== "=" && acc[writtenPc]) midi += acc[writtenPc];
+        var pc12 = ((midi % 12) + 12) % 12;
+        var oct = Math.floor(midi / 12) - 1;
+        seq.push({ midi: midi, name: solfaName(pc12, keyName) + oct, len: len, rest: false, start: cellCursor });
+        cellCursor += len;
+      }
+      return { seq: seq, abcChords: abcChords, cells: cellCursor };
+    }
+    var parsed = parseBody(melodyLines());
+    /* 성부 추출로 음을 못 찾는 특이 형식이면 본문 전체에서 한 번 더 */
+    if (!parsed.seq.some(function (n) { return !n.rest; })) parsed = parseBody(allMusicLines());
+    var seq = parsed.seq, abcChords = parsed.abcChords, cellCursor = parsed.cells;
     /* 박자 계산: beatCells = L분모/M분모 (예 L:1/8 M:4/4 → 2칸=1박) */
     var beatCells = Math.max(1, Math.round(lden / mden));
     return { title: title, keyName: keyName, bpm: bpm, seq: seq, abc: abc, acc: acc, abcChords: abcChords,
@@ -1191,7 +1215,11 @@
   function currentAbc() {
     var sel = $("songSel").value;
     if (sel === "custom") return $("abcInput").value.trim();
-    if (/^lib:/.test(sel)) return libMap[sel] || "";
+    if (/^lib:/.test(sel)) {
+      var e = libFind(sel);
+      if (e) return e.abc;
+      return libMap[sel] || "";
+    }
     return SONGS[sel];
   }
   /* ── 악보집(broguard_library)에서 불러오기 ── */
@@ -1200,6 +1228,18 @@
     var lib = null;
     try { lib = JSON.parse(localStorage.getItem("broguard_library") || ""); } catch (e) {}
     return (lib && lib.entries) ? lib.entries : (Array.isArray(lib) ? lib : []);
+  }
+  /* 재생 시점에 악보집에서 직접 다시 찾는다 — 목록을 만든 뒤 악보집이 바뀌어도(동기화·백업 복원 등) 안전.
+     id로 먼저 찾고, id가 바뀌었으면 화면에 보이는 제목으로 한 번 더 찾는다. */
+  function libFind(sel) {
+    var id = String(sel).slice(4);
+    var es = libEntries().filter(function (e) { return e && e.abc; })
+      .sort(function (a, b) { return (b.added || 0) - (a.added || 0); });   /* populate와 같은 순서(색인 id 대비) */
+    for (var i = 0; i < es.length; i++) if (String(es[i].id || i) === id) return es[i];
+    var op = $("songSel").options[$("songSel").selectedIndex];
+    var title = op ? op.textContent : "";
+    for (var j = 0; j < es.length; j++) if (es[j].title === title) return es[j];
+    return null;
   }
   function populateLibrary() {
     var sel = $("songSel");
@@ -1241,7 +1281,12 @@
     /* 텍스트 상자 등에 포커스가 남아 있으면 첫 키 입력이 그리로 가서 무시됨 → 포커스 해제 */
     try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
     var abc = currentAbc();
-    if (!abc) { setStatus("악보가 비어 있어요. 곡을 고르거나 ABC를 붙여넣어주세요."); return; }
+    if (!abc) {
+      setStatus(/^lib:/.test($("songSel").value)
+        ? "이 곡을 악보집에서 찾지 못했어요. 악보집 페이지에 곡이 있는지(같은 브라우저인지) 확인하고 이 페이지를 새로고침해주세요."
+        : "악보가 비어 있어요. 곡을 고르거나 ABC를 붙여넣어주세요.");
+      return;
+    }
     song = parseSong(abc);
     song.seq.forEach(function (n) { n.hit = false; });
     totalNotes = song.seq.filter(function (n) { return !n.rest; }).length;
@@ -1289,7 +1334,12 @@
   function listen() {
     stopAll();
     var abc = currentAbc();
-    if (!abc) { setStatus("들려드릴 악보가 없어요."); return; }
+    if (!abc) {
+      setStatus(/^lib:/.test($("songSel").value)
+        ? "이 곡을 악보집에서 찾지 못했어요. 악보집 페이지에 곡이 있는지 확인하고 새로고침해주세요."
+        : "들려드릴 악보가 없어요.");
+      return;
+    }
     song = parseSong(abc);
     renderScore(); buildKeyboard();
     var bpm = parseInt($("bpmInput").value, 10) || song.bpm;
@@ -1456,7 +1506,7 @@
   $("songSel").addEventListener("change", function () {
     $("abcInput").style.display = $("songSel").value === "custom" ? "block" : "none";
     var sel = $("songSel").value;
-    var src = sel === "custom" ? null : (/^lib:/.test(sel) ? libMap[sel] : SONGS[sel]);
+    var src = sel === "custom" ? null : (/^lib:/.test(sel) ? ((libFind(sel) || {}).abc || libMap[sel]) : SONGS[sel]);
     if (src) {
       var qm = src.match(/Q:[^=]*=\s*(\d+)/);
       if (qm) $("bpmInput").value = qm[1];
