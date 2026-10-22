@@ -424,6 +424,40 @@ test('parseAbcMelody / importMelodyAbc: ABC 단선율을 멜로디로', () => {
   assert.ok(res.melodyLane.length === 7, '멜로디 레인 7음');
 });
 
+test('parseAbcMelody: 조표(K:)를 읽어 샵/플랫을 적용한다', () => {
+  // K:G → F는 모두 F#(66)
+  const g = StudioCore.parseAbcMelody('X:1\nM:4/4\nL:1/8\nK:G\nG2 F2 G2 F2 |');
+  assert.deepEqual(g.notes.map(n => n.midi), [67, 66, 67, 66], 'K:G의 F = F#');
+  // K:F → B는 모두 Bb(70)
+  const f = StudioCore.parseAbcMelody('X:1\nM:4/4\nL:1/8\nK:F\nF2 B2 A2 B2 |');
+  assert.deepEqual(f.notes.map(n => n.midi), [65, 70, 69, 70], 'K:F의 B = Bb');
+  // 단조: K:Em → F#, K:Bm → F#·C#
+  const em = StudioCore.parseAbcMelody('X:1\nL:1/8\nK:Em\nE2 F2 G2 |');
+  assert.deepEqual(em.notes.map(n => n.midi), [64, 66, 67], 'K:Em의 F = F#');
+  const bm = StudioCore.parseAbcMelody('X:1\nL:1/8\nK:Bm\nB,2 C2 F2 |');
+  assert.deepEqual(bm.notes.map(n => n.midi), [59, 61, 66], 'K:Bm의 C·F = C#·F#');
+  // 플랫 여러 개: K:Eb → B·E·A 플랫
+  const eb = StudioCore.parseAbcMelody('X:1\nL:1/8\nK:Eb\nE2 A2 B2 |');
+  assert.deepEqual(eb.notes.map(n => n.midi), [63, 68, 70], 'K:Eb의 E·A·B = 플랫');
+});
+
+test('parseAbcMelody: 임시표는 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', () => {
+  // ^F 뒤 같은 마디의 F도 F# — 마디선 넘으면 조표(K:C → F 제자리)로 복귀
+  const p = StudioCore.parseAbcMelody('X:1\nL:1/8\nK:C\n^F2 F2 | F2 |');
+  assert.deepEqual(p.notes.map(n => n.midi), [66, 66, 65], '임시표 마디 내 지속 + 마디선 초기화');
+  // K:G에서 =F는 F 제자리(65), 같은 마디 뒤 F도 제자리 유지
+  const n = StudioCore.parseAbcMelody('X:1\nL:1/8\nK:G\n=F2 F2 | F2 |');
+  assert.deepEqual(n.notes.map(n2 => n2.midi), [65, 65, 66], '제자리표 지속 + 다음 마디는 조표 복귀');
+  // 임시표는 같은 글자·같은 옥타브에만 적용 (^F와 f는 별개)
+  const o = StudioCore.parseAbcMelody('X:1\nL:1/8\nK:C\n^F2 f2 |');
+  assert.deepEqual(o.notes.map(n3 => n3.midi), [66, 77], '옥타브 다른 음엔 미적용');
+  // 조표 + 2성부 가져오기에서도 적용
+  const r = StudioCore.importMelodyAbc('X:1\nM:4/4\nL:1/8\nK:D\n[V:RH] F2 C2 F2 C2 | F2 C2 F2 C2 |\n[V:LH] D,4 A,4 | D,4 A,4 |');
+  assert.ok(r.ok, r.error);
+  assert.ok(r.melodyLane.every(nn => nn.midi === 66 || nn.midi === 61), 'K:D의 F·C = F#·C#: ' + r.melodyLane.map(nn => nn.midi).join(','));
+  assert.ok(r.bassLane && r.bassLane.every(nn => nn.midi === 50 || nn.midi === 57), '베이스는 D·A 그대로');
+});
+
 test('laneToAbc → parseAbcMelody 왕복: 음높이 보존', () => {
   const u = StudioCore.PPQ / 2; // 1/8
   const lane = [

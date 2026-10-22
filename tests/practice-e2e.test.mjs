@@ -21,7 +21,7 @@ const server = createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage();
 let failures = 0;
 async function check(name, fn) {
@@ -30,6 +30,27 @@ async function check(name, fn) {
 }
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
+
+// 로컬 abcjs가 있으면 CDN 요청을 그걸로 대체 — 안전망(abcjs fallback) 검증용
+const ABCJS_CANDIDATES = [
+  join(root, 'node_modules/abcjs/dist/abcjs-basic-min.js'),
+  '/tmp/claude-0/-home-user-Broguard-music/c040e24c-4a69-5b46-9c8e-25ca04c1bca0/scratchpad/node_modules/abcjs/dist/abcjs-basic-min.js'
+];
+const abcjsPath = ABCJS_CANDIDATES.find(existsSync);
+const abcjsSrc = abcjsPath ? readFileSync(abcjsPath, 'utf8') : null;
+if (abcjsSrc) await page.route(/abcjs.*\.js/, r => r.fulfill({ contentType: 'application/javascript', body: abcjsSrc }));
+
+// 🎹 피아노 샘플 요청 → 작은 유효 WAV로 대체 (decodeAudioData 가능)
+const tinyWav = (() => {
+  const sr = 8000, n = 800, buf = Buffer.alloc(44 + n * 2);
+  buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8); buf.write('fmt ', 12);
+  buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(sr, 24); buf.writeUInt32LE(sr * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
+  buf.write('data', 36); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) buf.writeInt16LE(Math.round(Math.sin(i / 5) * 8000), 44 + i * 2);
+  return buf;
+})();
+await page.route(/midi-js-soundfonts/, r => r.fulfill({ contentType: 'audio/wav', body: tinyWav }));
 
 await page.goto(`${base}/practice.html`, { waitUntil: 'domcontentloaded' });
 
@@ -232,6 +253,61 @@ await check('레인이 일정한 속도로 흐른다(rAF 등속 구동)', async 
   assert.ok(Math.abs(v2 - 0.13) < 0.02, '2구간 속도 ≈ 0.13px/ms: ' + v2.toFixed(4));
   assert.ok(Math.abs(v1 - v2) < 0.01, '두 구간 속도 일치(등속): ' + v1.toFixed(4) + ' vs ' + v2.toFixed(4));
   await page.click('#stopBtn');
+});
+
+await check('parseSong: 임시표가 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', async () => {
+  const r = await page.evaluate(() => {
+    const P = window.__practice.parseSong;
+    const midis = s => s.seq.filter(x => !x.rest).map(x => x.midi);
+    return {
+      persist: midis(P('X:1\nL:1/8\nK:C\n^F2 F2 | F2 |')),      // ^F 뒤 같은 마디 F도 F#, 다음 마디는 제자리
+      natural: midis(P('X:1\nL:1/8\nK:G\n=F2 F2 | F2 |')),      // K:G에서 =F는 제자리, 다음 마디는 조표 복귀
+      octave: midis(P('X:1\nL:1/8\nK:C\n^F2 f2 |'))             // 임시표는 같은 옥타브에만
+    };
+  });
+  assert.deepEqual(r.persist, [66, 66, 65], '임시표 마디 내 지속: ' + r.persist.join(','));
+  assert.deepEqual(r.natural, [65, 65, 66], '제자리표 지속 + 조표 복귀: ' + r.natural.join(','));
+  assert.deepEqual(r.octave, [66, 77], '옥타브 다르면 미적용: ' + r.octave.join(','));
+});
+
+if (abcjsSrc) await check('안전망: 손 파서가 못 읽는 악보도 abcjs 엔진으로 읽는다(조표 포함)', async () => {
+  await page.waitForFunction(() => !!(window.ABCJS && window.ABCJS.synth), undefined, { timeout: 5000 });
+  const r = await page.evaluate(() => {
+    const fb = window.__practice.abcjsFallback('X:1\nM:4/4\nL:1/8\nK:G\nG2 F2 G2 F2 | A4 z4 |', 8, 'G');
+    if (!fb) return null;
+    const notes = fb.seq.filter(x => !x.rest);
+    return { midis: notes.map(x => x.midi), starts: notes.map(x => x.start), cells: fb.cells };
+  });
+  assert.ok(r, 'abcjs 엔진 추출 성공');
+  assert.deepEqual(r.midis, [67, 66, 67, 66, 69], 'K:G 조표 반영(F→F#): ' + r.midis.join(','));
+  assert.deepEqual(r.starts, [0, 2, 4, 6, 8], '음 위치(칸): ' + r.starts.join(','));
+});
+
+await check('🎹 피아노 음색: 진짜 샘플을 받아 건반 소리에 사용한다', async () => {
+  assert.ok(await page.isChecked('#pianoChk'), '기본 켜짐');
+  const loaded = await page.evaluate(() => window.__practice.loadSample(60).then(b => !!b));
+  assert.ok(loaded, '샘플 다운로드·디코드 성공');
+  const st = await page.evaluate(() => {
+    window.__practice.noteOn('tSample', 60);
+    const s = window.__practice.sampleStats();
+    window.__practice.noteOff('tSample');
+    return s;
+  });
+  assert.ok(st.loaded >= 1, '샘플 캐시: ' + st.loaded);
+  assert.ok(st.voices.indexOf(true) >= 0, '건반 소리가 샘플 보이스 사용: ' + JSON.stringify(st.voices));
+  // 끄면 기존 합성음으로
+  await page.uncheck('#pianoChk');
+  const st2 = await page.evaluate(() => {
+    window.__practice.noteOn('tOsc', 60);
+    const s = window.__practice.sampleStats();
+    window.__practice.noteOff('tOsc');
+    return s;
+  });
+  assert.ok(st2.voices.every(v => v === false), '끄면 합성음: ' + JSON.stringify(st2.voices));
+  // 선택이 저장된다 (새로고침 후에도 꺼진 상태)
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  assert.ok(!(await page.isChecked('#pianoChk')), '꺼짐 유지');
+  await page.check('#pianoChk');
 });
 
 await check('심각한 JS 오류가 없다 (abcjs 미로딩 환경 포함)', async () => {
