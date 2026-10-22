@@ -108,6 +108,7 @@
 
   <div class="card">
     <h2>&#9998; ABC 악보 입력</h2>
+    <select id="libSel" style="width:100%;margin-bottom:6px;"><option value="">&#128218; 내 악보집에서 불러오기&hellip;</option></select>
     <textarea id="abcIn" spellcheck="false" placeholder="여기에 ABC 악보를 붙여넣으세요. 피아노 양손 악보([V:RH]/[V:LH])는 오른손 멜로디를 자동 선택합니다."></textarea>
     <div class="row">
       <button id="btnSample" class="alt">샘플 불러오기</button>
@@ -1182,6 +1183,34 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
   });
   $('btnConvert').addEventListener('click', convertNow);
   $('btnSample').addEventListener('click', function () { abcIn.value = SAMPLE; convertNow(); });
+  /* ── 📚 악보집(broguard_library)에서 불러오기 ── */
+  function libEntries() {
+    var lib = null;
+    try { lib = JSON.parse(localStorage.getItem('broguard_library') || ''); } catch (e) {}
+    var es = (lib && lib.entries) ? lib.entries : (Array.isArray(lib) ? lib : []);
+    return es.filter(function (x) { return x && x.abc; }).sort(function (a, b) { return (b.added || 0) - (a.added || 0); });
+  }
+  function fillLibSel() {
+    var sel = $('libSel'); if (!sel) return;
+    while (sel.options.length > 1) sel.remove(1);
+    libEntries().forEach(function (e, i) {
+      var o = document.createElement('option');
+      o.value = String(e.id || 'i' + i);
+      o.textContent = (e.title || '(제목 없음)') + (e.cat ? ' · ' + e.cat : '');
+      sel.appendChild(o);
+    });
+  }
+  $('libSel').addEventListener('change', function () {
+    var sel = $('libSel');
+    if (!sel.value) return;
+    var es = libEntries(), hit = null;
+    for (var i = 0; i < es.length; i++) if (String(es[i].id || 'i' + i) === sel.value) { hit = es[i]; break; }
+    if (!hit) { fillLibSel(); sel.value = ''; return; }
+    abcIn.value = hit.abc;
+    convertNow();
+  });
+  window.addEventListener('focus', fillLibSel);
+  fillLibSel();
   $('btnFile').addEventListener('click', function () { $('fileIn').click(); });
   $('fileIn').addEventListener('change', function () {
     var f = this.files && this.files[0];
@@ -1237,8 +1266,37 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
     for (n = 0; n < len; n++) { var cur = ring[ptr]; var o = (cur + prev) * 0.5 * damp; ring[ptr] = o; prev = o; d[n] = o * Math.pow(1 - n / len, 0.6); ptr = (ptr + 1) % p; }
     fbBuf[midi] = buf; return buf;
   }
+  /* 🎸 진짜 기타 음색: 나일론 기타 녹음 샘플(MusyngKite)을 음마다 받아 사용.
+     아직 안 받아졌거나 오프라인이면 기존 합성 퉁김음으로 자연스럽게 대체 */
+  var GTR_SF = 'https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/acoustic_guitar_nylon-mp3/';
+  var GTR_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+  var gtrBuf = {}, gtrReq = {};
+  function hqOn() { try { return localStorage.getItem('broguard_hq_sound') !== '0'; } catch (e) { return true; } }
+  function gtrLoad(midi) {
+    if (midi < 21 || midi > 108 || !window.fetch) return;
+    if (gtrReq[midi]) return;
+    var a = fbCtx(); if (!a) return;
+    var pc = ((midi % 12) + 12) % 12, oct = Math.floor(midi / 12) - 1;
+    gtrReq[midi] = fetch(GTR_SF + GTR_NAMES[pc] + oct + '.mp3')
+      .then(function (r) { if (!r.ok) throw new Error('http'); return r.arrayBuffer(); })
+      .then(function (ab) { return new Promise(function (res, rej) { a.decodeAudioData(ab, res, rej); }); })
+      .then(function (buf) { gtrBuf[midi] = buf; })
+      .catch(function () { gtrReq[midi] = null; });
+  }
+  function gtrPrefetch(midis) {
+    if (!hqOn()) return;
+    var seen = {};
+    (midis || []).forEach(function (m) { if (m != null && !seen[m]) { seen[m] = 1; gtrLoad(m); } });
+  }
   function fbPluck(midi) {
-    var a = fbCtx(); if (!a) return; var b = fbBufFor(midi); if (!b) return;
+    var a = fbCtx(); if (!a) return;
+    if (hqOn() && gtrBuf[midi]) {   /* 진짜 기타 샘플 */
+      var s2 = a.createBufferSource(); s2.buffer = gtrBuf[midi];
+      var g2 = a.createGain(); g2.gain.value = 0.9; s2.connect(g2); g2.connect(a.destination); s2.start();
+      return;
+    }
+    if (hqOn()) gtrLoad(midi);      /* 지금은 합성음, 받아지면 다음부터 샘플 */
+    var b = fbBufFor(midi); if (!b) return;
     var src = a.createBufferSource(); src.buffer = b;
     var g = a.createGain(); g.gain.value = 0.85; src.connect(g); g.connect(a.destination); src.start();
   }
@@ -1311,6 +1369,10 @@ if (typeof window !== 'undefined') window.TabCore = TabCore;
     });
     fbTotal = t;
     if (!fbTimeline.length) { fbHide(); return; }
+    /* 🎸 이 곡에 쓰이는 음의 기타 샘플 미리 받기 */
+    var allMids = [];
+    fbTimeline.forEach(function (seg) { (seg.mid || []).forEach(function (m) { allMids.push(m); }); });
+    gtrPrefetch(allMids);
     fbMaxFret = Math.min(15, Math.max(5, fbMaxFret));
     fbNumBars = Math.max(1, (fbTimeline[fbTimeline.length - 1].bar || 0) + 1);
     // 마디 선택 채우기

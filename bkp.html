@@ -360,11 +360,43 @@
     return INSTRUMENTS[(sel && sel.value) || "piano"] || INSTRUMENTS.piano;
   }
   function freqOf(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+  /* 🎹 진짜 피아노 음색: 악기가 '피아노'일 때 녹음 샘플(MusyngKite)을 받아 사용.
+     로딩 전·오프라인이거나 다른 악기를 고르면 기존 합성음 그대로 */
+  var SF_BASE = "https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/acoustic_grand_piano-mp3/";
+  var SF_NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+  var sBuf = {}, sReq = {}, sfPrefetched = false;
+  function hqOn() { try { return localStorage.getItem("broguard_hq_sound") !== "0"; } catch (e) { return true; } }
+  function pianoVoice() { var s = document.getElementById("instSel"); return !s || !s.value || s.value === "piano"; }
+  function loadSample(m) {
+    if (m < 21 || m > 108 || !window.fetch || !audioCtx || sReq[m]) return;
+    var pc = ((m % 12) + 12) % 12, oct = Math.floor(m / 12) - 1;
+    sReq[m] = fetch(SF_BASE + SF_NAMES[pc] + oct + ".mp3")
+      .then(function (r) { if (!r.ok) throw new Error("http"); return r.arrayBuffer(); })
+      .then(function (ab) { return new Promise(function (res, rej) { audioCtx.decodeAudioData(ab, res, rej); }); })
+      .then(function (buf) { sBuf[m] = buf; })
+      .catch(function () { sReq[m] = null; });
+  }
+  function prefetchSamples() {
+    if (sfPrefetched || !hqOn()) return;
+    sfPrefetched = true;
+    for (var m = 48; m <= 84; m++) loadSample(m);   /* 건반 주 음역 미리 받기 */
+  }
   function noteOn(m) {
     ensureAudio();
+    prefetchSamples();
     if (voices[m]) noteOff(m, true);
     var inst = curInst();
     var now = audioCtx.currentTime;
+    if (hqOn() && pianoVoice()) {
+      if (sBuf[m]) {
+        var src = audioCtx.createBufferSource(); src.buffer = sBuf[m];
+        var sg = audioCtx.createGain(); sg.gain.setValueAtTime(1, now);
+        src.connect(sg); sg.connect(audioCtx.destination); src.start(now);
+        voices[m] = { sample: true, src: src, gain: sg, rel: inst.release, stp: inst.stop };
+        return;
+      }
+      loadSample(m);   /* 받아지면 다음부터 샘플로 */
+    }
     var gain = audioCtx.createGain();
     var o1 = audioCtx.createOscillator();
     var o2 = audioCtx.createOscillator();
@@ -393,6 +425,7 @@
       v.gain.gain.cancelScheduledValues(now);
       v.gain.gain.setValueAtTime(Math.max(v.gain.gain.value, 0.0001), now);
       v.gain.gain.exponentialRampToValueAtTime(0.0001, now + relTime);
+      if (v.sample) { v.src.stop(now + stopTime + 0.05); return; }
       v.oscs.forEach(function (o) { o.stop(now + stopTime); });
     } catch (e) {}
   }
@@ -650,7 +683,7 @@
     var activePointers = {};
     el.addEventListener("pointerdown", function (e) {
       e.preventDefault();
-      el.setPointerCapture && el.setPointerCapture(e.pointerId);
+      try { el.setPointerCapture && el.setPointerCapture(e.pointerId); } catch (err) {}
       var m = getMidi();
       activePointers[e.pointerId] = m;
       el.classList.add("active");
