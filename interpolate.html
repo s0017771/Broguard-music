@@ -75,11 +75,13 @@
     <div class="twocol">
       <div>
         <label class="fld">멜로디 A <button id="btnFileA" class="alt sm" style="float:right;margin-top:-3px">.abc 열기</button></label>
+        <select id="libSelA" class="libsel" style="width:100%;margin:2px 0 4px;"><option value="">&#128218; 내 악보집에서 A 불러오기&hellip;</option></select>
         <textarea id="abcA" spellcheck="false" placeholder="시작 멜로디의 ABC"></textarea>
         <input type="file" id="fileA" accept=".abc,.txt" style="display:none">
       </div>
       <div>
         <label class="fld">멜로디 B <button id="btnFileB" class="alt sm" style="float:right;margin-top:-3px">.abc 열기</button></label>
+        <select id="libSelB" class="libsel" style="width:100%;margin:2px 0 4px;"><option value="">&#128218; 내 악보집에서 B 불러오기&hellip;</option></select>
         <textarea id="abcB" spellcheck="false" placeholder="도착 멜로디의 ABC"></textarea>
         <input type="file" id="fileB" accept=".abc,.txt" style="display:none">
       </div>
@@ -657,15 +659,22 @@ if (typeof window !== 'undefined') window.Interp = Interp;
   }
 
   // 악기 음색: abcjs 신스(사운드폰트) — 인터넷 필요
+  // 🔊 고음질 음원(MusyngKite · 진짜 악기 녹음)을 먼저 시도하고, 실패하면 기본 음원 → 기본 톤 순서로
+  var HQ_SF = 'https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/';
+  function hqOn() { try { return localStorage.getItem('broguard_hq_sound') !== '0'; } catch (e) { return true; } }
   function playSynth(abc, btn, allowFallback) {
     var v; try { v = ABCJS.renderAbc(document.createElement('div'), abc)[0]; } catch (e) { v = null; }
     if (!v) { if (allowFallback) playTone(abc, btn); else flashBtn(btn, '재생 불가'); return; }
     try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { if (allowFallback) playTone(abc, btn); return; }
     var ac = audioCtx; if (ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
-    var synth = new ABCJS.synth.CreateSynth();
-    synth.init({ audioContext: ac, visualObj: v }).then(function () { return synth.prime(); }).then(function () {
-      synth.start(); currentSynth = synth; currentBtn = btn; btn.innerHTML = '&#9632; 정지';
-    }).catch(function () { if (allowFallback) playTone(abc, btn); else flashBtn(btn, '악기음색 실패(온라인?)'); });
+    function tryWith(opts, onFail) {
+      var synth = new ABCJS.synth.CreateSynth();
+      synth.init({ audioContext: ac, visualObj: v, options: opts }).then(function () { return synth.prime(); }).then(function () {
+        synth.start(); currentSynth = synth; currentBtn = btn; btn.innerHTML = '&#9632; 정지';
+      }).catch(onFail);
+    }
+    function basic() { tryWith({}, function () { if (allowFallback) playTone(abc, btn); else flashBtn(btn, '악기음색 실패(온라인?)'); }); }
+    if (hqOn()) tryWith({ soundFontUrl: HQ_SF }, basic); else basic();
   }
 
   function playAbc(abc, btn) {
@@ -828,6 +837,43 @@ if (typeof window !== 'undefined') window.Interp = Interp;
   $('mAI').addEventListener('click', function () { setMode('ai'); });
   $('btnGo').addEventListener('click', generate);
   $('btnSample').addEventListener('click', function () { abcA.value = SAMPLE_A; abcB.value = SAMPLE_B; generate(); });
+
+  /* ── 📚 악보집(broguard_library)에서 A/B 불러오기 ── */
+  function libEntries() {
+    var lib = null;
+    try { lib = JSON.parse(localStorage.getItem('broguard_library') || ''); } catch (e) {}
+    var es = (lib && lib.entries) ? lib.entries : (Array.isArray(lib) ? lib : []);
+    return es.filter(function (x) { return x && x.abc; }).sort(function (a, b) { return (b.added || 0) - (a.added || 0); });
+  }
+  function fillLibSels() {
+    ['libSelA', 'libSelB'].forEach(function (id) {
+      var sel = $(id); if (!sel) return;
+      var keep = sel.value;
+      while (sel.options.length > 1) sel.remove(1);
+      libEntries().forEach(function (e, i) {
+        var o = document.createElement('option');
+        o.value = String(e.id || 'i' + i);
+        o.textContent = (e.title || '(제목 없음)') + (e.cat ? ' · ' + e.cat : '');
+        sel.appendChild(o);
+      });
+      sel.value = keep; if (sel.selectedIndex < 0) sel.selectedIndex = 0;
+    });
+  }
+  function wireLibSel(id, target) {
+    var sel = $(id); if (!sel) return;
+    sel.addEventListener('change', function () {
+      if (!sel.value) return;
+      var es = libEntries(), hit = null;
+      for (var i = 0; i < es.length; i++) if (String(es[i].id || 'i' + i) === sel.value) { hit = es[i]; break; }
+      if (!hit) { fillLibSels(); sel.value = ''; return; }
+      target.value = hit.abc;
+      if (abcA.value.trim() && abcB.value.trim()) generate();
+    });
+  }
+  wireLibSel('libSelA', abcA);
+  wireLibSel('libSelB', abcB);
+  window.addEventListener('focus', fillLibSels);
+  fillLibSels();
 
   /* abcjs 동적 로드(실패해도 생성은 동작) */
   var s = document.createElement('script');

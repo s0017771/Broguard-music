@@ -1127,12 +1127,8 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     fallbackMode = false;
     if (ABCJS.synth.supportsAudio()) {
       try {
-        synth = new ABCJS.synth.CreateSynth();
-        await synth.init({
-          audioContext: audioCtx, visualObj: visualObj,
-          options: { chordsOff: chordAccOff(), onEnded: function () { unlight(); resetPlayUI(); setStatus(""); } }
-        });
-        await synth.prime();
+        synth = await createHQSynth(audioCtx, visualObj,
+          { chordsOff: chordAccOff(), onEnded: function () { unlight(); resetPlayUI(); setStatus(""); } });
         synth.start();
         startTiming(false);
         isPlaying = true; stopBtn.disabled = false;
@@ -1180,6 +1176,25 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; audioCtx = new AC(); }
     await audioCtx.resume();
   }
+  /* 🔊 고음질 음원: 진짜 악기 녹음(MusyngKite)을 먼저 받아 쓰고, 내려받기 실패 시 기본 음원 */
+  var HQ_SF = "https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/";
+  function hqOn() { try { return localStorage.getItem("broguard_hq_sound") !== "0"; } catch (e) { return true; } }
+  async function createHQSynth(ac, vo, opts) {
+    if (hqOn()) {
+      try {
+        var hq = new ABCJS.synth.CreateSynth();
+        var o = { soundFontUrl: HQ_SF };
+        for (var k in opts) o[k] = opts[k];
+        await hq.init({ audioContext: ac, visualObj: vo, options: o });
+        await hq.prime();
+        return hq;
+      } catch (e) {}
+    }
+    var sy = new ABCJS.synth.CreateSynth();
+    await sy.init({ audioContext: ac, visualObj: vo, options: opts });
+    await sy.prime();
+    return sy;
+  }
   /* 전체를 처음부터 재생하되 bars마디 뒤 자동 정지 (멀티보이스 폴백) */
   function playLimited(bars) {
     fallbackMode = false;
@@ -1188,10 +1203,8 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     var stopAfter = ms * bars + 150;
     function armStop() { limitTimer = setTimeout(stopPlay, stopAfter); }
     if (ABCJS.synth.supportsAudio()) {
-      var sy = new ABCJS.synth.CreateSynth();
-      sy.init({ audioContext: audioCtx, visualObj: visualObj, options: { chordsOff: chordAccOff(), onEnded: function () { unlight(); resetPlayUI(); setStatus(""); } } })
-        .then(function () { return sy.prime(); })
-        .then(function () { synth = sy; sy.start(); startTiming(false); isPlaying = true; stopBtn.disabled = false; armStop(); setStatus("4마디만 듣기 (처음부터 · 피아노 음원)"); })
+      createHQSynth(audioCtx, visualObj, { chordsOff: chordAccOff(), onEnded: function () { unlight(); resetPlayUI(); setStatus(""); } })
+        .then(function (sy) { synth = sy; sy.start(); startTiming(false); isPlaying = true; stopBtn.disabled = false; armStop(); setStatus("4마디만 듣기 (처음부터 · 피아노 음원)"); })
         .catch(function () { fallbackMode = true; startTiming(true); isPlaying = true; stopBtn.disabled = false; armStop(); setStatus("4마디만 듣기 (간이 신디사이저)"); });
     } else {
       fallbackMode = true; startTiming(true); isPlaying = true; stopBtn.disabled = false; armStop();
@@ -1285,9 +1298,8 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     try { var t = ABCJS.renderAbc("snippetHolder", AbcMidi.slurSameToTie(snippet), { add_classes: false }); vo = t && t[0]; } catch (e) {}
     if (vo && ABCJS.synth.supportsAudio()) {
       try {
-        snippetSynth = new ABCJS.synth.CreateSynth();
-        await snippetSynth.init({ audioContext: audioCtx, visualObj: vo, options: { chordsOff: chordAccOff(), onEnded: function () { setStatus(""); } } });
-        await snippetSynth.prime(); snippetSynth.start();
+        snippetSynth = await createHQSynth(audioCtx, vo, { chordsOff: chordAccOff(), onEnded: function () { setStatus(""); } });
+        snippetSynth.start();
         setStatus(lineNo + "줄 재생 중 (피아노 음원)");
         return;
       } catch (e) { snippetSynth = null; }
@@ -1311,9 +1323,7 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     try { var tunes = ABCJS.renderAbc("snippetHolder", AbcMidi.slurSameToTie(sliced.abc), { add_classes: false }); vo = tunes && tunes[0]; } catch (e) {}
     if (vo && ABCJS.synth.supportsAudio()) {
       try {
-        snippetSynth = new ABCJS.synth.CreateSynth();
-        await snippetSynth.init({ audioContext: audioCtx, visualObj: vo, options: { chordsOff: chordAccOff(), onEnded: function () { setStatus(""); play4Btn.disabled = false; } } });
-        await snippetSynth.prime();
+        snippetSynth = await createHQSynth(audioCtx, vo, { chordsOff: chordAccOff(), onEnded: function () { setStatus(""); play4Btn.disabled = false; } });
         snippetSynth.start();
         setStatus("4마디만 듣기 — " + (sliced.from + 1) + "~" + sliced.to + "마디 (피아노 음원)");
         play4Btn.disabled = false;
