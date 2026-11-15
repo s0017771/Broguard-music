@@ -88,9 +88,12 @@
       <label>🔊 음질
         <select id="soundSel">
           <option value="fluid">기본 피아노</option>
-          <option value="musyng">고음질 피아노 (첫 로딩 느림)</option>
+          <option value="musyng">고음질 (MusyngKite)</option>
+          <option value="fluidr3">고음질 2 (FluidR3)</option>
+          <option value="fatboy">고음질 3 (FatBoy)</option>
         </select>
       </label>
+      <label title="잔향(리버브)과 가벼운 다듬기를 더해 홀에서 연주하듯 풍성하게 — 곡 준비 시간이 조금 늘어요"><input type="checkbox" id="reverbChk" checked> ✨ 공간감</label>
       <label title="멜로디 성부만 다른 악기로 — 베이스·반주는 피아노 그대로">🎻 멜로디 악기
         <select id="instSel">
           <option value="">피아노 (기본)</option>
@@ -146,6 +149,12 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   var MUSYNG = "https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/";
+  /* 🔊 고음질 음원들 — 모두 무료 공개 녹음 샘플. 취향껏 고르세요 */
+  var SOUNDFONTS = {
+    musyng: MUSYNG,
+    fluidr3: "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/",
+    fatboy: "https://gleitz.github.io/midi-js-soundfonts/FatBoy/"
+  };
   var LIST_KEY = "broguard_player_list", PREF_KEY = "broguard_player_prefs";
 
   /* ── 같은 음 슬러(이음줄) → 붙임줄 정규화 (연구소와 동일 — 두 번 소리나는 문제 방지) ── */
@@ -216,11 +225,11 @@
   })();
   function saveList() { try { localStorage.setItem(LIST_KEY, JSON.stringify(playlist)); } catch (e) {} }
   function savePrefs() {
-    try { localStorage.setItem(PREF_KEY, JSON.stringify({ loop: $("loopChk").checked, chord: $("chordAccChk").checked, sound: $("soundSel").value, inst: $("instSel").value, acc: $("accSel").value })); } catch (e) {}
+    try { localStorage.setItem(PREF_KEY, JSON.stringify({ loop: $("loopChk").checked, chord: $("chordAccChk").checked, sound: $("soundSel").value, inst: $("instSel").value, acc: $("accSel").value, rv: $("reverbChk").checked })); } catch (e) {}
   }
   try {
     var p = JSON.parse(localStorage.getItem(PREF_KEY) || "");
-    if (p) { $("loopChk").checked = !!p.loop; $("chordAccChk").checked = p.chord !== false; if (p.sound) $("soundSel").value = p.sound; if (p.inst != null) $("instSel").value = p.inst; if (p.acc) $("accSel").value = p.acc; }
+    if (p) { $("loopChk").checked = !!p.loop; $("chordAccChk").checked = p.chord !== false; if (p.sound) $("soundSel").value = p.sound; if (p.inst != null) $("instSel").value = p.inst; if (p.acc) $("accSel").value = p.acc; $("reverbChk").checked = p.rv !== false; }
   } catch (e) {}
 
   /* ── 상태 ── */
@@ -533,10 +542,76 @@
     if (!vo) return { err: "악보 해석 실패" };
     var sy = new ABCJS.synth.CreateSynth();
     var o = { chordsOff: !$("chordAccChk").checked || block };      /* 블록 코드일 땐 쿵짝 자동 반주 끔 */
-    if ($("soundSel").value === "musyng") o.soundFontUrl = MUSYNG;
-    await sy.init({ audioContext: audioCtx, visualObj: vo, options: o });
-    await sy.prime();
-    return { url: sy.download() };
+    var sfu = SOUNDFONTS[$("soundSel").value];
+    if (sfu) o.soundFontUrl = sfu;
+    try {
+      await sy.init({ audioContext: audioCtx, visualObj: vo, options: o });
+      await sy.prime();
+    } catch (e) {
+      if (!sfu) throw e;
+      /* 고음질 음원을 못 받으면(오프라인 등) 기본 음원으로 한 번 더 */
+      sy = new ABCJS.synth.CreateSynth();
+      delete o.soundFontUrl;
+      await sy.init({ audioContext: audioCtx, visualObj: vo, options: o });
+      await sy.prime();
+    }
+    var url = sy.download();
+    lastBuildFx = false;
+    if ($("reverbChk").checked) {
+      var fx = await addReverb(url);
+      if (fx) { revokeUrl(url); url = fx; lastBuildFx = true; }
+    }
+    return { url: url };
+  }
+  /* ✨ 공간감: 완성된 음원(WAV)에 잔향(리버브) + 가벼운 다듬기(컴프레서)를 입힌다.
+     곡 준비 단계에서만 한 번 처리 — 재생 중에는 아무 작업도 하지 않는 원칙 유지.
+     실패하면 조용히 원본을 그대로 쓴다(오프라인·구형 브라우저 안전). */
+  var lastBuildFx = false;
+  function wavFromBuffer(buf) {
+    var ch = buf.numberOfChannels, len = buf.length, sr = buf.sampleRate;
+    var ab = new ArrayBuffer(44 + len * ch * 2), dv = new DataView(ab);
+    function ws(o2, s) { for (var i = 0; i < s.length; i++) dv.setUint8(o2 + i, s.charCodeAt(i)); }
+    ws(0, "RIFF"); dv.setUint32(4, 36 + len * ch * 2, true); ws(8, "WAVE"); ws(12, "fmt ");
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, ch, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * ch * 2, true); dv.setUint16(32, ch * 2, true); dv.setUint16(34, 16, true);
+    ws(36, "data"); dv.setUint32(40, len * ch * 2, true);
+    var chans = [], c;
+    for (c = 0; c < ch; c++) chans.push(buf.getChannelData(c));
+    var off = 44;
+    for (var i2 = 0; i2 < len; i2++) for (c = 0; c < ch; c++) {
+      var v = Math.max(-1, Math.min(1, chans[c][i2]));
+      dv.setInt16(off, v < 0 ? v * 0x8000 : v * 0x7FFF, true); off += 2;
+    }
+    return new Blob([ab], { type: "audio/wav" });
+  }
+  async function addReverb(url) {
+    try {
+      var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!OAC || !window.fetch) return null;
+      var ab = await (await fetch(url)).arrayBuffer();
+      var dec = new OAC(2, 44100, 44100);
+      var src0 = await new Promise(function (res, rej) { dec.decodeAudioData(ab, res, rej); });
+      var sr = src0.sampleRate, tail = Math.round(sr * 1.6);
+      var oc = new OAC(2, src0.length + tail, sr);
+      var src = oc.createBufferSource(); src.buffer = src0;
+      /* 임펄스 응답: 1.6초 감쇠 노이즈 — 작은 홀의 잔향 */
+      var ir = oc.createBuffer(2, tail, sr);
+      for (var c = 0; c < 2; c++) {
+        var d = ir.getChannelData(c);
+        for (var i = 0; i < tail; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / tail, 2.8);
+      }
+      var conv = oc.createConvolver(); conv.buffer = ir;
+      var wet = oc.createGain(); wet.gain.value = 0.22;
+      var dry = oc.createGain(); dry.gain.value = 0.95;
+      var comp = oc.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 2.5;
+      comp.attack.value = 0.01; comp.release.value = 0.25;
+      src.connect(dry); src.connect(conv); conv.connect(wet);
+      dry.connect(comp); wet.connect(comp); comp.connect(oc.destination);
+      src.start(0);
+      var out = await oc.startRendering();
+      return URL.createObjectURL(wavFromBuffer(out));
+    } catch (e) { return null; }
   }
   function setMediaSession(title, state) {
     if (!("mediaSession" in navigator)) return;
@@ -768,6 +843,10 @@
     savePrefs();
     if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
   });
+  $("reverbChk").addEventListener("change", function () {
+    savePrefs();
+    if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
+  });
   $("instSel").addEventListener("change", function () {
     savePrefs();
     if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
@@ -779,7 +858,8 @@
 
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__player = {
-    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "" }; },
+    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "", fx: lastBuildFx }; },
+    addReverb: addReverb,
     getSets: function () { return plSets.map(function (s) { return { name: s.name, n: s.items.length }; }); },
     playAt: playAt, slurSameToTie: slurSameToTie, injectMelodyProgram: injectMelodyProgram, addBlockChords: addBlockChords
   };
