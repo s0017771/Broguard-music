@@ -93,7 +93,14 @@
           <option value="fatboy">고음질 3 (FatBoy)</option>
         </select>
       </label>
-      <label title="잔향(리버브)과 가벼운 다듬기를 더해 홀에서 연주하듯 풍성하게 — 곡 준비 시간이 조금 늘어요"><input type="checkbox" id="reverbChk" checked> ✨ 공간감</label>
+      <label title="잔향(리버브)과 가벼운 다듬기를 더해 홀에서 연주하듯 풍성하게 — 곡 준비 시간이 조금 늘어요">✨ 공간감
+        <select id="reverbSel">
+          <option value="off">끄기</option>
+          <option value="light">살짝</option>
+          <option value="mid" selected>보통</option>
+          <option value="deep">깊게</option>
+        </select>
+      </label>
       <label title="멜로디 성부만 다른 악기로 — 베이스·반주는 피아노 그대로">🎻 멜로디 악기
         <select id="instSel">
           <option value="">피아노 (기본)</option>
@@ -225,11 +232,18 @@
   })();
   function saveList() { try { localStorage.setItem(LIST_KEY, JSON.stringify(playlist)); } catch (e) {} }
   function savePrefs() {
-    try { localStorage.setItem(PREF_KEY, JSON.stringify({ loop: $("loopChk").checked, chord: $("chordAccChk").checked, sound: $("soundSel").value, inst: $("instSel").value, acc: $("accSel").value, rv: $("reverbChk").checked })); } catch (e) {}
+    try { localStorage.setItem(PREF_KEY, JSON.stringify({ loop: $("loopChk").checked, chord: $("chordAccChk").checked, sound: $("soundSel").value, inst: $("instSel").value, acc: $("accSel").value, rv: $("reverbSel").value })); } catch (e) {}
   }
   try {
     var p = JSON.parse(localStorage.getItem(PREF_KEY) || "");
-    if (p) { $("loopChk").checked = !!p.loop; $("chordAccChk").checked = p.chord !== false; if (p.sound) $("soundSel").value = p.sound; if (p.inst != null) $("instSel").value = p.inst; if (p.acc) $("accSel").value = p.acc; $("reverbChk").checked = p.rv !== false; }
+    if (p) {
+      $("loopChk").checked = !!p.loop; $("chordAccChk").checked = p.chord !== false;
+      if (p.sound) $("soundSel").value = p.sound; if (p.inst != null) $("instSel").value = p.inst; if (p.acc) $("accSel").value = p.acc;
+      /* 공간감: 예전 켬/끔(불리언) 저장값도 그대로 이어받는다 */
+      if (p.rv === false) $("reverbSel").value = "off";
+      else if (typeof p.rv === "string" && p.rv) $("reverbSel").value = p.rv;
+      if ($("reverbSel").selectedIndex < 0) $("reverbSel").value = "mid";
+    }
   } catch (e) {}
 
   /* ── 상태 ── */
@@ -557,8 +571,9 @@
     }
     var url = sy.download();
     lastBuildFx = false;
-    if ($("reverbChk").checked) {
-      var fx = await addReverb(url);
+    var rv = REVERB_LEVELS[$("reverbSel").value];
+    if (rv) {
+      var fx = await addReverb(url, rv);
       if (fx) { revokeUrl(url); url = fx; lastBuildFx = true; }
     }
     return { url: url };
@@ -567,6 +582,12 @@
      곡 준비 단계에서만 한 번 처리 — 재생 중에는 아무 작업도 하지 않는 원칙 유지.
      실패하면 조용히 원본을 그대로 쓴다(오프라인·구형 브라우저 안전). */
   var lastBuildFx = false;
+  /* 잔향 단계: tail=잔향 길이(초), wet=잔향 섞는 양, decay=감쇠 곡선(작을수록 길게 울림), dry=원음 */
+  var REVERB_LEVELS = {
+    light: { tail: 1.0, wet: 0.15, decay: 3.4, dry: 0.97 },
+    mid:   { tail: 1.6, wet: 0.22, decay: 2.8, dry: 0.95 },
+    deep:  { tail: 2.8, wet: 0.34, decay: 2.0, dry: 0.90 }
+  };
   function wavFromBuffer(buf) {
     var ch = buf.numberOfChannels, len = buf.length, sr = buf.sampleRate;
     var ab = new ArrayBuffer(44 + len * ch * 2), dv = new DataView(ab);
@@ -584,25 +605,26 @@
     }
     return new Blob([ab], { type: "audio/wav" });
   }
-  async function addReverb(url) {
+  async function addReverb(url, lv) {
     try {
+      lv = lv || REVERB_LEVELS.mid;
       var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
       if (!OAC || !window.fetch) return null;
       var ab = await (await fetch(url)).arrayBuffer();
       var dec = new OAC(2, 44100, 44100);
       var src0 = await new Promise(function (res, rej) { dec.decodeAudioData(ab, res, rej); });
-      var sr = src0.sampleRate, tail = Math.round(sr * 1.6);
+      var sr = src0.sampleRate, tail = Math.round(sr * lv.tail);
       var oc = new OAC(2, src0.length + tail, sr);
       var src = oc.createBufferSource(); src.buffer = src0;
-      /* 임펄스 응답: 1.6초 감쇠 노이즈 — 작은 홀의 잔향 */
+      /* 임펄스 응답: 감쇠 노이즈 — 단계에 따라 작은 홀~큰 홀의 잔향 */
       var ir = oc.createBuffer(2, tail, sr);
       for (var c = 0; c < 2; c++) {
         var d = ir.getChannelData(c);
-        for (var i = 0; i < tail; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / tail, 2.8);
+        for (var i = 0; i < tail; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / tail, lv.decay);
       }
       var conv = oc.createConvolver(); conv.buffer = ir;
-      var wet = oc.createGain(); wet.gain.value = 0.22;
-      var dry = oc.createGain(); dry.gain.value = 0.95;
+      var wet = oc.createGain(); wet.gain.value = lv.wet;
+      var dry = oc.createGain(); dry.gain.value = lv.dry;
       var comp = oc.createDynamicsCompressor();
       comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 2.5;
       comp.attack.value = 0.01; comp.release.value = 0.25;
@@ -843,7 +865,7 @@
     savePrefs();
     if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
   });
-  $("reverbChk").addEventListener("change", function () {
+  $("reverbSel").addEventListener("change", function () {
     savePrefs();
     if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
   });
@@ -858,7 +880,7 @@
 
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__player = {
-    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "", fx: lastBuildFx }; },
+    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "", fx: lastBuildFx, audioDur: (audioEl && audioEl.duration) || 0 }; },
     addReverb: addReverb,
     getSets: function () { return plSets.map(function (s) { return { name: s.name, n: s.items.length }; }); },
     playAt: playAt, slurSameToTie: slurSameToTie, injectMelodyProgram: injectMelodyProgram, addBlockChords: addBlockChords

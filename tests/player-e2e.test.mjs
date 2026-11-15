@@ -134,7 +134,7 @@ try {
       window.__ended = () => document.getElementById('audioEl').dispatchEvent(new Event('ended'));
     });
     // ✨ 공간감(리버브)은 전용 검사에서만 켠다 — 60초 오프라인 렌더로 다른 검사가 느려지지 않게
-    await page.uncheck('#reverbChk');
+    await page.selectOption('#reverbSel', 'off');
 
     // 5) 재생 → 첫 곡이 <audio>로 실제 재생됨, 기본 음질, 코드 반주 켬
     await page.click('#playBtn');
@@ -302,20 +302,24 @@ try {
     ok('🔊 음질 선택지 확장: MusyngKite · FluidR3 · FatBoy 음원이 각각 적용된다');
 
     // 8.19) ✨ 공간감: 완성된 WAV에 리버브·다듬기를 입힌 새 음원으로 재생 (실제 오프라인 렌더)
+    //        '깊게'는 잔향 꼬리(2.8초)만큼 음원이 길어진다 — 원본 60초 → 62.8초
     await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
-    await page.check('#reverbChk');
+    await page.selectOption('#reverbSel', 'deep');
     await page.waitForFunction(() => {
       const st = window.__player.getState();
-      return st.fx === true && st.audioPlaying;
+      return st.fx === true && st.audioPlaying && st.audioDur > 0;
     }, undefined, { timeout: 20000 });
     st = await page.evaluate(() => window.__player.getState());
     assert.ok(/^blob:/.test(st.audioSrc), '공간감 입힌 음원도 blob으로 재생');
-    await page.uncheck('#reverbChk');
+    assert.ok(st.audioDur > 62 && st.audioDur < 64, '깊게: 잔향 꼬리 2.8초 반영(' + st.audioDur.toFixed(1) + 's)');
+    await page.selectOption('#reverbSel', 'off');
     await page.waitForFunction(() => {
       const st2 = window.__player.getState();
-      return st2.fx === false && st2.audioPlaying;
+      return st2.fx === false && st2.audioPlaying && st2.audioDur > 0;
     }, undefined, { timeout: 10000 });
-    ok('✨ 공간감(리버브)이 곡 준비 단계에서 적용·해제된다');
+    st = await page.evaluate(() => window.__player.getState());
+    assert.ok(st.audioDur > 59 && st.audioDur < 61, '끄기: 원본 60초 그대로(' + st.audioDur.toFixed(1) + 's)');
+    ok('✨ 공간감(리버브) 단계 선택: 깊게는 잔향이 길어지고, 끄면 원본 그대로');
 
     // 8.2) ⏸ 일시정지 — 가짜 '곡 끝' 이벤트가 와도 다음 곡으로 튀지 않는다
     await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
@@ -394,7 +398,7 @@ try {
   assert.equal(st.count, 3, '재생목록도 유지');
   if (abcjsSrc) assert.equal(await page.$eval('#instSel', e => e.value), '40', '🎻 멜로디 악기 선택도 유지');
   if (abcjsSrc) assert.equal(await page.$eval('#accSel', e => e.value), 'block', '🎹 반주 스타일 선택도 유지');
-  if (abcjsSrc) assert.equal(await page.$eval('#reverbChk', e => e.checked), false, '✨ 공간감 선택도 유지');
+  if (abcjsSrc) assert.equal(await page.$eval('#reverbSel', e => e.value), 'off', '✨ 공간감 단계 선택도 유지');
   if (abcjsSrc) assert.equal(await page.$eval('#soundSel', e => e.value), 'musyng', '🔊 음질 선택도 유지');
   // 삭제
   await page.click('#plsets li:nth-child(2) button.pl-del');
