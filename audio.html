@@ -874,16 +874,23 @@ if (typeof module !== 'undefined') module.exports = AudioMidi;
   });
 
   /* ---------- 재생(abcjs 신스) ---------- */
+  /* 🔊 고음질 음원(MusyngKite · 진짜 악기 녹음)을 먼저 시도, 내려받기 실패 시 기본 음원 */
+  var HQ_SF = 'https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/';
+  function hqOn() { try { return localStorage.getItem('broguard_hq_sound') !== '0'; } catch (e) { return true; } }
   $('btnPlay').addEventListener('click', function () {
     if (!window.ABCJS || !ABCJS.synth || !lastAbc) { setStatus('이 환경에서는 재생을 지원하지 않습니다. .mid로 저장해 들어보세요.', 'err'); return; }
     stopPlay();
     try {
       var visual = ABCJS.renderAbc('preview', lastAbc, { responsive: 'resize' })[0];
       var ac = new (window.AudioContext || window.webkitAudioContext)();
-      synth = new ABCJS.synth.CreateSynth();
-      synth.init({ audioContext: ac, visualObj: visual, millisecondsPerMeasure: visual.millisecondsPerMeasure() })
-        .then(function () { return synth.prime(); })
-        .then(function () { synth.start(); $('btnStop').disabled = false; });
+      var tryWith = function (opts) {
+        var sy = new ABCJS.synth.CreateSynth();
+        return sy.init({ audioContext: ac, visualObj: visual, millisecondsPerMeasure: visual.millisecondsPerMeasure(), options: opts })
+          .then(function () { return sy.prime(); })
+          .then(function () { synth = sy; sy.start(); $('btnStop').disabled = false; });
+      };
+      (hqOn() ? tryWith({ soundFontUrl: HQ_SF }).catch(function () { return tryWith({}); }) : tryWith({}))
+        .catch(function (e) { setStatus('재생 실패: ' + (e && e.message || e), 'err'); });
     } catch (e) { setStatus('재생 실패: ' + e.message, 'err'); }
   });
   function stopPlay() { if (synth) { try { synth.stop(); } catch (e) {} synth = null; } $('btnStop').disabled = true; }

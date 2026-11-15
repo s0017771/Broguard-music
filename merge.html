@@ -80,6 +80,7 @@
   <div class="card">
     <h2>&#127925; ① 멜로디</h2>
     <p class="sub">ABC를 붙여넣으면 <b>자동으로 MIDI 변환</b>됩니다. 또는 멜로디 <b>.mid</b> 파일을 여세요.</p>
+    <select id="libSel" style="width:100%;margin-bottom:6px;"><option value="">&#128218; 내 악보집에서 불러오기&hellip;</option></select>
     <textarea id="abcIn" spellcheck="false" placeholder="여기에 ABC 멜로디를 붙여넣으세요 (뮤직랩 Melody Maker 등에서 복사)"></textarea>
     <input type="file" id="fileMel" accept=".abc,.txt,.mid,.midi" style="display:none">
     <div class="row">
@@ -814,6 +815,34 @@ if (typeof window !== 'undefined') window.MidiCore = MidiCore;
   }
   var abcDebounce;
   $('abcIn').addEventListener('input', function () { clearTimeout(abcDebounce); abcDebounce = setTimeout(melFromAbc, 350); });
+  /* ── 📚 악보집(broguard_library)에서 불러오기 ── */
+  function libEntries() {
+    var lib = null;
+    try { lib = JSON.parse(localStorage.getItem('broguard_library') || ''); } catch (e) {}
+    var es = (lib && lib.entries) ? lib.entries : (Array.isArray(lib) ? lib : []);
+    return es.filter(function (x) { return x && x.abc; }).sort(function (a, b) { return (b.added || 0) - (a.added || 0); });
+  }
+  function fillLibSel() {
+    var sel = $('libSel'); if (!sel) return;
+    while (sel.options.length > 1) sel.remove(1);
+    libEntries().forEach(function (e, i) {
+      var o = document.createElement('option');
+      o.value = String(e.id || 'i' + i);
+      o.textContent = (e.title || '(제목 없음)') + (e.cat ? ' · ' + e.cat : '');
+      sel.appendChild(o);
+    });
+  }
+  $('libSel').addEventListener('change', function () {
+    var sel = $('libSel');
+    if (!sel.value) return;
+    var es = libEntries(), hit = null;
+    for (var i = 0; i < es.length; i++) if (String(es[i].id || 'i' + i) === sel.value) { hit = es[i]; break; }
+    if (!hit) { fillLibSel(); sel.value = ''; return; }
+    $('abcIn').value = hit.abc;
+    melFromAbc();
+  });
+  window.addEventListener('focus', fillLibSel);
+  fillLibSel();
   $('btnSampleMel').addEventListener('click', function () { $('abcIn').value = SAMPLE_ABC; melFromAbc(); });
   $('btnMelFile').addEventListener('click', function () { $('fileMel').click(); });
   $('fileMel').addEventListener('change', function () {

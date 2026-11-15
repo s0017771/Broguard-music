@@ -937,34 +937,62 @@ var StudioCore = (function () {
   }
 
   // ── ABC(단선율) → 멜로디 노트 ──  ('C'=60, 'c'=72, ',' -12, "'" +12, ^올림 _내림, L 기본 1/8)
+  // K: 조표를 음이름별 샵/플랫으로 풀어낸다 (예 K:G → F는 모두 F#, K:F → B는 모두 Bb, 단조·선법 지원)
+  function keySigMap(kstr) {
+    var m = /^([A-Ga-g])\s*([#b♯♭]?)\s*([A-Za-z]*)/.exec(String(kstr || '').trim());
+    if (!m) return {};
+    var fifths = { F: -1, C: 0, G: 1, D: 2, A: 3, E: 4, B: 5 }[m[1].toUpperCase()];
+    if (m[2] === '#' || m[2] === '♯') fifths += 7;
+    else if (m[2] === 'b' || m[2] === '♭') fifths -= 7;
+    var mode = m[3].toLowerCase();
+    if (/^maj|^ion/.test(mode) || mode === '' || /^clef/.test(mode)) { /* 장조 그대로 */ }
+    else if (/^mix/.test(mode)) fifths -= 1;
+    else if (/^dor/.test(mode)) fifths -= 2;
+    else if (/^m(in|$)|^aeo/.test(mode) || mode === 'm') fifths -= 3;   /* 단조 */
+    else if (/^phr/.test(mode)) fifths -= 4;
+    else if (/^lyd/.test(mode)) fifths += 1;
+    else if (/^loc/.test(mode)) fifths -= 5;
+    var map = {}, SH = ['F', 'C', 'G', 'D', 'A', 'E', 'B'], FL = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+    for (var i = 0; i < Math.min(7, Math.abs(fifths)); i++) map[(fifths > 0 ? SH : FL)[i]] = fifths > 0 ? 1 : -1;
+    return map;
+  }
   function parseAbcMelody(text) {
     var lines = String(text || '').split('\n');
-    var L = 1 / 8, tempo = 100, header = true, body = [];
+    var L = 1 / 8, tempo = 100, header = true, body = [], keySig = {};
     var LETTER = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
     lines.forEach(function (ln) {
       var h = ln.match(/^([A-Za-z]):\s*(.*)$/);
       if (h && h[1] !== 'w') {
         if (h[1] === 'L') { var m = h[2].match(/(\d+)\s*\/\s*(\d+)/); if (m) L = +m[1] / +m[2]; }
         else if (h[1] === 'Q') { var q = h[2].match(/=\s*(\d+)/); if (q) tempo = +q[1]; }
-        else if (h[1] === 'K') { header = false; }
+        else if (h[1] === 'K') { keySig = keySigMap(h[2]); header = false; }
         return;
       }
       if (!header && !/^%/.test(ln)) body.push(ln);
     });
     var ppq = 480, unit = ppq * (L * 4), s = String(body.join(' '));
-    s = s.replace(/"[^"]*"/g, '').replace(/!.*?!/g, '').replace(/\[[A-Za-z]:[^\]]*\]/g, '');   // 주석·장식·인라인필드 제거
-    var re = /([_^=]*)([A-Ga-gz])([,']*)(\d*)(?:\/(\d+))?/g, m2, tick = 0, notes = [];
+    s = s.replace(/"[^"]*"/g, '').replace(/!.*?!/g, '').replace(/\{[^}]*\}/g, '').replace(/\[[A-Za-z]:[^\]]*\]/g, '');   // 주석·장식·꾸밈음·인라인필드 제거
+    // 임시표(^ _ =)는 그 마디 안에서 같은 글자·옥타브에 계속 적용된다 — 마디선(|)에서 초기화
+    var re = /(\|)|([_^=]*)([A-Ga-gz])([,']*)(\d*)(?:\/(\d+))?/g, m2, tick = 0, notes = [], measureAcc = {};
     while ((m2 = re.exec(s))) {
-      var acc = m2[1], let2 = m2[2], oct = m2[3], num = m2[4], den = m2[5];
+      if (m2[1]) { measureAcc = {}; continue; }
+      var acc = m2[2], let2 = m2[3], oct = m2[4], num = m2[5], den = m2[6];
       var len = (num ? +num : 1) / (den ? +den : 1);
       var durTick = Math.max(1, Math.round(len * unit));
       if (let2 === 'z') { tick += durTick; continue; }
       var up = let2 >= 'a' && let2 <= 'g';
-      var pc = LETTER[let2.toUpperCase()];
+      var letter = let2.toUpperCase();
+      var pc = LETTER[letter];
       var midi = (up ? 72 : 60) + pc;
       for (var oi = 0; oi < oct.length; oi++) midi += (oct[oi] === "'") ? 12 : -12;
-      var accCount = (acc.match(/\^/g) || []).length - (acc.match(/_/g) || []).length;
-      midi += accCount;
+      var noteKey = letter + Math.floor(midi / 12);   // 같은 글자+옥타브에만 임시표 지속
+      var off;
+      if (acc) {                                       // 명시 임시표: = 는 제자리(0)
+        off = (acc.match(/\^/g) || []).length - (acc.match(/_/g) || []).length;
+        measureAcc[noteKey] = off;
+      } else if (noteKey in measureAcc) off = measureAcc[noteKey];   // 같은 마디 앞의 임시표 유지
+      else off = keySig[letter] || 0;                  // 조표 적용
+      midi += off;
       notes.push({ midi: midi, s: tick, d: durTick }); tick += durTick;
     }
     if (!notes.length) return { error: 'ABC에서 멜로디 음표를 찾지 못했습니다.' };

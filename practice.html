@@ -132,6 +132,7 @@
     <input type="file" id="fileInput" accept=".abc,.txt" style="display:none;">
     <label class="check"><input type="checkbox" id="octaveFree"> 옥타브 무시</label>
     <label class="check"><input type="checkbox" id="sustainChk"> 연음</label>
+    <label class="check" title="진짜 피아노 녹음 샘플로 연주(다운로드 필요) · 끄면 가벼운 합성음"><input type="checkbox" id="pianoChk" checked> 🎹 피아노 음색</label>
     <label class="check"><input type="checkbox" id="chordMode" checked> 왼손 화음</label>
   </div>
   <div class="row" style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);">
@@ -247,6 +248,58 @@
   }
 
   /* ════════ ABC 파싱 ════════ */
+  /* ── 안전망: 손 파서가 음을 못 찾는 특이한 악보는 abcjs 엔진으로 MIDI를 뽑아 읽는다.
+     플레이어가 재생할 수 있는 악보라면 피아노 교실에서도 항상 열리게 하는 장치. ── */
+  function smfTracks(b) {
+    function u32(p) { return ((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]) >>> 0; }
+    if (!b || b.length < 14 || String.fromCharCode(b[0], b[1], b[2], b[3]) !== "MThd") return null;
+    var division = (b[12] << 8) | b[13], i = 8 + u32(4), tracks = [];
+    while (i + 8 <= b.length) {
+      if (String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]) !== "MTrk") break;
+      var end = i + 8 + u32(i + 4); i += 8;
+      var tick = 0, run = 0, open = {}, notes = [], c, l;
+      while (i < end) {
+        var d = 0; do { c = b[i++]; d = (d << 7) | (c & 0x7F); } while (c & 0x80);
+        tick += d;
+        var st = b[i];
+        if (st & 0x80) i++; else st = run;
+        if (st === 0xFF) { i++; l = 0; do { c = b[i++]; l = (l << 7) | (c & 0x7F); } while (c & 0x80); i += l; continue; }
+        if (st === 0xF0 || st === 0xF7) { l = 0; do { c = b[i++]; l = (l << 7) | (c & 0x7F); } while (c & 0x80); i += l; continue; }
+        run = st;
+        var hi = st & 0xF0, n1 = b[i++], n2 = (hi === 0xC0 || hi === 0xD0) ? 0 : b[i++];
+        if (hi === 0x90 && n2 > 0) { open[n1] = { midi: n1, t: tick, d: 0 }; notes.push(open[n1]); }
+        else if (hi === 0x80 || (hi === 0x90 && n2 === 0)) { if (open[n1]) { open[n1].d = tick - open[n1].t; delete open[n1]; } }
+      }
+      i = end;
+      if (notes.length) tracks.push(notes);
+    }
+    return { division: division || 480, tracks: tracks };
+  }
+  function abcjsFallback(abc, lden, keyName) {
+    if (!window.ABCJS || !ABCJS.synth || !ABCJS.synth.getMidiFile) return null;
+    var bin;
+    try { bin = ABCJS.synth.getMidiFile(abc, { midiOutputType: "binary", chordsOff: true }); } catch (e) { return null; }
+    var smf = smfTracks((bin && (bin[0] || bin)) || null);
+    if (!smf || !smf.tracks.length) return null;
+    var mel = smf.tracks[0];                   /* 첫 성부 = 멜로디 */
+    var by = {};                               /* 같은 시작 시각이면 최고음만(화음 → 멜로디 톱노트) */
+    mel.forEach(function (n) { if (!by[n.t] || n.midi > by[n.t].midi) by[n.t] = n; });
+    var src = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b2) { return a.t - b2.t; });
+    var cellTicks = smf.division * 4 / (lden || 8);   /* 1칸 = L: 단위 */
+    var seq = [], cur = 0;
+    src.forEach(function (n, ix) {
+      var st = Math.round(n.t / cellTicks);
+      if (st < cur) st = cur;
+      if (st > cur) seq.push({ rest: true, len: st - cur, start: cur });
+      var gap = (ix + 1 < src.length) ? (src[ix + 1].t - n.t) : (n.d || cellTicks);
+      var ln = Math.max(1, Math.round(Math.min(n.d || gap, gap) / cellTicks));
+      var pc12 = ((n.midi % 12) + 12) % 12, oct = Math.floor(n.midi / 12) - 1;
+      seq.push({ midi: n.midi, name: solfaName(pc12, keyName) + oct, len: ln, rest: false, start: st });
+      cur = st + ln;
+    });
+    if (!seq.some(function (x) { return !x.rest; })) return null;
+    return { seq: seq, cells: cur };
+  }
   function parseSong(abc) {
     var lines = abc.split("\n");
     var keyName = "C", title = "", bpm = 90, bodyStart = 0, mnum = 4, mden = 4, lden = 8;
@@ -285,8 +338,8 @@
       var seq = [];
       /* 코드 기호("C" "Am7" 등)는 위치(cell)와 함께 캡처 — 레인에 음표와 같이 흘려보내기 위함 */
       var abcChords = [];
-      var re = /"([^"]*)"|([_^=]?)([A-Ga-gz])([,']*)(\d*)(\/(\d+))?/g, m;
-      var cellCursor = 0;
+      var re = /"([^"]*)"|(\|)|([_^=]?)([A-Ga-gz])([,']*)(\d*)(\/(\d+))?/g, m;
+      var cellCursor = 0, measureAcc = {};   /* 마디 안 임시표: 같은 글자·옥타브에 계속 적용, 마디선에서 초기화 */
       while ((m = re.exec(body)) !== null) {
         if (m[1] !== undefined) {
           var cn = m[1].trim();
@@ -294,17 +347,21 @@
           if (cn && !/^[\^_<>@]/.test(cn)) abcChords.push({ cell: cellCursor, name: cn });
           continue;
         }
-        var len = m[5] ? parseInt(m[5], 10) : 1;
-        if (m[7]) len = Math.max(1, Math.round(len / parseInt(m[7], 10)));
-        if (m[3] === "z") { seq.push({ rest: true, len: len, start: cellCursor }); cellCursor += len; continue; }
-        var upper = m[3].toUpperCase();
+        if (m[2]) { measureAcc = {}; continue; }
+        var len = m[6] ? parseInt(m[6], 10) : 1;
+        if (m[8]) len = Math.max(1, Math.round(len / parseInt(m[8], 10)));
+        if (m[4] === "z") { seq.push({ rest: true, len: len, start: cellCursor }); cellCursor += len; continue; }
+        var upper = m[4].toUpperCase();
         var midi = 60 + LETTER_PC[upper];
-        if (m[3] !== upper) midi += 12;
-        for (var c = 0; c < m[4].length; c++) midi += (m[4][c] === "'" ? 12 : -12);
+        if (m[4] !== upper) midi += 12;
+        for (var c = 0; c < m[5].length; c++) midi += (m[5][c] === "'" ? 12 : -12);
         var writtenPc = ((midi % 12) + 12) % 12;
-        if (m[2] === "^") midi += 1;
-        else if (m[2] === "_") midi -= 1;
-        else if (m[2] !== "=" && acc[writtenPc]) midi += acc[writtenPc];
+        var noteKey = upper + Math.floor(midi / 12);
+        if (m[3] === "^") { midi += 1; measureAcc[noteKey] = 1; }
+        else if (m[3] === "_") { midi -= 1; measureAcc[noteKey] = -1; }
+        else if (m[3] === "=") { measureAcc[noteKey] = 0; }
+        else if (noteKey in measureAcc) midi += measureAcc[noteKey];
+        else if (acc[writtenPc]) midi += acc[writtenPc];
         var pc12 = ((midi % 12) + 12) % 12;
         var oct = Math.floor(midi / 12) - 1;
         seq.push({ midi: midi, name: solfaName(pc12, keyName) + oct, len: len, rest: false, start: cellCursor });
@@ -315,6 +372,11 @@
     var parsed = parseBody(melodyLines());
     /* 성부 추출로 음을 못 찾는 특이 형식이면 본문 전체에서 한 번 더 */
     if (!parsed.seq.some(function (n) { return !n.rest; })) parsed = parseBody(allMusicLines());
+    /* 그래도 못 찾으면 abcjs 엔진으로 — 코드 위치는 신뢰할 수 없어 자동 추정에 맡긴다 */
+    if (!parsed.seq.some(function (n) { return !n.rest; })) {
+      var fb = abcjsFallback(abc, lden, keyName);
+      if (fb) parsed = { seq: fb.seq, abcChords: [], cells: fb.cells };
+    }
     var seq = parsed.seq, abcChords = parsed.abcChords, cellCursor = parsed.cells;
     /* 박자 계산: beatCells = L분모/M분모 (예 L:1/8 M:4/4 → 2칸=1박) */
     var beatCells = Math.max(1, Math.round(lden / mden));
@@ -466,6 +528,39 @@
   window.addEventListener("focus", wakeAudio);
   window.addEventListener("pageshow", wakeAudio);
   function freqOf(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+  /* ── 🎹 피아노 음색: 진짜 피아노 녹음 샘플(MusyngKite — 플레이어 고음질과 같은 음원)을
+     음마다 내려받아 재생한다. 아직 안 받아졌거나 오프라인이면 기존 합성음으로 자연스럽게 대체. ── */
+  var SF_BASE = "https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/acoustic_grand_piano-mp3/";
+  var SF_NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+  var sampleBuf = {}, sampleReq = {};
+  function sampleUrl(midi) { var pc = ((midi % 12) + 12) % 12, oct = Math.floor(midi / 12) - 1; return SF_BASE + SF_NAMES[pc] + oct + ".mp3"; }
+  function loadSample(midi) {
+    if (midi < 21 || midi > 108 || !window.fetch) return Promise.resolve(null);
+    if (sampleReq[midi]) return sampleReq[midi];
+    var ctx = ensureAudio();
+    sampleReq[midi] = fetch(sampleUrl(midi))
+      .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.arrayBuffer(); })
+      .then(function (ab) { return new Promise(function (res, rej) { ctx.decodeAudioData(ab, res, rej); }); })
+      .then(function (buf) { sampleBuf[midi] = buf; return buf; })
+      .catch(function () { sampleReq[midi] = null; return null; });   /* 실패하면 나중에 다시 시도 가능 */
+    return sampleReq[midi];
+  }
+  function prefetchSamples(midis) {
+    if (!$("pianoChk").checked) return;
+    var seen = {};
+    (midis || []).forEach(function (m) { if (m != null && !seen[m]) { seen[m] = 1; loadSample(m); } });
+  }
+  /* 곡에 필요한 음(멜로디 + 반주 코드음)을 미리 받아둔다 */
+  function prefetchSong(s) {
+    if (!s) return;
+    var ms = [];
+    (s.seq || []).forEach(function (n) { if (!n.rest) ms.push(n.midi); });
+    (s.chords || []).forEach(function (c) {
+      ms.push(36 + c.rootPc, 48 + c.rootPc);
+      if (c.tones) ms.push(48 + (c.tones[1] % 12), 48 + (c.tones[2] % 12));
+    });
+    prefetchSamples(ms);
+  }
   function noteOn(handle, midi, vol) {
     if (voices[handle]) return;
     /* 동시 발음 과다 방지: 가장 오래된 것부터 정리 (연음 시 오디오 스레드 부하 완화) */
@@ -473,6 +568,20 @@
     if (keys.length > 12) { for (var q = 0; q < keys.length - 12; q++) noteOff(keys[q]); }
     try {
       var ctx = ensureAudio();
+      if ($("pianoChk").checked) {
+        var buf = sampleBuf[midi];
+        if (buf) {
+          var src = ctx.createBufferSource(); src.buffer = buf;
+          var sg = ctx.createGain();
+          src.connect(sg); sg.connect(ctx.destination);
+          var sv = Math.min(1.4, (vol || 0.3) * 3.2);
+          sg.gain.value = sv;
+          src.start(ctx.currentTime);
+          voices[handle] = { sample: true, src: src, g: sg, v: sv };
+          return;
+        }
+        loadSample(midi);   /* 지금은 합성음으로 내고, 받아지면 다음부터 샘플로 */
+      }
       var o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
       var g = ctx.createGain(), g2 = ctx.createGain();
       o1.type = "triangle"; o2.type = "sine";
@@ -494,6 +603,13 @@
     try {
       var now = audioCtx.currentTime;
       var rel = $("sustainChk").checked ? 1.7 : 0.3;
+      if (vc.sample) {   /* 샘플 음: 자연스러운 릴리즈 후 정지 */
+        vc.g.gain.cancelScheduledValues(now);
+        vc.g.gain.setValueAtTime(Math.max(0.0001, vc.v), now);
+        vc.g.gain.exponentialRampToValueAtTime(0.0001, now + rel);
+        vc.src.stop(now + rel + 0.05);
+        return;
+      }
       vc.g.gain.cancelScheduledValues(now);
       vc.g.gain.setValueAtTime(Math.max(0.0001, vc.v * 0.7), now);
       vc.g.gain.exponentialRampToValueAtTime(0.0001, now + rel);
@@ -1299,6 +1415,7 @@
     autoCompNextIdx = 0;
     lastCompBar = -1;
     applyChords(song);
+    prefetchSong(song);   /* 🎹 필요한 피아노 샘플 미리 받기 */
     playing = true;
     correctFirst = 0; mistakes = 0; hits = 0; missCount = 0; lateCount = 0;
     firstTry = true;
@@ -1345,6 +1462,7 @@
     var bpm = parseInt($("bpmInput").value, 10) || song.bpm;
     var cMs = (60000 / bpm) / song.beatCells;
     applyChords(song);
+    prefetchSong(song);
     var compBar = -1, cellsPerBar = song.mnum * song.beatCells;
     var i = 0;
     function step() {
@@ -1534,6 +1652,13 @@
   $("octaveFree").addEventListener("change", function () { $("octaveFree").blur(); wakeAudio(); });
   $("sustainChk").addEventListener("change", function () { $("sustainChk").blur(); wakeAudio(); });
   $("chordMode").addEventListener("change", function () { $("chordMode").blur(); wakeAudio(); });
+  /* 🎹 피아노 음색: 선택 저장 + 켜면 현재 곡 샘플 미리 받기 */
+  try { if (localStorage.getItem("broguard_practice_piano") === "0") $("pianoChk").checked = false; } catch (e) {}
+  $("pianoChk").addEventListener("change", function () {
+    $("pianoChk").blur(); wakeAudio();
+    try { localStorage.setItem("broguard_practice_piano", $("pianoChk").checked ? "1" : "0"); } catch (e) {}
+    if ($("pianoChk").checked && song) prefetchSong(song);
+  });
   ["autoChord", "showChord", "autoComp"].forEach(function (id) {
     $(id).addEventListener("change", function () {
       $(id).blur();
@@ -1561,6 +1686,8 @@
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__practice = {
     parseSong: parseSong, attempt: attempt, generateChords: generateChords, chordAtCell: chordAtCell, staffY: staffY, injectChordsIntoAbc: injectChordsIntoAbc, wakeAudio: wakeAudio,
+    abcjsFallback: abcjsFallback, smfTracks: smfTracks, loadSample: loadSample, noteOn: noteOn, noteOff: noteOff,
+    sampleStats: function () { return { loaded: Object.keys(sampleBuf).length, voices: Object.keys(voices).map(function (k) { return !!voices[k].sample; }) }; },
     parseChordSym: parseChordSym, chordsFromAbc: chordsFromAbc, populateLibrary: populateLibrary,
     midiToAbcToken: midiToAbcToken, buildRecAbc: buildRecAbc, classifyDur: classifyDur,
     startRecording: startRecording, stopRecording: stopRecording, recordNote: recordNote,

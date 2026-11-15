@@ -1106,16 +1106,23 @@ function render(out) {
   });
 }
 
+/* 🔊 고음질 음원(MusyngKite · 진짜 악기 녹음)을 먼저 시도, 내려받기 실패 시 기본 음원 */
+const HQ_SF = 'https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/';
+function hqOn() { try { return localStorage.getItem('broguard_hq_sound') !== '0'; } catch (e) { return true; } }
 async function playVisual(visual) {
   if (!window.ABCJS || !ABCJS.synth || !visual) { alert('이 환경에서는 재생을 지원하지 않습니다. ABC를 복사해 뮤직랩에서 들어보세요.'); return; }
   stopPlay();
-  try {
-    const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  async function tryWith(opts) {
     const synth = new ABCJS.synth.CreateSynth();
-    await synth.init({ audioContext: ac, visualObj: visual, millisecondsPerMeasure: visual.millisecondsPerMeasure() });
+    await synth.init({ audioContext: ac, visualObj: visual, millisecondsPerMeasure: visual.millisecondsPerMeasure(), options: opts });
     await synth.prime();
     synth.start();
     currentSynth = synth;
+  }
+  try {
+    if (hqOn()) { try { await tryWith({ soundFontUrl: HQ_SF }); return; } catch (e) {} }
+    await tryWith({});
   } catch (e) {
     alert('재생 실패 (사운드폰트 로드 문제일 수 있습니다). ABC를 복사해 뮤직랩에서 확인해 주세요.');
   }
