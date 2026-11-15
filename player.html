@@ -298,6 +298,10 @@
     if (!silent) { saveList(); renderNow(); setStatus("'" + (e.title || "곡") + "'을(를) 재생목록에 담았어요. (" + playlist.length + "곡)"); }
     return true;
   }
+  /* 분류 접힘/펼침 상태 — 처음엔 모두 닫혀 있고, 펼친 분류는 기억한다 */
+  var openCats = {};
+  try { openCats = JSON.parse(localStorage.getItem("broguard_player_opencats") || "{}") || {}; } catch (e) { openCats = {}; }
+  function saveOpenCats() { try { localStorage.setItem("broguard_player_opencats", JSON.stringify(openCats)); } catch (e) {} }
   function renderLibrary() {
     var box = $("liblist"); box.innerHTML = "";
     var es = libEntries().filter(function (e) { return e && e.abc; })
@@ -312,7 +316,9 @@
     CATS.forEach(function (c) {
       var list = groups[c];
       if (!list || !list.length) return;
-      var det = document.createElement("details"); det.className = "catgrp"; det.open = true;
+      var det = document.createElement("details"); det.className = "catgrp";
+      det.open = !!openCats[c];   /* 처음엔 닫힘 — 눌러서 펼치면 다음에도 기억 */
+      det.addEventListener("toggle", function () { openCats[c] = det.open; saveOpenCats(); });
       var sum = document.createElement("summary");
       var nm = document.createElement("span"); nm.textContent = c; sum.appendChild(nm);
       var cnt = document.createElement("span"); cnt.className = "cnt"; cnt.textContent = list.length + "곡"; sum.appendChild(cnt);

@@ -55,7 +55,15 @@ try {
   assert.equal(groups[0].name, 'K-가요'); assert.deepEqual(groups[0].titles, ['곡 하나']);
   assert.equal(groups[1].name, '기타'); assert.deepEqual(groups[1].titles, ['곡 둘', '곡 셋'], '분류 없는 곡은 기타로');
   assert.equal(groups[1].cnt, '2곡', '곡 수 표기');
-  ok('악보집이 카테고리별로 묶여 보인다');
+  // 처음엔 모두 닫혀 있고, 펼친 분류는 새로고침 뒤에도 기억된다
+  let openStates = await page.$$eval('#liblist details.catgrp', els => els.map(d => d.open));
+  assert.deepEqual(openStates, [false, false], '분류는 처음에 닫혀 있음');
+  await page.click('#liblist details.catgrp:nth-child(2) summary span');   // '기타' 펼치기
+  await page.waitForFunction(() => document.querySelectorAll('#liblist details.catgrp')[1].open, undefined, { timeout: 3000 });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  openStates = await page.$$eval('#liblist details.catgrp', els => els.map(d => d.open));
+  assert.deepEqual(openStates, [false, true], '펼친 분류(기타)만 열린 채 유지');
+  ok('악보집이 카테고리별로 묶여 보인다 (처음엔 접힘 · 펼침 기억)');
 
   // 2) 담기(개별/분류/전체) — 같은 곡은 중복으로 담기지 않는다
   await page.evaluate(() => {   // '곡 둘' 개별 담기
