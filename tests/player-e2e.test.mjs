@@ -118,7 +118,8 @@ try {
         dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
         dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
         ws(36, 'data'); dv.setUint32(40, n * 2, true);
-        window.__testWav = URL.createObjectURL(new Blob([ab], { type: 'audio/wav' }));
+        window.__testWavBlob = new Blob([ab], { type: 'audio/wav' });
+        window.__testWav = URL.createObjectURL(window.__testWavBlob);
       })();
       window.AudioContext = function () { this.state = 'running'; this.resume = function () { return Promise.resolve(); }; };
       window.webkitAudioContext = window.AudioContext;
@@ -126,12 +127,14 @@ try {
         return {
           init: function (o) { window.__inits.push({ chordsOff: !!o.options.chordsOff, sf: o.options.soundFontUrl || 'default' }); return Promise.resolve(); },
           prime: function () { return Promise.resolve(); },
-          download: function () { return window.__testWav; },
+          download: function () { return URL.createObjectURL(window.__testWavBlob); },   // 실제처럼 매번 새 URL
           start: function () {}, stop: function () {}
         };
       };
       window.__ended = () => document.getElementById('audioEl').dispatchEvent(new Event('ended'));
     });
+    // ✨ 공간감(리버브)은 전용 검사에서만 켠다 — 60초 오프라인 렌더로 다른 검사가 느려지지 않게
+    await page.uncheck('#reverbChk');
 
     // 5) 재생 → 첫 곡이 <audio>로 실제 재생됨, 기본 음질, 코드 반주 켬
     await page.click('#playBtn');
@@ -283,6 +286,37 @@ try {
     await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
     ok('🎹 반주 스타일 "한번에": 코드 자리마다 베이스 화음 한 번에 + 쿵짝 자동 끔');
 
+    // 8.18) 🔊 고음질 음원 선택지: FluidR3·FatBoy도 사운드폰트로 전달된다
+    await page.selectOption('#soundSel', 'fluidr3');
+    await page.waitForFunction(() => {
+      const a = window.__inits; return a.length && /FluidR3_GM/.test(a[a.length - 1].sf);
+    }, undefined, { timeout: 6000 });
+    await page.selectOption('#soundSel', 'fatboy');
+    await page.waitForFunction(() => {
+      const a = window.__inits; return a.length && /FatBoy/.test(a[a.length - 1].sf);
+    }, undefined, { timeout: 6000 });
+    await page.selectOption('#soundSel', 'musyng');
+    await page.waitForFunction(() => {
+      const a = window.__inits; return a.length && /MusyngKite/.test(a[a.length - 1].sf);
+    }, undefined, { timeout: 6000 });
+    ok('🔊 음질 선택지 확장: MusyngKite · FluidR3 · FatBoy 음원이 각각 적용된다');
+
+    // 8.19) ✨ 공간감: 완성된 WAV에 리버브·다듬기를 입힌 새 음원으로 재생 (실제 오프라인 렌더)
+    await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
+    await page.check('#reverbChk');
+    await page.waitForFunction(() => {
+      const st = window.__player.getState();
+      return st.fx === true && st.audioPlaying;
+    }, undefined, { timeout: 20000 });
+    st = await page.evaluate(() => window.__player.getState());
+    assert.ok(/^blob:/.test(st.audioSrc), '공간감 입힌 음원도 blob으로 재생');
+    await page.uncheck('#reverbChk');
+    await page.waitForFunction(() => {
+      const st2 = window.__player.getState();
+      return st2.fx === false && st2.audioPlaying;
+    }, undefined, { timeout: 10000 });
+    ok('✨ 공간감(리버브)이 곡 준비 단계에서 적용·해제된다');
+
     // 8.2) ⏸ 일시정지 — 가짜 '곡 끝' 이벤트가 와도 다음 곡으로 튀지 않는다
     await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
     const idxBefore = (await page.evaluate(() => window.__player.getState())).curIdx;
@@ -360,6 +394,8 @@ try {
   assert.equal(st.count, 3, '재생목록도 유지');
   if (abcjsSrc) assert.equal(await page.$eval('#instSel', e => e.value), '40', '🎻 멜로디 악기 선택도 유지');
   if (abcjsSrc) assert.equal(await page.$eval('#accSel', e => e.value), 'block', '🎹 반주 스타일 선택도 유지');
+  if (abcjsSrc) assert.equal(await page.$eval('#reverbChk', e => e.checked), false, '✨ 공간감 선택도 유지');
+  if (abcjsSrc) assert.equal(await page.$eval('#soundSel', e => e.value), 'musyng', '🔊 음질 선택도 유지');
   // 삭제
   await page.click('#plsets li:nth-child(2) button.pl-del');
   sets = await page.evaluate(() => window.__player.getSets());
