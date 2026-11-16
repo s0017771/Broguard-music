@@ -1,0 +1,33 @@
+X:1
+T:문 두드리는 노래
+T:(The Knock-Knock Song)
+R:Music Box
+M:4/4
+L:1/16
+Q:1/4=92
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:F
+% 동화 뮤지컬 풍 오리지널(멜로디 창작): 톡톡톡 노크 모티프가 절마다 자라고,
+% 문이 열리지 않는 단조 전환, 어른이 된 마지막 노크
+% ===== 기 · 어린 노크 (1-8마디) : 톡톡톡! 같이 놀래? =====
+[V:1] !mp!"F""^톡톡톡!"c2c2c2z2 a4f4 | "Bb"g4f4 d8 | "C"g2g2g2z2 e4c4 | "F"f4g4 a8 |
+[V:2] F,4[A,C]4 F,4[A,C]4 | B,,4[DF]4 B,,4[DF]4 | C,4[G,E]4 C,4[G,E]4 | F,4[A,C]4 F,4[A,C]4 |
+[V:1] "F"c2c2c2z2 a4f4 | "Bb"g4f4 d8 | "Gm"b4a4 "C"g4e4 | "F"f8 z8 |
+[V:2] F,4[A,C]4 F,4[A,C]4 | B,,4[DF]4 B,,4[DF]4 | G,4[B,D]4 C,4[G,E]4 | F,4[A,C]4 F,4[A,C]4 |
+% ===== 승 · 조금 자란 노크 (9-16마디) : 같은 노래, 한 층 위에서 =====
+[V:1] !mf!"F""^조금 자라서"c'2c'2c'2z2 a4c'4 | "Bb"d'4c'4 b8 | "C"g2g2g2z2 e'4c'4 | "F"c'4d'4 c'8 |
+[V:2] F,4[A,C]4 F,4[A,C]4 | B,,4[DF]4 B,,4[DF]4 | C,4[G,E]4 C,4[G,E]4 | F,4[A,C]4 F,4[A,C]4 |
+[V:1] "Dm"d'4a4 f4a4 | "Bb"b4d'4 f'8 | "Gm"b4a4 "C7"g4e4 | "F"f8 z4 c2d2 |
+[V:2] D,4[FA]4 D,4[FA]4 | B,,4[DF]4 B,,4[DF]4 | G,4[B,D]4 C,4[B,E]4 | F,4[A,C]4 F,4[A,C]4 |
+% ===== 전 · 열리지 않는 문 (17-24마디) : 노크가 조용해진다 =====
+[V:1] !p!"Dm""^문이 열리지 않는다"d2d2d2z2 f4d4 | "Bb"f8 d4B4 | "Gm"b8 g4d4 | "A7"^c'8 a4e4 |
+[V:2] D,4[FA]4 D,4[FA]4 | B,,4[DF]4 B,,4[DF]4 | G,4[B,D]4 G,4[B,D]4 | A,4[^CG]4 A,4[^CG]4 |
+[V:1] "Dm"f4e4 d4e4 | "Gm"d4f4 g4b4 | "Bb"b8 "C"c'4b4 | "C7"c'8 z8 |
+[V:2] D,4[FA]4 D,4[FA]4 | G,4[B,D]4 G,4[B,D]4 | B,,4[DF]4 C,4[G,E]4 | C,4[B,E]4 z8 |
+% ===== 결 · 어른의 노크 (25-32마디) : 같은 멜로디, 여리게 =====
+[V:1] !p!"F""^어른이 되어"c2c2c2z2 a4f4 | "Bb"g4f4 d8 | "C"g2g2g2z2 e4c4 | "F"f4g4 a8 |
+[V:2] F,4[A,C]4 F,4[A,C]4 | B,,4[DF]4 B,,4[DF]4 | C,4[G,E]4 C,4[G,E]4 | F,4[A,C]4 F,4[A,C]4 |
+[V:1] "Dm"a4f4 d8 | "Bb"d4f4 b8 | !pp!"C7""^rit."g4f4 e4d4 | "F""^마지막 노크"c2z2c2z2 H[Acf]8 |]
+[V:2] D,4[FA]4 D,4[FA]4 | B,,4[DF]4 B,,4[DF]4 | C,4[B,E]4 C,4[B,E]4 | F,4[A,C]4 H[F,,C,F,]8 |]

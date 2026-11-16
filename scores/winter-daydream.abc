@@ -1,0 +1,25 @@
+X:1
+T:겨울의 몽상
+T:(Winter Daydream)
+R:Folk Rock
+M:4/4
+L:1/16
+Q:1/4=100
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Em
+% 60년대 포크록 풍 오리지널(멜로디 창작): 안달루시아 하강 진행(Em–D–C–B7),
+% 부름과 응답, 플루트 같은 간주 — 추운 거리에서 꾸는 따뜻한 꿈
+% ===== 기 · 벌스 (1-8마디) : 겨울 거리 =====
+[V:1] !mf!"Em""^겨울 거리"b3b b2a2 g2a2 b4 | "D"a3a a2g2 f2g2 a4 | "C"g3g g2e2 c2e2 g4 | "B7"f3f f2e2 ^d2e2 f4 | "Em"b3b b2a2 g2a2 b4 | "D"a3a a2g2 f2g2 a4 | "C"e3e g2e2 "B7"^d2e2 f4 | "Em"e8 z4 B2d2 |
+[V:2] E,2B,2E2B,2 E,2B,2E2B,2 | D,2A,2D2A,2 D,2A,2D2A,2 | C,2G,2C2G,2 C,2G,2C2G,2 | B,,2F,2B,2F,2 B,,2F,2B,2F,2 | E,2B,2E2B,2 E,2B,2E2B,2 | D,2A,2D2A,2 D,2A,2D2A,2 | C,2G,2C2G,2 B,,2F,2B,2F,2 | E,2B,2E2B,2 E,2B,2E2B,2 |
+% ===== 승 · 부름과 응답 (9-16마디) =====
+[V:1] !mp!"Em""^부름"e2e2 e2d2 B4z4 | "D""^응답"f2g2 a2b2 a4z4 | "C""^부름"e2e2 e2d2 c4z4 | "B7""^응답"^d2e2 f2a2 b4z4 | "Em"e2e2 e2d2 B4z4 | "D"f2g2 a2b2 a4z4 | "C"c'2b2 a2g2 "B7"f2e2 ^d2e2 | "B7"f8 z4 b2a2 |
+[V:2] E,2B,2E2B,2 E,2B,2E2B,2 | D,2A,2D2A,2 D,2A,2D2A,2 | C,2G,2C2G,2 C,2G,2C2G,2 | B,,2F,2B,2F,2 B,,2F,2B,2F,2 | E,2B,2E2B,2 E,2B,2E2B,2 | D,2A,2D2A,2 D,2A,2D2A,2 | C,2G,2C2G,2 B,,2F,2B,2F,2 | B,,2F,2B,2F,2 B,,2F,2B,2F,2 |
+% ===== 전 · 간주 (17-24마디) : 플루트처럼 =====
+[V:1] !mf!"Em""^플루트처럼"g2ab g2ab g2e2 g4 | "D"f2ga f2ga f2d2 f4 | "C"e2fg e2fg e2c2 e4 | "B7"^d2ef ^d2ef ^d2B2 ^d4 | "Em"b2c'd' b2c'd' b2g2 b4 | "D"a2bc' a2bc' a2f2 a4 | "C"g2ab c'2b2 "B7"a2f2 e2^d2 | "Em"e8 z4 e2d2 |
+[V:2] E,2B,2E2B,2 E,2B,2E2B,2 | D,2A,2D2A,2 D,2A,2D2A,2 | C,2G,2C2G,2 C,2G,2C2G,2 | B,,2F,2B,2F,2 B,,2F,2B,2F,2 | E,2B,2E2B,2 E,2B,2E2B,2 | D,2A,2D2A,2 D,2A,2D2A,2 | C,2G,2C2G,2 B,,2F,2B,2F,2 | E,2B,2E2B,2 E,2B,2E2B,2 |
+% ===== 결 · 마지막 벌스 (25-32마디) : 겨울의 꿈 =====
+[V:1] !f!"Em"b3b b2a2 g2a2 b4 | "D"a3a a2g2 f2g2 a4 | "C"g3g g2e2 c2e2 g4 | "B7"f3f f2e2 ^d2e2 f4 | "Em"b3b b2a2 g2a2 b2c'2 | "C"c'3c' c'2b2 "B7"a2f2 e2^d2 | !mf!"B7""^rit."f4e4 ^d4B4 | "Em""^겨울의 꿈"e8 H[GBe]8 |]
+[V:2] E,2B,2E2B,2 E,2B,2E2B,2 | D,2A,2D2A,2 D,2A,2D2A,2 | C,2G,2C2G,2 C,2G,2C2G,2 | B,,2F,2B,2F,2 B,,2F,2B,2F,2 | E,2B,2E2B,2 E,2B,2E2B,2 | C,2G,2C2G,2 B,,2F,2B,2F,2 | B,,2F,2B,2F,2 B,,2F,2B,2F,2 | E,,2B,,2E,2G,2 H[E,,B,,E,]8 |]

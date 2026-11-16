@@ -1,0 +1,33 @@
+X:1
+T:춤추는 고양이
+T:(Dancing Cat)
+R:Dance Pop
+M:4/4
+L:1/16
+Q:1/4=98
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Gm
+% 통통 튀는 댄스팝 풍 오리지널(멜로디 창작): 장난스러운 벌스,
+% 낮춰 속삭이는 프리, 높이 뛰어오르는 후크, 움-파 베이스
+% ===== 기 · 벌스 (1-8마디) : 고양이가 걷는다 =====
+[V:1] !mf!"Gm""^장난스럽게"d2d2 d2dc B2G2 B4 | "Eb"c2c2 c2cB G2E2 G4 | "Bb"d2d2 d2dc B2d2 f4 | "F"c2c2 c2B2 A4F4 |
+[V:2] G,2[B,D]2G,2[B,D]2 G,2[B,D]2G,2[B,D]2 | E,2[G,B,]2E,2[G,B,]2 E,2[G,B,]2E,2[G,B,]2 | B,,2[DF]2B,,2[DF]2 B,,2[DF]2B,,2[DF]2 | F,2[A,C]2F,2[A,C]2 F,2[A,C]2F,2[A,C]2 |
+[V:1] "Gm"d2d2 d2dc B2G2 B4 | "Eb"c2c2 c2cB G2E2 G4 | "Bb"d2d2 f2f2 g2f2 d4 | "F"c8 z4 c2d2 |
+[V:2] G,2[B,D]2G,2[B,D]2 G,2[B,D]2G,2[B,D]2 | E,2[G,B,]2E,2[G,B,]2 E,2[G,B,]2E,2[G,B,]2 | B,,2[DF]2B,,2[DF]2 B,,2[DF]2B,,2[DF]2 | F,2[A,C]2F,2[A,C]2 F,2[A,C]2F,2[A,C]2 |
+% ===== 승 · 프리 (9-16마디) : 목소리를 낮춰 =====
+[V:1] !mp!"Gm""^목소리를 낮춰"g2g2 g2f2 d2d2 d4 | "Eb"g2g2 g2f2 e2e2 e4 | "Bb"f2f2 f2d2 B2B2 B4 | "F"c2c2 d2e2 f4a4 |
+[V:2] G,8 [B,D]8 | E,8 [G,B,]8 | B,,8 [DF]8 | F,8 [A,C]8 |
+[V:1] "Gm"g2g2 g2f2 d2d2 d4 | "Eb"g2g2 g2f2 e2e2 e4 | "Bb"f2f2 g2g2 a2a2 b2b2 | "F""^뛰어올라!"c'4c'4 c'2d'2 e'2f'2 |
+[V:2] G,8 [B,D]8 | E,8 [G,B,]8 | B,,2[DF]2B,,2[DF]2 B,,2[DF]2B,,2[DF]2 | F,2A,2C2F2 A2F2C2A,2 |
+% ===== 전 · 후크 (17-24마디) : 춤추는 고양이 =====
+[V:1] !f!"Gm""^후크"b2b2 b2ag b2g2 d4 | "Eb"g2g2 g2fe g2e2 c4 | "Bb"f2f2 f2fd f2b2 d'4 | "F"c'2c'2 c'2b2 a4f4 |
+[V:2] G,,2[B,D]2G,2[B,D]2 G,,2[B,D]2G,2[B,D]2 | E,,2[G,B,]2E,2[G,B,]2 E,,2[G,B,]2E,2[G,B,]2 | B,,2[DF]2B,2[DF]2 B,,2[DF]2B,2[DF]2 | F,,2[A,C]2F,2[A,C]2 F,,2[A,C]2F,2[A,C]2 |
+[V:1] "Gm"b2b2 b2ag b2g2 d4 | "Eb"g2g2 g2fe g2e2 c4 | "Bb"d'2d'2 d'2c'2 b2a2 f4 | "F"c'8 z4 d'2e'2 |
+[V:2] G,,2[B,D]2G,2[B,D]2 G,,2[B,D]2G,2[B,D]2 | E,,2[G,B,]2E,2[G,B,]2 E,,2[G,B,]2E,2[G,B,]2 | B,,2[DF]2B,2[DF]2 B,,2[DF]2B,2[DF]2 | F,,2[A,C]2F,2[A,C]2 F,,2[A,C]2F,2[A,C]2 |
+% ===== 결 · 마지막 후크 (25-32마디) : 야옹! =====
+[V:1] !ff!"Gm""^마지막 후크"f'2f'2 f'2e'd' b2g2 b4 | "Eb"e'2e'2 e'2d'c' g2e2 g4 | "Bb"d'2d'2 d'2c'2 b2f2 b4 | "F"c'2c'2 c'2b2 a4f4 |
+[V:2] G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | E,,2E,2E,,2E,2 E,,2E,2E,,2E,2 | B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 | F,,2F,2F,,2F,2 F,,2F,2F,,2F,2 |
+[V:1] "Gm"b2g2 d2B2 G2B2 d2g2 | "Eb"e2g2 b2e'2 "F"d'2c'2 a2f2 | !mf!"F""^rit."c'4b4 a4f4 | "Gm""^야옹!"g8 H[gbd']8 |]
+[V:2] G,2[B,D]2G,2[B,D]2 G,2[B,D]2G,2[B,D]2 | E,2[G,B,]2E,2[G,B,]2 F,2[A,C]2F,2[A,C]2 | F,2[A,C]2F,2[A,C]2 F,2[A,C]2F,2[A,C]2 | G,,2G,2B,2D2 H[G,,G,]8 |]

@@ -1,0 +1,29 @@
+X:1
+T:브레이크 없음
+T:(No Brakes)
+R:Power Pop
+M:4/4
+L:1/16
+Q:1/4=92
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Cm
+% 파워 팝 발라드 풍 오리지널(멜로디 창작): 담담한 벌스,
+% 가속하는 프리, 길게 내지르는 후렴 — 멈추지 않는 질주
+% ===== 기 · 벌스 (1-8마디) : 담담하게 시동 =====
+[V:1] !mp!"Cm""^담담하게"g2g2 g2f2 e4c4 | "Ab"e2e2 e2f2 e4c4 | "Eb"g2g2 g2b2 g4e4 | "Bb"f2f2 f2g2 f4d4 |
+[V:2] C,2G,2C,2G,2 C,2G,2C,2G,2 | A,,2E,2A,,2E,2 A,,2E,2A,,2E,2 | E,2B,2E,2B,2 E,2B,2E,2B,2 | B,,2F,2B,,2F,2 B,,2F,2B,,2F,2 |
+[V:1] "Cm"g2g2 g2f2 e4c4 | "Ab"e2e2 e2f2 g4e4 | "Eb"g2g2 b2b2 c'4b4 | "Bb"d'8 z4 c2d2 |
+[V:2] C,2G,2C,2G,2 C,2G,2C,2G,2 | A,,2E,2A,,2E,2 A,,2E,2A,,2E,2 | E,2B,2E,2B,2 E,2B,2E,2B,2 | B,,2F,2B,,2F,2 B,,2F,2B,,2F,2 |
+% ===== 승 · 가속 (9-16마디) : 브레이크는 없다 =====
+[V:1] !mf!"Cm""^가속"c'2c'2 c'2b2 g4e4 | "Ab"c'2c'2 c'2b2 a4e4 | "Eb"b2b2 b2c'2 b4g4 | "Bb"d'2d'2 d'2c'2 d'4f'4 |
+[V:2] C,,2C,2C,,2C,2 C,,2C,2C,,2C,2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | E,2E2E,2E2 E,2E2E,2E2 | B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 |
+[V:1] "Cm"c'2c'2 c'2b2 g4e4 | "Ab"c'2c'2 c'2b2 a4c'4 | "Eb"b2b2 c'2c'2 d'2d'2 e'2e'2 | "Bb""^브레이크는 없다"f'4d'4 b4f4 |
+[V:2] C,,2C,2C,,2C,2 C,,2C,2C,,2C,2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 | E,2E2E,2E2 E,2E2E,2E2 | B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 |
+% ===== 전 · 후렴 (17-24마디) : 길게 내지른다 =====
+[V:1] !f!"Cm""^내지르는 후렴"g8 e'8 | "Ab"e'4d'4 c'8 | "Eb"g8 c'8 | "Bb"d'8 c'4b4 | "Cm"g8 e'8 | "Ab"e'4d'4 c'8 | "Eb"b4c'4 d'4b4 | "Bb"c'8 z4 g2b2 |
+[V:2] C,2G,2C2E2 G2E2C2G,2 | A,,2E,2A,2C2 E2C2A,2E,2 | E,2B,2E2G2 B2G2E2B,2 | B,,2F,2B,2D2 F2D2B,2F,2 | C,2G,2C2E2 G2E2C2G,2 | A,,2E,2A,2C2 E2C2A,2E,2 | E,2B,2E2G2 B2G2E2B,2 | B,,2F,2B,2D2 F2D2B,2F,2 |
+% ===== 결 · 마지막 질주 (25-32마디) =====
+[V:1] !ff!"Cm""^더 크게"g8 e'8 | "Ab"e'4d'4 c'8 | "Eb"g8 c'8 | "Bb"d'8 e'4f'4 | "Cm"g'8 e'8 | "Ab"e'4d'4 c'4a4 | !mf!"Eb""^rit."b4g4 "Bb"f4d4 | "Cm""^질주 끝"c'8 H[cegc']8 |]
+[V:2] C,2G,2C2E2 G2E2C2G,2 | A,,2E,2A,2C2 E2C2A,2E,2 | E,2B,2E2G2 B2G2E2B,2 | B,,2F,2B,2D2 F2D2B,2F,2 | C,2G,2C2E2 G2E2C2G,2 | A,,2E,2A,2C2 E2C2A,2E,2 | E,2B,2E2G2 B,2F,2B,2D2 | C,,2C,2G,2C2 H[C,,C,G,]8 |]

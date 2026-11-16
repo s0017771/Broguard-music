@@ -1,0 +1,25 @@
+X:1
+T:오후 세 시의 캐논
+T:(Canon at Three O'Clock)
+R:Lazy Canon
+M:4/4
+L:1/8
+Q:1/4=66
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:F
+% 캐논 진행 오리지널(멜로디 창작): F–C/E–Dm–Am/C–B♭–F/A–B♭–C 여덟 화음을 네 바퀴.
+% 계단처럼 내려가는 캐논 베이스를 멜로디도 함께 따라 내려가며 하품하듯 늘어진다.
+% ===== 기 · 창가의 햇살 (1-8마디) : 반쯤 감긴 눈 =====
+[V:1] !p!"F""^창가의 햇살"A4 G2F2 | "C/E"G6 z2 | "Dm"F4 E2D2 | "Am/C"E6 z2 | "Bb"D2F2 B2d2 | "F/A"c4 A4 | "Bb"B2A2 G2F2 | "C"G6 z2 |
+[V:2] F,4 [A,C]4 | E,4 [G,C]4 | D,4 [F,A,]4 | C,4 [E,A,]4 | B,,4 [D,F,]4 | A,,4 [C,F,]4 | B,,4 [D,F,]4 | C,4 [E,G,]4 |
+% ===== 승 · 고양이와 차 한 잔 (9-16마디) : 살랑이는 점음표 =====
+[V:1] !mp!"F""^고양이와 차 한 잔"A3G FG A2 | "C/E"G3F E2C2 | "Dm"F3E DE F2 | "Am/C"E3D C2E2 | "Bb"D2F2 B3c | "F/A"d2c2 A4 | "Bb"B2d2 c2B2 | "C7"G4 E2C2 |
+[V:2] F,,C,F,A, CA,F,C, | E,,C,E,G, CG,E,C, | D,,A,,D,F, A,F,D,A,, | C,E,A,C ECA,E, | B,,F,B,D FDB,F, | A,,F,A,C FCA,F, | B,,F,B,D FDB,F, | C,G,B,E GEB,G, |
+% ===== 전 · 깜빡 낮잠 (17-24마디) : 꿈속에서 한 옥타브 위로 =====
+[V:1] !pp!"F""^깜빡 낮잠"c'6 a2 | "C/E"g6 e2 | "Dm"f6 d2 | "Am/C"e6 c2 | !mp!"Bb""^햇살 반짝"d2f2 b2d'2 | "F/A"c'2a2 f2a2 | "Bb"b2a2 g2f2 | "C""^기지개"e2g2 c'4 |
+[V:2] F,,2C,2 A,2F2 | E,,2C,2 G,2E2 | D,,2A,,2 F,2D2 | C,2E,2 A,2E2 | B,,2F,2 D2F2 | A,,2F,2 C2F2 | B,,2F,2 D2F2 | C,2G,2 E2G2 |
+% ===== 결 · 다시, 평화로운 오후 (25-32마디) : 3도 화음으로 돌아온 주제 =====
+[V:1] !mp!"F""^다시, 평화로운 오후"[FA]4 [EG]2[DF]2 | "C/E"[EG]6 z2 | "Dm"[DF]4 [CE]2[B,D]2 | "Am/C"[CE]6 z2 | "Bb"D2F2 B2d2 | "F/A"[Ac]4 [FA]4 | !p!"Bb""^rit."B2d2 "C7"c2B2 | "F6""^하~암"C2F2 H[Acdf]4 |]
+[V:2] F,2[A,C]2 C,2[A,C]2 | E,2[G,C]2 C,2[G,C]2 | D,2[F,A,]2 A,,2[F,A,]2 | C,2[E,A,]2 A,,2[E,A,]2 | B,,2[D,F,]2 F,,2[D,F,]2 | A,,2[C,F,]2 F,,2[C,F,]2 | B,,2[D,F,]2 C,2[E,B,]2 | F,,2C,2 H[F,A,D]4 |]

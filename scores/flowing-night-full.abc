@@ -1,0 +1,54 @@
+X:1
+T:흐르는 밤 (풀버전)
+T:(The Flowing Night — Full Version)
+R:New Age
+M:4/4
+L:1/16
+Q:1/4=68
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Am
+% 28번 「흐르는 밤」의 확장형 풀버전 — 약 3분 35초, 60마디. 밤이 흘러 새벽이 되기까지
+% 1절은 원곡 그대로(물결 · 주제 · 잔물결 · 깊은 물살) → 달이 구름에 가리는 간주
+% → 2절은 add9 물결과 꾸밈음 → 거짓마침으로 들어가는 '가장 깊은 밤'(B♭maj7의 어둠)
+% → A장조로 동이 트며 주제가 돌아오는 새벽 → 물결이 잦아드는 코다. 왼손 물결은 끝까지 멈추지 않는다
+% ===== 전주 (1-4마디) : 물결 위로 — 첫 음들이 떠오른다 =====
+[V:1] !pp!"Am""^물결처럼"z8 e4a4 | "F"z8 c'4a4 | "C"z8 g4e4 | "G"z8 e4g4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 |
+% ===== 1절 · 주제 (5-12마디) : 노래하는 후렴 =====
+[V:1] !p!"Am""^1절 — 주제"a4b4 c'6ba | "F"a6ag f4c4 | "C"g6ag e4c4 | "G"d6ed B4G4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 |
+[V:1] "Am"a4b4 c'6ba | "F"a6ag f4c4 | "C"g6ag e4g4 | "E7"a8 ^g4e4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | E,2B,2E2^G2 B2^G2E2B,2 |
+% ===== 1절 · 잔물결 (13-20마디) : 같은 주제, 16분음표 장식이 반짝인다 =====
+[V:1] !mp!"Am""^잔물결"a4b4 c'4bc'ba | "F"a4agag f4c4 | "C"g4agag e4c4 | "G"d4eded B4G4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | G,,2D,2G,2B,2 D2B,2G,2D,2 |
+[V:1] "Am"a4b4 c'4bc'ba | "F"a4agag f4c4 | "C"g4agag e4g4 | "E7"a4b4 ^g4e4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | C,2G,2C2E2 G2E2C2G,2 | E,2B,2E2^G2 B2^G2E2B,2 |
+% ===== 1절 · 깊은 물살 (21-28마디) : 옥타브 위에서 차오른다 =====
+[V:1] !mf!"Dm""^물살이 깊어진다"d'6c'd' f'4d'4 | "Am"e'6d'e' c'4a4 | !f!"F"f'6e'f' c'4a4 | "E7"e'8 b4^g4 |
+[V:2] D,2A,2D2F2 A2F2D2A,2 | A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | E,2B,2E2^G2 B2^G2E2B,2 |
+[V:1] "Dm"d'6c'd' f'4d'4 | "Am"e'6d'e' c'4a4 | "F"f'4e'4 d'4c'4 | "E7"b6c'b ^g4e4 |
+[V:2] D,2A,2D2F2 A2F2D2A,2 | A,,2E,2A,2C2 E2C2A,2E,2 | F,,2C,2F,2A,2 C2A,2F,2C,2 | E,2B,2E2^G2 B2^G2E2B,2 |
+% ===== 간주 (29-32마디) : 달이 구름에 가린다 =====
+[V:1] !pp!"Fmaj7""^달이 구름에 가린다"z8 c'4e'4 | "Em7"z8 b4g4 | "Dm7"z8 a4f4 | "E7sus4"z8 a4 "E7"^g4 |
+[V:2] F,,2C,2F,2A,2 E2A,2F,2C,2 | E,,2B,,2E,2G,2 D2G,2E,2B,,2 | D,,2A,,2D,2F,2 C2F,2D,2A,,2 | E,,2B,,2E,2A,2 D2A,2^G,2E,2 |
+% ===== 2절 (33-40마디) : 별빛이 섞인 물결 — add9 물결과 꾸밈음 =====
+[V:1] !mp!"Am""^2절 — 별빛이 섞인 물결"a4b4 !turn!c'6ba | "F"{b}a6ag f4c4 | "C"!mordent!g6ag e4c4 | "G"d6ed B4G4 |
+[V:2] A,,2E,2B,2C2 E2C2B,2E,2 | F,,2C,2G,2A,2 C2A,2G,2C,2 | C,2G,2D2E2 G2E2D2G,2 | G,,2D,2A,2B,2 D2B,2A,2D,2 |
+[V:1] "Am"a4b4 c'6ba | "F"a6ag f4a4 | "C"!trill!g6ag e4g4 | "E7"a8 ^g4b4 |
+[V:2] A,,2E,2B,2C2 E2C2B,2E,2 | F,,2C,2G,2A,2 C2A,2G,2C,2 | C,2G,2D2E2 G2E2D2G,2 | E,2B,2D2^G2 B2^G2D2B,2 |
+% ===== 가장 깊은 밤 (41-48마디) : 새로 쓴 구간 — 거짓마침으로 들어가 B♭maj7의 어둠까지 =====
+[V:1] !mf!"F""^가장 깊은 밤"c'8 f'4e'4 | "G"d'8 g'4f'4 | "Em7"e'6d'2 b4g4 | "Am"a8 c'4e'4 |
+[V:2] F,,2C,2F,2A,2 C2F2C2A,2 | G,,2D,2G,2B,2 D2G2D2B,2 | E,,2B,,2E,2G,2 B,2D2B,2G,2 | A,,2E,2A,2C2 E2A2E2C2 |
+[V:1] !f!"Dm7"f'6e'2 d'4c'4 | !ff!"Bbmaj7"d'8 f'4a'4 | !mf!"E7sus4"e'8 d'4b4 | !p!"E7"^g12 z4 |
+[V:2] D,,2A,,2D,2F,2 A,2C2A,2F,2 | _B,,,2F,,2_B,,2D,2 F,2A,2F,2D,2 | E,,2B,,2E,2A,2 D2A,2E,2B,,2 | E,,2B,,2E,2^G,2 B,2D2B,2^G,2 |
+% ===== 새벽 (49-56마디) : A장조, 동이 트며 주제가 돌아온다 =====
+[V:1] [K:A]!p!"A""^새벽 — 동이 튼다"a4b4 c'6ba | "D"a6ba f4d4 | "C#m"g6ag e4c4 | "E7"d6ed B4G4 |
+[V:2] [K:A]A,,2E,2A,2C2 E2C2A,2E,2 | D,,2A,,2D,2F,2 A,2F,2D,2A,,2 | C,,2G,,2C,2E,2 G,2E,2C,2G,,2 | E,,2B,,2E,2G,2 B,2D2B,2G,2 |
+[V:1] !mp!"A"a4b4 c'6ba | "D"a6ba f4a4 | !mf!"C#m"g6ag e4g4 | "E7sus4"a8 "E7"g4e4 |
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | D,,2A,,2D,2F,2 A,2F,2D,2A,,2 | C,,2G,,2C,2E,2 G,2E,2C,2G,,2 | E,,2B,,2E,2A,2 D2B,2G,2E,2 |
+% ===== 코다 (57-60마디) : 물결이 잦아든다 =====
+[V:1] [Q:1/4=64]!pp!"A""^물결이 잦아든다"e4a4 c'8 | [Q:1/4=58]"D"c'4b4 a8 | [Q:1/4=52]"E7""^rit."b4g4 e8 | [Q:1/4=46]"A(add9)"H[Aceb]16 |]
+[V:2] A,,2E,2A,2C2 E2C2A,2E,2 | D,,2A,,2D,2F,2 A,2F,2D,2A,,2 | E,,2B,,2E,2G,2 B,2D2B,2G,2 | H[A,,E,A,]16 |]

@@ -1,0 +1,33 @@
+X:1
+T:쇼핑 목록
+T:(Shopping List)
+R:Pop Trap
+M:4/4
+L:1/16
+Q:1/4=70
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Em
+% 하프타임 트랩 팝 풍 오리지널(멜로디 창작): 우아한 오르골 인트로,
+% 한 음으로 속삭이는 랩 벌스, 호화로운 후크, 다시 오르골로
+% ===== 기 · 오르골 (1-8마디) : 우아하게 =====
+[V:1] !p!"Em""^오르골처럼"b2g2 e2g2 b2g2 b2e'2 | "C"c'2g2 e2g2 c'2g2 c'2e'2 | "Am"a2e2 c2e2 a2e2 a2c'2 | "B7"b2f2 ^d2f2 b2f2 b2^d'2 |
+[V:2] E,4B,4G4B,4 | C,4G,4E4G,4 | A,,4E,4C4E,4 | B,,4F,4^D4F,4 |
+[V:1] "Em"b2g2 e2g2 b4g4 | "C"c'2g2 e2g2 c'4g4 | "Am"a2e2 c2e2 a4c'4 | "B7"b2f2 ^d2f2 b4f'4 |
+[V:2] E,4B,4G4B,4 | C,4G,4E4G,4 | A,,4E,4C4E,4 | B,,4F,4^D4F,4 |
+% ===== 승 · 속삭이는 랩 (9-16마디) : 트랩 붐 =====
+[V:1] !mp!"Em""^속삭이듯 랩"e2ee e2ee g2ge e4 | "C"e2ee e2ee g2ga g4 | "Am"a2aa a2ag e2ee e4 | "B7"f2ff f2fe ^d2^dd ^d4 |
+[V:2] E,8 [GB]4z4 | C,8 [Gc]4z4 | A,,8 [Ac]4z4 | B,,8 [FB]4z4 |
+[V:1] "Em"g2gg g2ge e2ee e4 | "C"g2gg g2ga a2aa a4 | "Am"c'2c'c' c'2ba a2ge e4 | "B7""^사고 싶어, 산다"f2fe ^d2e2 f4^d4 |
+[V:2] E,8 [GB]4z4 | C,8 [Gc]4z4 | A,,8 [Ac]4z4 | B,,8 [FB]4z4 |
+% ===== 전 · 호화로운 후크 (17-24마디) =====
+[V:1] !mf!"Em""^호화로운 후크"b4g4 e'4b4 | "C"c'4g4 e'4c'4 | "Am"a4e'4 c'4a4 | "B7"b4^d'4 f'4b4 |
+[V:2] E,8 [GB]4z2E,2 | C,8 [Gc]4z2C,2 | A,,8 [Ac]4z2A,2 | B,,8 [FB]4z2B,,2 |
+[V:1] "Em"b4g4 e'4b4 | "C"c'4g4 e'4c'4 | "Am"c'4a4 e4a4 | "B7"b8 z4 ^d2f2 |
+[V:2] E,8 [GB]4z2E,2 | C,8 [Gc]4z2C,2 | A,,8 [Ac]4z2A,2 | B,,8 [FB]4z2B,,2 |
+% ===== 결 · 다시 오르골 (25-32마디) : 포장해 주세요 =====
+[V:1] !p!"Em""^다시 오르골"b2g2 e2g2 b2g2 b2e'2 | "C"c'2g2 e2g2 c'2g2 c'2e'2 | "Am"a2e2 c2e2 a2e2 a2c'2 | "B7"b2f2 ^d2f2 b2f2 b2^d'2 |
+[V:2] E,4B,4G4B,4 | C,4G,4E4G,4 | A,,4E,4C4E,4 | B,,4F,4^D4F,4 |
+[V:1] "Em"b2g2 e2g2 b4e'4 | "Am"a2e2 c2e2 a4c'4 | !pp!"B7""^rit."b4a4 f4^d4 | "Em""^포장해 주세요"e8 H[Beg]8 |]
+[V:2] E,4B,4G4B,4 | A,,4E,4C4E,4 | B,,4F,4^D4F,4 | E,,2E,2G,2B,2 H[E,B,E]8 |]

@@ -1,0 +1,25 @@
+X:1
+T:건배
+T:(A Toast)
+R:Pop
+M:4/4
+L:1/16
+Q:1/4=91
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 캐논 진행 팝 풍 오리지널(멜로디 창작): 같은 여덟 화음을 네 바퀴 돌며
+% 점점 커지는 건배의 노래 — G–D–Em–Bm–C–G–C–D
+% ===== 기 · 첫 잔 (1-8마디) : 조용히 잔을 들고 =====
+[V:1] !mp!"G""^잔을 들고"d4B4 G4A4 | "D"B4A4 F4A4 | "Em"G4B4 e4d4 | "Bm"B4d4 f4d4 | "C"e4d4 c4B4 | "G"d4B4 G4B4 | "C"c4B4 A4c4 | "D"A8 z4 d2c2 |
+[V:2] G,8 [B,D]8 | D,8 [F,A,]8 | E,8 [G,B,]8 | B,,8 [DF]8 | C,8 [E,G,]8 | G,8 [B,D]8 | C,8 [E,G,]8 | D,8 [F,A,]8 |
+% ===== 승 · 두 번째 잔 (9-16마디) : 이야기가 흐른다 =====
+[V:1] !mf!"G"d3e d2B2 G2A2 B2d2 | "D"B3c B2A2 F2G2 A2d2 | "Em"g3a g2f2 e2d2 B2G2 | "Bm"f3g f2e2 d2B2 d2f2 | "C"e3f e2d2 c2B2 c2e2 | "G"d3e d2B2 G2B2 d2g2 | "C"a3g a2g2 e2c2 e2g2 | "D"a8 f4d4 |
+[V:2] G,4[B,D]4 G,4[B,D]4 | D,4[F,A,]4 D,4[F,A,]4 | E,4[G,B,]4 E,4[G,B,]4 | B,,4[DF]4 B,,4[DF]4 | C,4[E,G,]4 C,4[E,G,]4 | G,4[B,D]4 G,4[B,D]4 | C,4[E,G,]4 C,4[E,G,]4 | D,4[F,A,]4 D,4[F,A,]4 |
+% ===== 전 · 다 같이 (17-24마디) : 건배! =====
+[V:1] !f!"G""^건배!"b4g4 d'6c'b | "D"a6gf g4a4 | "Em"b4g4 e'6d'b | "Bm"d'8 b4f4 | "C"e'4d'4 c'6ba | "G"b4d'4 g'6d'b | "C"e'4c'4 a4c'4 | "D"d'8 z4 a2c'2 |
+[V:2] G,2D,2B,2D,2 G,2D,2B,2D,2 | D,2A,2F2A,2 D2A,2F2A,2 | E,2B,2G2B,2 E2B,2G2B,2 | B,,2F,2D2F,2 B,2F,2D2F,2 | C,2G,2E2G,2 C2G,2E2G,2 | G,2D,2B,2D,2 G,2D,2B,2D,2 | C,2G,2E2G,2 C2G,2E2G,2 | D,2A,2F2A,2 D2A,2F2A,2 |
+% ===== 결 · 남은 온기 (25-32마디) : 마지막 잔 =====
+[V:1] !mf!"G""^남은 온기"d'4b4 g4b4 | "D"a4f4 d4f4 | "Em"g4b4 e'4b4 | "Bm"f'4d'4 b4f4 | "C"e'4c'4 g4e4 | !mp!"G"d'4b4 g4d4 | "C""^rit."c'4e4 "D"a4c'4 | "G""^마지막 잔"b8 H[dgb]8 |]
+[V:2] G,8 [B,D]8 | D,8 [F,A,]8 | E,8 [G,B,]8 | B,,8 [DF]8 | C,8 [E,G,]8 | G,8 [B,D]8 | C,8 D,8 | G,,2D,2B,2D,2 H[G,,D,G,]8 |]
