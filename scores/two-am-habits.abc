@@ -1,0 +1,27 @@
+X:1
+T:새벽 두 시의 습관
+T:(Two A.M. Habits)
+R:Dance Pop
+M:4/4
+L:1/16
+Q:1/4=126
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Bm
+% 포온더플로어 댄스팝 풍 오리지널(멜로디 창작): 쿵쿵 찍는 킥,
+% 숨을 참는 프리, 새벽의 유포리아 후렴
+% ===== 기 · 벌스 (1-8마디) : 밤의 펄스 =====
+[V:1] !mf!"Bm""^밤의 펄스"f2f2 f2e2 d2d2 B4 | "G"d2d2 d2e2 d2B2 B4 | "D"f2f2 f2g2 f2d2 d4 | "A"e2e2 e2f2 e2c2 c4 |
+[V:2] B,4B,4 B,4B,4 | G,4G,4 G,4G,4 | D,4D,4 D,4D,4 | A,4A,4 A,4A,4 |
+[V:1] "Bm"f2f2 f2e2 d2d2 B4 | "G"d2d2 d2e2 d2B2 d4 | "D"f2f2 g2g2 a2a2 b2b2 | "A"c'8 z4 a2b2 |
+[V:2] B,4B,4 B,4B,4 | G,4G,4 G,4G,4 | D,4D,4 D,4D,4 | A,4A,4 A,4A,4 |
+% ===== 승 · 프리 (9-16마디) : 숨을 참고 =====
+[V:1] !mp!"Bm""^숨을 참고"d'2z2 b2z2 f2z2 d4 | "G"b2z2 g2z2 d2z2 B4 | "D"a2z2 f2z2 d2z2 A4 | "A"e2e2 f2f2 g2g2 a2a2 | "Bm"d'2z2 b2z2 f2z2 d4 | "G"b2z2 g2z2 d2z2 B4 | "D"a2a2 b2b2 c'2c'2 d'2d'2 | "A""^터진다!"e'4e'4 e'2e'2 e'2z2 |
+[V:2] B,8 [DF]8 | G,8 [B,D]8 | D,8 [FA]8 | A,8 [CE]8 | B,8 [DF]8 | G,8 [B,D]8 | D,4D,4 D,4D,4 | A,2A,2A,2A,2 A,2A,2A,2A,2 |
+% ===== 전 · 후렴 (17-24마디) : 새벽의 유포리아 =====
+[V:1] !f!"Bm""^새벽의 유포리아"d'4f'4 f'6e'd' | "G"d'6c'b b4d'4 | "D"a4d'4 f'6e'd' | "A"e'8 c'4a4 | "Bm"d'4f'4 f'6e'd' | "G"d'6c'b b4d'4 | "D"a4d'4 f'4a'4 | "A"e'8 z4 d'2e'2 |
+[V:2] [B,,B,]4[B,,B,]4 [B,,B,]4[B,,B,]4 | [G,,G,]4[G,,G,]4 [G,,G,]4[G,,G,]4 | [D,D]4[D,D]4 [D,D]4[D,D]4 | [A,,A,]4[A,,A,]4 [A,,A,]4[A,,A,]4 | [B,,B,]4[B,,B,]4 [B,,B,]4[B,,B,]4 | [G,,G,]4[G,,G,]4 [G,,G,]4[G,,G,]4 | [D,D]4[D,D]4 [D,D]4[D,D]4 | [A,,A,]4[A,,A,]4 [A,,A,]4[A,,A,]4 |
+% ===== 결 · 마지막 후렴 (25-32마디) : 새벽 두 시 =====
+[V:1] !ff!"Bm"d'4f'4 f'6e'd' | "G"d'6c'b b4d'4 | "D"a4d'4 f'6e'd' | "A"e'8 f'4e'4 | "Bm"d'2b2 f2d2 B2d2 f2b2 | "G"b2g2 d2B2 "A"c2e2 a2c'2 | !mf!"Bm""^rit."d'4c'4 b4f4 | "Bm""^새벽 두 시"f'8 H[bd'f']8 |]
+[V:2] [B,,B,]4[B,,B,]4 [B,,B,]4[B,,B,]4 | [G,,G,]4[G,,G,]4 [G,,G,]4[G,,G,]4 | [D,D]4[D,D]4 [D,D]4[D,D]4 | [A,,A,]4[A,,A,]4 [A,,A,]4[A,,A,]4 | B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 | G,,2G,2G,,2G,2 A,,2A,2A,,2A,2 | B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 | B,,2F,2B,2D2 H[B,,F,B,]8 |]

@@ -1,0 +1,38 @@
+X:1
+T:방학 첫날 (옥타브 바운스)
+T:(First Day of Vacation - Octave Bounce)
+R:Bright Piano
+M:4/4
+L:1/8
+Q:1/4=116
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:D
+% 42번 트랙의 리메이크(멜로디 동일·창작): 옥타브를 왔다갔다하는
+% 스타카토 베이스가 주인공 — 베이스 솔로 인트로로 흥미를 당기고,
+% 곡 전체를 옥타브 바운스가 끌고 간다. 중간의 베이스 브레이크까지!
+% ===== 인트로 (1-4마디) : 베이스 옥타브 바운스, 솔로 =====
+[V:1] "D""^베이스가 먼저"z8 | z8 | "^멜로디 살금살금"z2.f.a z2.f.a | .d'2.a2 .f2z2 |
+[V:2] !mf!"^옥타브 바운스!".D,.D.D,.D .D,.D.D,.D | .D,.D.D,.D .D,.D.D,.D | .D,.D.D,.D .D,.D.D,.D | .D,.D.D,.D .A,.A.A,.A |
+% ===== 기 (5-12마디) : 아침 햇살 — 바운스 위에서 폴짝 =====
+[V:1] !mf!"D""^폴짝폴짝"f2a2 f2d2 | "G"g2b2 g2d2 | "A"e2a2 c'2a2 | "D"d'2a2 f2z2 |
+[V:2] .D,.D.D,.D .D,.D.D,.D | .G,.G.G,.G .G,.G.G,.G | .A,.A.A,.A .A,.A.A,.A | .D,.D.D,.D .D,.D.D,.D |
+[V:1] "D"f2a2 f2d2 | "G"g2b2 g2d2 | "A"e2f2 g2e2 | "D"d2f2 a2z2 |
+[V:2] .D,.D.D,.D .D,.D.D,.D | .G,.G.G,.G .G,.G.G,.G | .A,.A.A,.A .A,.A.A,.A | .D,.D.D,.D .D,.D.D,.D |
+% ===== 승 (13-20마디) : 자전거 — 한 층 높이 =====
+[V:1] "D""^자전거"a2d'2 a2f2 | "G"b2d'2 b2g2 | "A"a2c'2 e'2c'2 | "D"d'4 a2f2 |
+[V:2] .D,.D.D,.D .D,.D.D,.D | .G,.G.G,.G .G,.G.G,.G | .A,.A.A,.A .A,.A.A,.A | .D,.D.D,.D .D,.D.D,.D |
+[V:1] "Bm"b2d'2 b2f2 | "G"b2g2 e2g2 | "Em"g2e2 "A"e2c2 | "D"d2z2 d'2z2 |
+[V:2] .B,.B.B,.B .B,.B.B,.B | .G,.G.G,.G .G,.G.G,.G | .E,.E.E,.E .A,.A.A,.A | .D,.D.D,.D .D,.D.D,.D |
+% ===== 전 (21-28마디) : 달리기 — 베이스도 함께 질주 =====
+[V:1] !f!"D""^달리기"defg a2f2 | "G"gabc' d'2b2 | "A"abc'd' e'2c'2 | "D"f'2d'2 a2d'2 |
+[V:2] .D,.D.D,.D .D,.D.D,.D | .G,.G.G,.G .G,.G.G,.G | .A,.A.A,.A .A,.A.A,.A | .D,.D.D,.D .D,.D.D,.D |
+[V:1] "Bm"d'c'ba f2d2 | "G"b2g2 d2g2 | "Em"efga b2g2 | "A7"a2g2 e2c2 |
+[V:2] .B,.B.B,.B .B,.B.B,.B | .G,.G.G,.G .G,.G.G,.G | .E,.E.E,.E .E,.E.E,.E | .A,.A.A,.A .A,.A.A,.A |
+% ===== 브레이크 (29-30마디) : 다시 베이스만! =====
+[V:1] !mf!"D""^다시 베이스만!"z8 | z4 "A7"z2 .d.e |
+[V:2] .D,.D.D,.D .D,.D.D,.D | .D,.D.D,.D .A,.A.A,.A |
+% ===== 결 (31-36마디) : 다시 아침 — 폴짝! =====
+[V:1] "D"f2a2 f2d2 | "G"g2b2 g2d2 | "A"e2a2 c'2a2 | "D"d'2a2 f2z2 | "A7"e2g2 a2c'2 | "D""^폴짝!"d'2a2 H[dfa]4 |]
+[V:2] .D,.D.D,.D .D,.D.D,.D | .G,.G.G,.G .G,.G.G,.G | .A,.A.A,.A .A,.A.A,.A | .D,.D.D,.D .D,.D.D,.D | .A,.A.A,.A .A,.A.A,.A | .D,.D.A,.A H[D,A,D]4 |]

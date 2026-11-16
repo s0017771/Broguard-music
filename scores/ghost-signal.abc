@@ -1,0 +1,33 @@
+X:1
+T:유령 신호
+T:(Ghost Signal)
+R:EDM
+M:4/4
+L:1/16
+Q:1/4=100
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Bm
+% 바운스 EDM 풍 오리지널(멜로디 창작): 통통 튀는 아르페지오 리프,
+% 싱어롱 벌스, 드라이브 드롭, 리프의 귀환
+% ===== 기 · 리프 (1-8마디) : 신호가 잡힌다 =====
+[V:1] !mf!"Bm""^아르페지오 리프"b2f2d2f2 b2f2d'2b2 | "G"b2g2d2g2 b2g2d'2b2 | "D"a2f2d2f2 a2f2d'2a2 | "A"a2e2c2e2 a2e2c'2a2 |
+[V:2] B,4[DF]4 B,4[DF]4 | G,4[B,D]4 G,4[B,D]4 | D,4[FA]4 D,4[FA]4 | A,4[CE]4 A,4[CE]4 |
+[V:1] "Bm"b2f2d2f2 b2f2d'2b2 | "G"b2g2d2g2 b2g2d'2b2 | "D"a2f2d2f2 a2f2d'2a2 | "A"a2e2c2e2 a2e2c'2a2 |
+[V:2] B,4[DF]4 B,4[DF]4 | G,4[B,D]4 G,4[B,D]4 | D,4[FA]4 D,4[FA]4 | A,4[CE]4 A,4[CE]4 |
+% ===== 승 · 벌스 (9-16마디) : 싱어롱 =====
+[V:1] !mp!"Bm""^싱어롱"d3d d2c2 B6z2 | "G"d3d d2e2 d6z2 | "D"f3f f2e2 d6z2 | "A"e3e e2c2 A6z2 |
+[V:2] B,4[DF]4 B,4[DF]4 | G,4[B,D]4 G,4[B,D]4 | D,4[FA]4 D,4[FA]4 | A,4[CE]4 A,4[CE]4 |
+[V:1] "Bm"d3d d2c2 B6z2 | "G"d3d d2e2 d6z2 | "D"f3f f2e2 d6z2 | "A"e8 z4 f2g2 |
+[V:2] B,4[DF]4 B,4[DF]4 | G,4[B,D]4 G,4[B,D]4 | D,4[FA]4 D,4[FA]4 | A,4[CE]4 A,4[CE]4 |
+% ===== 전 · 드롭 (17-24마디) : 리프가 달린다 =====
+[V:1] !f!"Bm""^드롭!"b2f2d2f2 b2f2d'2b2 | "G"b2g2d2g2 b2g2d'2b2 | "D"a2f2d2f2 a2f2d'2a2 | "A"a2e2c2e2 a2e2c'2a2 |
+[V:2] B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 |
+[V:1] "Bm"b2f2d2f2 b2f2d'2b2 | "G"b2g2d2g2 b2g2d'2b2 | "D"a2f2d2f2 a2f2d'2a2 | "A"a2e2c2e2 a2e2c'2a2 |
+[V:2] B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 |
+% ===== 결 · 마지막 송신 (25-32마디) =====
+[V:1] !mf!"Bm"d3d d2c2 B6z2 | "G"d3d d2e2 d6z2 | "D"f3f f2e2 d6z2 | "A"e8 z4 c2e2 |
+[V:2] B,,2B,2B,,2B,2 B,,2B,2B,,2B,2 | G,,2G,2G,,2G,2 G,,2G,2G,,2G,2 | D,2D2D,2D2 D,2D2D,2D2 | A,,2A,2A,,2A,2 A,,2A,2A,,2A,2 |
+[V:1] "Bm"b2f2d2f2 b2f2d'2b2 | "G"b2g2d2g2 b2g2d'2b2 | !p!"A""^rit."e2c2 A2c2 e4a4 | "Bm""^신호 종료"d'8 H[fbd']8 |]
+[V:2] B,4[DF]4 B,4[DF]4 | G,4[B,D]4 G,4[B,D]4 | A,4[CE]4 A,4[CE]4 | B,,2B,2B,,2B,2 H[B,,F,B,]8 |]

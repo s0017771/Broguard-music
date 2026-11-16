@@ -1,0 +1,25 @@
+X:1
+T:우리 동네 큰길
+T:(Our Boulevard)
+R:Chanson
+M:4/4
+L:1/16
+Q:1/4=112
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 프렌치 샹송 행진곡 풍 오리지널(멜로디 창작): 움-파 반주 위를
+% 성큼성큼 걷는 벌스, 다 같이 부르는 후렴
+% ===== 기 · 벌스 (1-8마디) : 성큼성큼 =====
+[V:1] !mf!"G""^성큼성큼"d3d B2G2 B4d4 | "D7"c3c A2F2 A4c4 | "D7"c3c d2c2 A4F4 | "G"B3B G2B2 d4B4 | "G"d3d B2G2 B4d4 | "G7"=f3f d2B2 d4f4 | "C"e3e c2e2 g4e4 | "D7"d8 z4 d2d2 |
+[V:2] G,4[B,D]4 G,4[B,D]4 | D,4[FC]4 D,4[FC]4 | D,4[FC]4 D,4[FC]4 | G,4[B,D]4 G,4[B,D]4 | G,4[B,D]4 G,4[B,D]4 | G,4[B,=F]4 G,4[B,F]4 | C,4[E,G,]4 C,4[E,G,]4 | D,4[FC]4 D,4[FC]4 |
+% ===== 승 · 두 번째 벌스 (9-16마디) : 골목의 인사 =====
+[V:1] "G"d3d B2G2 B4d4 | "D7"c3c A2F2 A4c4 | "C"e3e c2A2 "D7"c4A4 | "G"G8 z4 B2c2 | "Em"e3e e2d2 B4G4 | "A7"^c3c A2c2 e4c4 | "D"d3d d2e2 f4e4 | "D7"a8 f4d4 |
+[V:2] G,4[B,D]4 G,4[B,D]4 | D,4[FC]4 D,4[FC]4 | C,4[E,G,]4 D,4[FC]4 | G,4[B,D]4 G,4[B,D]4 | E,4[G,B,]4 E,4[G,B,]4 | A,4[^CE]4 A,4[^CE]4 | D,4[FA,]4 D,4[FA,]4 | D,4[FC]4 D,4[FC]4 |
+% ===== 전 · 후렴 (17-24마디) : 다 같이! =====
+[V:1] !f!"G""^다 같이!"b3b g2b2 d'4b4 | "D7"a3a f2a2 c'4a4 | "D7"a3a c'2a2 f4d4 | "G"g3g b2g2 d4g4 | "G7"g3g =f2d2 B4f4 | "C"e3e g2e2 c4e4 | "A7"a3a e2^c2 "D7"a4c'4 | "G"g8 z4 b2c'2 |
+[V:2] G,4[B,D]4 G,4[B,D]4 | D,4[FC]4 D,4[FC]4 | D,4[FC]4 D,4[FC]4 | G,4[B,D]4 G,4[B,D]4 | G,4[B,=F]4 G,4[B,F]4 | C,4[E,G,]4 C,4[E,G,]4 | A,4[^CE]4 D,4[FC]4 | G,4[B,D]4 G,4[B,D]4 |
+% ===== 결 · 마지막 후렴 (25-32마디) : 빰! =====
+[V:1] "G"b3b g2b2 d'4b4 | "D7"a3a f2a2 c'4a4 | "D7"a3a c'2a2 f4d4 | "G"g3g b2g2 d4g4 | "C"e3e g2c'2 e'4c'4 | "G"d'3d' b2d'2 g'4d'4 | !mf!"A7""^rit."e'4^c'4 "D7"d'4a4 | "G""^빰!"g8 H[Bdg]8 |]
+[V:2] G,4[B,D]4 G,4[B,D]4 | D,4[FC]4 D,4[FC]4 | D,4[FC]4 D,4[FC]4 | G,4[B,D]4 G,4[B,D]4 | C,4[E,G,]4 C,4[E,G,]4 | G,4[B,D]4 G,4[B,D]4 | A,4[^CE]4 D,4[FC]4 | G,,2D,2G,2B,2 H[G,,D,G,]8 |]

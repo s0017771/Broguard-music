@@ -1,0 +1,27 @@
+X:1
+T:미끄러지듯
+T:(Smooth Slide)
+R:Funk Pop
+M:4/4
+L:1/16
+Q:1/4=110
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Dm
+% 매끈한 펑크 팝 풍 오리지널(멜로디 창작): 쉼표로 그루브를 만드는 베이스,
+% 미끄러지는 멜로디, 핑거 스냅 브레이크
+% ===== 기 · 벌스 (1-8마디) : 미끄러지듯 =====
+[V:1] !mf!"Dm""^미끄러지듯"z2a2 f2d2 z2f2 e2c2 | "Am"z2g2 e2c2 z2e2 d2A2 | "Bb"z2f2 d2B2 z2d2 c2A2 | "A"z2e2 ^c2A2 z2^c2 e2g2 |
+[V:2] D,2z2A,2D2 z2C2D2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | B,,2z2F,2B,2 z2D2B,2z2 | A,,2z2E,2A,2 z2G,2A,2z2 |
+[V:1] "Dm"z2a2 f2d2 z2f2 g2a2 | "Am"z2g2 e2c2 z2e2 g2a2 | "Bb"z2b2 a2f2 z2d2 f2a2 | "A"e8 z4 ^c2e2 |
+[V:2] D,2z2A,2D2 z2C2D2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | B,,2z2F,2B,2 z2D2B,2z2 | A,,2z2E,2A,2 z2G,2A,2z2 |
+% ===== 승 · 부드럽게 (9-16마디) : 버터처럼 =====
+[V:1] !mp!"Dm""^부드럽게"d'6c'a f4d4 | "Am"c'6ag e4c4 | "Bb"d'6c'a b4d'4 | "A"e'8 ^c'4A4 | "Dm"d'6c'a f4d4 | "Am"c'6ag e4g4 | "Bb"f'6d'b b4f4 | "A""^스냅 준비"z2.e2 z2.e2 z2.^c2 z2.A2 |
+[V:2] D,2z2A,2D2 z2C2D2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | B,,2z2F,2B,2 z2D2B,2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | D,2z2A,2D2 z2C2D2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | B,,2z2F,2B,2 z2D2B,2z2 | A,,2z2E,2A,2 z2G,2A,2z2 |
+% ===== 전 · 그루브 후렴 (17-24마디) : 핑거 스냅 =====
+[V:1] !f!"Dm""^그루브 후렴"a2z2 a2f2 z2a2 d'2c'2 | "Am"g2z2 g2e2 z2g2 c'2a2 | "Bb"f2z2 f2d2 z2f2 b2a2 | "A"e'2z2 ^c'2A2 z2e2 g2^g2 | "Dm"a2z2 a2f2 z2a2 d'2c'2 | "Am"g2z2 g2e2 z2g2 c'2d'2 | "Bb""^스냅 브레이크".d'2z2 .d'2z2 z2.b2 .f2z2 | "A".e2z2 .^c2z2 z8 |
+[V:2] D,2z2A,2D2 z2C2D2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | B,,2z2F,2B,2 z2D2B,2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | D,2z2A,2D2 z2C2D2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | .B,,2z2 .B,,2z2 z2.B,2 .B,,2z2 | .A,,2z2 .A,,2z2 z8 |
+% ===== 결 · 착지 (25-32마디) : 스무스! =====
+[V:1] !mf!"Dm"z2a2 f2d2 z2f2 e2c2 | "Am"z2g2 e2c2 z2e2 d2A2 | "Bb"z2f2 d2B2 z2d2 c2A2 | "A"z2e2 ^c2A2 z2^c2 e2g2 | "Dm"z2a2 f2d2 z2f2 g2a2 | "Bb"b2a2 f2d2 "A"e2^c2 e2g2 | !mp!"A""^rit."a2g2 e2^c2 e4g4 | "Dm""^스무스!"d8 H[Adf]8 |]
+[V:2] D,2z2A,2D2 z2C2D2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | B,,2z2F,2B,2 z2D2B,2z2 | A,,2z2E,2A,2 z2G,2A,2z2 | D,2z2A,2D2 z2C2D2z2 | B,,2z2F,2B,2 A,,2z2E,2A,2 | A,,2E,2A,2E,2 A,,2E,2A,2E,2 | D,2A,2D2A,2 H[D,A,D]8 |]
