@@ -133,7 +133,10 @@ try {
       window.webkitAudioContext = window.AudioContext;
       ABCJS.synth.CreateSynth = function () {
         return {
-          init: function (o) { window.__inits.push({ chordsOff: !!o.options.chordsOff, sf: o.options.soundFontUrl || 'default' }); return Promise.resolve(); },
+          init: function (o) {
+            window.__inits.push({ chordsOff: !!o.options.chordsOff, sf: o.options.soundFontUrl || 'default' });
+            return window.__initDelay ? new Promise(r => setTimeout(r, window.__initDelay)) : Promise.resolve();
+          },
           prime: function () { return Promise.resolve(); },
           download: function () { return URL.createObjectURL(window.__testWavBlob); },   // 실제처럼 매번 새 URL
           start: function () {}, stop: function () {}
@@ -157,11 +160,21 @@ try {
     assert.ok(/곡 하나/.test(await page.textContent('#nowTitle')), '지금 재생 표시');
     ok('▶ 재생: 곡이 통째 음원으로 만들어져 <audio>로 재생된다');
 
-    // 6) 곡 끝(ended) → 자동 다음 곡 (다음 곡은 미리 준비된 캐시 사용 가능)
-    await page.evaluate(() => window.__ended());
-    await page.waitForFunction(() => window.__player.getState().curIdx === 1 && window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
+    // 6) 곡 끝(ended) → 즉시 무음 브리지로 '재생 중' 유지(화면 꺼짐 보호) → 다음 곡
+    await page.evaluate(() => { window.__initDelay = 400; });   // 준비 시간을 만들어 브리지를 관찰
+    const bridgeSt = await page.evaluate(() => { window.__ended(); return window.__player.getState(); });
+    assert.ok(bridgeSt.bridge, '곡 사이에 무음 브리지 재생(백그라운드 얼림 방지)');
+    assert.ok(bridgeSt.loop, '브리지는 반복 재생');
+    assert.ok(bridgeSt.audioPlaying, '소리가 끊기지 않고 이어짐');
+    await page.waitForFunction(() => {
+      const s = window.__player.getState();
+      return s.curIdx === 1 && s.audioPlaying && !s.bridge;   /* 브리지가 실제 곡으로 바뀔 때까지 */
+    }, undefined, { timeout: 6000 });
+    st = await page.evaluate(() => window.__player.getState());
+    assert.ok(!st.loop, '다음 곡으로 바뀌면 반복(브리지) 해제');
     assert.ok(/곡 둘/.test(await page.textContent('#nowTitle')));
-    ok('곡이 끝나면 자동으로 다음 곡이 이어진다');
+    await page.evaluate(() => { window.__initDelay = 0; });
+    ok('곡이 끝나면 무음 브리지를 거쳐 자동으로 다음 곡이 이어진다');
 
     // 7) 마지막 곡 끝 + 🔁 꺼짐 → 정지 / 🔁 켬 → 처음으로
     await page.click('#nextBtn');   // 3번째(마지막) 곡

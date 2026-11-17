@@ -657,9 +657,36 @@
     if (document.hidden || !isPlaying || isPaused) return;
     if (audioEl.paused) { var p = audioEl.play(); if (p && p.catch) p.catch(function () {}); }
   });
+  /* 🌉 곡 사이 무음 브리지 — 곡이 끝나 소리가 멈추면 폰이 백그라운드 페이지를 얼려서
+     다음 곡 준비(합성·공간감 처리)가 끝나지 못할 수 있다(특히 화면 꺼짐·배터리 절약).
+     곡이 끝나는 즉시 아주 작은 무음을 반복 재생해 '재생 중' 상태를 유지하고,
+     다음 곡이 준비되면 그 음원으로 바꾼다. */
+  var BRIDGE_URL = null;
+  function bridgeUrl() {
+    if (BRIDGE_URL) return BRIDGE_URL;
+    var sr = 8000, n = sr, ab = new ArrayBuffer(44 + n * 2), dv = new DataView(ab);
+    function ws(o, s) { for (var i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); }
+    ws(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); ws(8, "WAVE"); ws(12, "fmt ");
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    ws(36, "data"); dv.setUint32(40, n * 2, true);   /* 본문은 0 = 1초 무음 */
+    BRIDGE_URL = URL.createObjectURL(new Blob([ab], { type: "audio/wav" }));
+    return BRIDGE_URL;
+  }
+  function startBridge() {
+    try {
+      internalPause = true;
+      audioEl.src = bridgeUrl();
+      audioEl.loop = true;
+      var p = audioEl.play();
+      if (p && p.then) p.then(function () { internalPause = false; }, function () { internalPause = false; });
+      else internalPause = false;
+    } catch (e) { internalPause = false; }
+  }
   /* 곡이 끝나면 자동으로 다음 곡 — <audio>의 ended는 화면이 꺼져 있어도 발생 */
   audioEl.addEventListener("ended", function () {
     if (!isPlaying || isPaused) return;
+    startBridge();   /* 준비하는 동안에도 '재생 중'으로 — 화면 꺼짐에도 다음 곡으로 이어짐 */
     advance(playToken);
   });
   /* 📞 전화·다른 앱이 소리를 가져가면 폰이 오디오를 멈춘다(pause 이벤트).
@@ -715,7 +742,13 @@
     try { await ensureAudio(); } catch (e) { setStatus("이 브라우저에서 오디오를 시작할 수 없습니다.", true); stopAll(); return; }
     setStatus("♪ 준비 중… " + it.title);
     var r = null;
-    try { r = await buildWavFor(i); } catch (e) { r = null; }
+    /* 워치독: 준비가 60초 넘게 걸리면(백그라운드 네트워크 정지 등) 실패로 보고 재시도/건너뛰기 */
+    try {
+      r = await Promise.race([
+        buildWavFor(i),
+        new Promise(function (_, rej) { setTimeout(function () { rej(new Error("build timeout")); }, 60000); })
+      ]);
+    } catch (e) { r = null; }
     restCtx();   /* 합성 끝 → 재생 중엔 오디오 회로를 재워 끊김 원인 제거 */
     if (token !== playToken) { if (r && r.url && r.url !== curUrl) revokeUrl(r.url); return; }   /* 준비 중 다른 곡으로 이동함 */
     if (!r || !r.url) {
@@ -728,6 +761,7 @@
     var old = curUrl; curUrl = url;
     if (old && old !== url) revokeUrl(old);
     internalPause = true;   /* 곡 교체로 나는 pause 이벤트는 전화가 아님 */
+    audioEl.loop = false;   /* 무음 브리지의 반복 꺼서 실제 곡으로 */
     if (audioEl.src !== url) audioEl.src = url;
     try { audioEl.currentTime = 0; } catch (e) {}
     try {
@@ -886,7 +920,7 @@
 
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__player = {
-    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "", fx: lastBuildFx, audioDur: (audioEl && audioEl.duration) || 0 }; },
+    getState: function () { return { curIdx: curIdx, playing: isPlaying, paused: isPaused, count: playlist.length, titles: playlist.map(function (x) { return x.title; }), audioPlaying: !!(audioEl && !audioEl.paused), audioSrc: (audioEl && audioEl.src) || "", fx: lastBuildFx, audioDur: (audioEl && audioEl.duration) || 0, loop: !!(audioEl && audioEl.loop), bridge: !!(audioEl && BRIDGE_URL && audioEl.src === BRIDGE_URL) }; },
     addReverb: addReverb,
     getSets: function () { return plSets.map(function (s) { return { name: s.name, n: s.items.length }; }); },
     playAt: playAt, slurSameToTie: slurSameToTie, injectMelodyProgram: injectMelodyProgram, addBlockChords: addBlockChords
