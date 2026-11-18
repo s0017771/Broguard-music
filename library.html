@@ -504,29 +504,45 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
       s.textContent = (albumTracks[i].no != null ? albumTracks[i].no + '. ' : '') + (albumTracks[i].title || '(제목 없음)');
     });
   }
+  /* 앨범 목록들: 작곡 세션의 반딧불 앨범 + 원장님의 리믹스 앨범.
+     하나가 없거나 실패해도 받은 목록만으로 진행하고, 전부 실패하면 안내만. */
+  var ALBUM_SOURCES = [
+    { url: 'scores/album.json', base: 'scores/' },
+    { url: 'remixes/album.json', base: 'remixes/' }
+  ];
   $('btnAlbum').addEventListener('click', function () {
     setStatus(''); $('albumStatus').textContent = '';
-    fetch('scores/album.json?t=' + Date.now())
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (al) {
-        if (!al || !Array.isArray(al.tracks)) throw new Error('형식 오류');
-        var d = LibraryCore.albumDiff(entries, al.tracks);
-        if (!d.fresh.length) {
-          $('albumReview').style.display = 'none';
-          setStatus('새 곡이 없어요. ' + al.tracks.length + '곡이 모두 들어 있어요 ✓');
-          return;
-        }
-        albumTracks = d.fresh;
-        albumCat = LibraryCore.normCat(al.category || '기타');
-        $('albumCount').textContent = '(새 곡 ' + d.fresh.length + '곡 · 분류 「' + albumCat + '」)';
-        $('albumSkip').textContent = (d.present.length ? '이미 있는 ' + d.present.length + '곡은 건너뜁니다. ' : '') + '추가할 곡을 확인하고 「추가」를 누르세요.';
-        renderAlbumList();
-        $('albumReview').style.display = '';
-        $('albumReview').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      })
-      .catch(function (e) {
-        setStatus('앨범 목록을 받지 못했어요(' + (e && e.message || e) + '). 인터넷 연결을 확인해 주세요 — 앨범이 아직 사이트에 올라오기 전일 수도 있어요.', true);
-      });
+    Promise.all(ALBUM_SOURCES.map(function (s) {
+      return fetch(s.url + '?t=' + Date.now())
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (al) {
+          if (!al || !Array.isArray(al.tracks)) throw new Error('형식 오류');
+          var cat = LibraryCore.normCat(al.category || '기타');
+          al.tracks.forEach(function (t) { if (t) { t._base = s.base; t._cat = cat; } });
+          return al;
+        })
+        .catch(function (e) { return { _err: (e && e.message) || String(e) }; });
+    })).then(function (als) {
+      var tracks = [];
+      als.forEach(function (a) { if (!a._err) tracks = tracks.concat(a.tracks); });
+      if (!tracks.length) {
+        setStatus('앨범 목록을 받지 못했어요(' + als[0]._err + '). 인터넷 연결을 확인해 주세요 — 앨범이 아직 사이트에 올라오기 전일 수도 있어요.', true);
+        return;
+      }
+      var d = LibraryCore.albumDiff(entries, tracks);
+      if (!d.fresh.length) {
+        $('albumReview').style.display = 'none';
+        setStatus('새 곡이 없어요. ' + tracks.length + '곡이 모두 들어 있어요 ✓');
+        return;
+      }
+      albumTracks = d.fresh;
+      albumCat = d.fresh[0]._cat || '기타';
+      $('albumCount').textContent = '(새 곡 ' + d.fresh.length + '곡 · 분류 「' + albumCat + '」)';
+      $('albumSkip').textContent = (d.present.length ? '이미 있는 ' + d.present.length + '곡은 건너뜁니다. ' : '') + '추가할 곡을 확인하고 「추가」를 누르세요.';
+      renderAlbumList();
+      $('albumReview').style.display = '';
+      $('albumReview').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   });
   $('btnAlbumCancel').addEventListener('click', function () { albumTracks = []; $('albumReview').style.display = 'none'; });
   $('btnAlbumConfirm').addEventListener('click', function () {
@@ -539,12 +555,12 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
     $('albumStatus').textContent = '악보 받는 중…';
     var got = [], fail = [];
     Promise.all(sel.map(function (t) {
-      return fetch('scores/' + t.file + '?t=' + Date.now())
+      return fetch((t._base || 'scores/') + t.file + '?t=' + Date.now())
         .then(function (r) { if (!r.ok) throw 0; return r.text(); })
         .then(function (txt) {
           var tunes = LibraryCore.splitAbcTunes(txt, t.title);
           if (!tunes.length || !tunes[0].abc) throw 0;
-          got.push({ id: t.id, title: t.title, abc: tunes[0].abc, cat: albumCat, added: Date.now() });
+          got.push({ id: t.id, title: t.title, abc: tunes[0].abc, cat: t._cat || albumCat, added: Date.now() });
         })
         .catch(function () { fail.push(t.title); });
     })).then(function () {
