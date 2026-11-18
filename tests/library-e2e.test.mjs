@@ -45,14 +45,29 @@ const ABC = {
   'starlight-waltz.abc': 'X:1\nT:별빛 왈츠\nM:3/4\nL:1/8\nK:G\nG2 B2 d2 |',
   'morning-dew.abc': 'X:1\nT:아침 이슬 연습곡\nM:4/4\nL:1/8\nK:F\nF2 A2 c2 f2 |'
 };
-let albumOffline = false;
+// 원장님 리믹스 앨범(두 번째 목록) — 폴더가 달라 경로 해석도 함께 검증된다
+const REMIX = {
+  album: '반딧불 리믹스', category: '기타', updated: '2026-11-18', count: 1,
+  tracks: [{ no: 1, id: 'fireflies-remix-901', title: '리믹스 테스트곡', file: 'remix-test.abc' }]
+};
+const REMIX_ABC = { 'remix-test.abc': 'X:1\nT:리믹스 테스트곡\nM:4/4\nL:1/8\nK:D\nD2 F2 A2 d2 |' };
+let scoresDown = false, remixDown = false;
 await page.route(/scores\/album\.json/, r => {
-  if (albumOffline) return r.abort();
+  if (scoresDown) return r.abort();
   r.fulfill({ contentType: 'application/json', body: JSON.stringify(ALBUM) });
+});
+await page.route(/remixes\/album\.json/, r => {
+  if (remixDown) return r.abort();
+  r.fulfill({ contentType: 'application/json', body: JSON.stringify(REMIX) });
 });
 await page.route(/scores\/.*\.abc/, r => {
   const name = decodeURIComponent(r.request().url().split('/').pop().split('?')[0]);
   if (ABC[name]) r.fulfill({ contentType: 'text/plain', body: ABC[name] });
+  else r.fulfill({ status: 404, body: 'nf' });
+});
+await page.route(/remixes\/.*\.abc/, r => {
+  const name = decodeURIComponent(r.request().url().split('/').pop().split('?')[0]);
+  if (REMIX_ABC[name]) r.fulfill({ contentType: 'text/plain', body: REMIX_ABC[name] });
   else r.fulfill({ status: 404, body: 'nf' });
 });
 
@@ -69,27 +84,29 @@ await page.reload({ waitUntil: 'domcontentloaded' });
 
 const lib = () => page.evaluate(() => JSON.parse(localStorage.getItem('broguard_library')).entries);
 
-await check('버튼 → 확인 화면: 없는 곡만, 건너뛰는 곡 수 표시, 전체 선택', async () => {
+await check('버튼 → 확인 화면: 두 앨범(반딧불+리믹스) 합쳐 없는 곡만, 건너뛰는 곡 수 표시', async () => {
   await page.click('#btnAlbum');
   await page.waitForSelector('#albumReview', { state: 'visible', timeout: 5000 });
-  assert.match(await page.textContent('#albumCount'), /새 곡 2곡/, '제목이 같은 1곡은 제외');
+  assert.match(await page.textContent('#albumCount'), /새 곡 3곡/, '제목이 같은 1곡은 제외, 리믹스 포함');
   assert.match(await page.textContent('#albumSkip'), /이미 있는 1곡은 건너뜁니다/);
   const boxes = await page.$$eval('#albumList input[data-alb]', els => els.map(c => c.checked));
-  assert.deepEqual(boxes, [true, true], '기본 전체 선택');
+  assert.deepEqual(boxes, [true, true, true], '기본 전체 선택');
   const items = await page.$$eval('#albumList li span', els => els.map(s => s.textContent));
-  assert.deepEqual(items, ['2. 별빛 왈츠', '3. 아침 이슬 연습곡'], '번호·제목 표시');
+  assert.deepEqual(items, ['2. 별빛 왈츠', '3. 아침 이슬 연습곡', '1. 리믹스 테스트곡'], '번호·제목 표시(리믹스는 뒤에)');
 });
 
 await check('추가 → 기타 분류로 저장, 기존 곡은 그대로', async () => {
   await page.click('#btnAlbumConfirm');
   await page.waitForFunction(() => /곡을 추가했어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
   const es = await lib();
-  assert.equal(es.length, 4, '2 + 새 2곡');
+  assert.equal(es.length, 5, '2 + 새 3곡(리믹스 포함)');
   const w = es.find(e => e.id === 'fireflies-album-002');
   const d = es.find(e => e.id === 'fireflies-album-003');
-  assert.ok(w && d, '고정 id로 저장');
-  assert.equal(w.cat, '기타'); assert.equal(d.cat, '기타');
+  const x = es.find(e => e.id === 'fireflies-remix-901');
+  assert.ok(w && d && x, '고정 id로 저장(리믹스 포함)');
+  assert.equal(w.cat, '기타'); assert.equal(d.cat, '기타'); assert.equal(x.cat, '기타');
   assert.ok(/별빛 왈츠/.test(w.abc), 'abc 본문 저장');
+  assert.ok(/리믹스 테스트곡/.test(x.abc), '리믹스는 remixes/ 폴더에서 받아옴');
   const old = es.find(e => e.id === 'rnd123');
   assert.equal(old.abc, EDITED_ABC, '사용자가 고친 기존 곡은 덮어쓰지 않음');
   assert.ok(!(await page.isVisible('#albumReview')), '확인 화면 닫힘');
@@ -98,8 +115,8 @@ await check('추가 → 기타 분류로 저장, 기존 곡은 그대로', async
 await check('다시 눌러도 중복 없음 — "새 곡이 없어요"', async () => {
   await page.click('#btnAlbum');
   await page.waitForFunction(() => /새 곡이 없어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
-  assert.match(await page.textContent('#formStatus'), /3곡이 모두 들어 있어요/);
-  assert.equal((await lib()).length, 4, '중복 0');
+  assert.match(await page.textContent('#formStatus'), /4곡이 모두 들어 있어요/);
+  assert.equal((await lib()).length, 5, '중복 0');
 });
 
 await check('체크 해제한 곡은 추가되지 않는다', async () => {
@@ -113,17 +130,25 @@ await check('체크 해제한 곡은 추가되지 않는다', async () => {
   await page.click('#btnAlbumConfirm');
   await page.waitForFunction(() => /곡을 추가했어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
   const es = await lib();
-  assert.equal(es.length, 2, '선택한 2곡만');
+  assert.equal(es.length, 3, '선택한 3곡만');
   assert.ok(!es.some(e => e.id === 'fireflies-album-001'), '해제한 곡 제외');
 });
 
-await check('오프라인(목록 실패) → 안내만, 악보집은 그대로', async () => {
+await check('한쪽 목록만 실패 → 받은 목록만으로 진행', async () => {
+  scoresDown = true;   // 반딧불 앨범만 실패 — 리믹스(이미 보유)만 남아 '새 곡 없음'
+  await page.click('#btnAlbum');
+  await page.waitForFunction(() => /새 곡이 없어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
+  assert.match(await page.textContent('#formStatus'), /1곡이 모두 들어 있어요/, '리믹스 목록만으로 판정');
+  scoresDown = false;
+});
+
+await check('오프라인(목록 전부 실패) → 안내만, 악보집은 그대로', async () => {
   const before = (await lib()).length;
-  albumOffline = true;
+  scoresDown = true; remixDown = true;
   await page.click('#btnAlbum');
   await page.waitForFunction(() => /앨범 목록을 받지 못했어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
   assert.equal((await lib()).length, before, '악보집 변화 없음');
-  albumOffline = false;
+  scoresDown = false; remixDown = false;
 });
 
 await check('심각한 JS 오류가 없다', async () => {

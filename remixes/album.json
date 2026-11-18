@@ -1,0 +1,10 @@
+{
+  "album": "반딧불 리믹스",
+  "category": "기타",
+  "updated": "2026-11-18",
+  "count": 2,
+  "tracks": [
+    {"no": 1, "id": "fireflies-remix-001", "title": "퇴근길의 반딧불 (고양이 스텝 리믹스)", "file": "fireflies-cat-step-remix.abc"},
+    {"no": 2, "id": "fireflies-remix-002", "title": "춤추는 고양이 (달빛 발라드 리믹스)", "file": "dancing-cat-moonlight-remix.abc"}
+  ]
+}
