@@ -717,7 +717,11 @@
   }
   async function ensureAudio() {
     if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; audioCtx = new AC(); }
-    await audioCtx.resume();
+    /* 주의: resume()을 '기다리지' 않는다 — 화면이 꺼진 상태에선 resume이 화면을 켤 때까지
+       보류되는 기기가 있어, 기다리면 다음 곡 준비가 통째로 멈춘다(켜면 그제야 재생되는 증상).
+       우리 파이프라인(음 디코드·버퍼 생성·WAV 변환)은 일시정지(suspended) 상태에서도 동작하고,
+       실제 소리는 <audio> 요소가 내므로 오디오 회로의 실행 상태가 필요 없다. */
+    try { var p = audioCtx.resume(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
   }
   var failStreak = 0;   /* 연속으로 건너뛴 곡 수 — 전부 실패하면 무한 루프 대신 정지 */
   function skipNext(token, why) {

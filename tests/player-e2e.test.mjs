@@ -129,7 +129,9 @@ try {
         window.__testWavBlob = new Blob([ab], { type: 'audio/wav' });
         window.__testWav = URL.createObjectURL(window.__testWavBlob);
       })();
-      window.AudioContext = function () { this.state = 'running'; this.resume = function () { return Promise.resolve(); }; };
+      // resume()은 영원히 끝나지 않는 Promise — 화면 꺼짐에서 resume이 보류되는 폰을 모사.
+      // 재생 파이프라인이 resume 완료를 기다리면 안 된다는 회귀 방지(기다리면 전체 검사가 멈춤).
+      window.AudioContext = function () { this.state = 'suspended'; this.resume = function () { return new Promise(function () {}); }; };
       window.webkitAudioContext = window.AudioContext;
       ABCJS.synth.CreateSynth = function () {
         return {
