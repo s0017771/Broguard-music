@@ -75,6 +75,7 @@
       <button class="act btn-ink" id="stopBtn" disabled>■ 정지</button>
       <button class="act btn-ghost" id="prevBtn">⏮ 이전</button>
       <button class="act btn-ghost" id="nextBtn">⏭ 다음</button>
+      <button class="act btn-ghost" id="mp3Btn" title="지금 재생 중인 곡을 들리는 그대로(음질·반주·공간감 반영) MP3 파일로 저장해요">💾 MP3 저장</button>
     </div>
     <div class="opts">
       <label title="목록 끝나면 처음부터 다시"><input type="checkbox" id="loopChk"> 🔁 전체 반복</label>
@@ -670,6 +671,64 @@
       return URL.createObjectURL(wavFromBuffer(out));
     } catch (e) { return null; }
   }
+  /* ── 💾 MP3로 저장: 지금 들리는 그대로(음질·반주 스타일·공간감 반영) 파일로 ── */
+  function sanitizeName(t) { return String(t || "곡").replace(/[\\/:*?"<>|]/g, "_").slice(0, 60); }
+  function dlBlob(blob, name) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { try { URL.revokeObjectURL(a.href); a.remove(); } catch (e) {} }, 4000);
+  }
+  function loadLame() {   /* MP3 인코더(lamejs)는 필요할 때만 내려받는다 */
+    if (window.lamejs) return Promise.resolve(true);
+    return new Promise(function (res) {
+      var sc = document.createElement("script");
+      sc.src = "https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js";
+      sc.onload = function () { res(!!window.lamejs); };
+      sc.onerror = function () { res(false); };
+      document.head.appendChild(sc);
+    });
+  }
+  function floatTo16(f) {
+    var o = new Int16Array(f.length);
+    for (var i = 0; i < f.length; i++) { var v = Math.max(-1, Math.min(1, f[i])); o[i] = v < 0 ? v * 0x8000 : v * 0x7FFF; }
+    return o;
+  }
+  async function exportMp3() {
+    if (!curUrl || curIdx < 0) { setStatus("먼저 ▶ 재생으로 곡을 틀어주세요 — 지금 들리는 소리 그대로 저장돼요."); return; }
+    var title = (playlist[curIdx] && playlist[curIdx].title) || "곡";
+    $("mp3Btn").disabled = true;
+    try {
+      setStatus("💾 MP3 만드는 중… " + title);
+      var ab = await (await fetch(curUrl)).arrayBuffer();
+      var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      var dec = new OAC(2, 441, 44100);
+      var buf = await new Promise(function (res, rej) { dec.decodeAudioData(ab, res, rej); });
+      if (!(await loadLame())) {
+        dlBlob(wavFromBuffer(buf), sanitizeName(title) + ".wav");   /* 인코더를 못 받으면 WAV로라도 */
+        setStatus("MP3 인코더를 내려받지 못해 WAV로 저장했어요 (음질은 WAV가 더 좋아요).");
+        return;
+      }
+      var sr = buf.sampleRate, ch = Math.min(2, buf.numberOfChannels);
+      var enc = new lamejs.Mp3Encoder(ch, sr, 192);
+      var Lc = floatTo16(buf.getChannelData(0));
+      var Rc = ch > 1 ? floatTo16(buf.getChannelData(1)) : Lc;
+      var out = [], CHUNK = 1152;
+      for (var i = 0; i < Lc.length; i += CHUNK) {
+        var d = ch > 1 ? enc.encodeBuffer(Lc.subarray(i, i + CHUNK), Rc.subarray(i, i + CHUNK)) : enc.encodeBuffer(Lc.subarray(i, i + CHUNK));
+        if (d.length) out.push(new Int8Array(d));
+        if ((i / CHUNK) % 400 === 0) await new Promise(function (r) { setTimeout(r, 0); });   /* 재생 끊김 방지 숨 고르기 */
+      }
+      var tail = enc.flush();
+      if (tail.length) out.push(new Int8Array(tail));
+      dlBlob(new Blob(out, { type: "audio/mpeg" }), sanitizeName(title) + ".mp3");
+      setStatus("💾 '" + title + "' MP3 저장 완료 — 지금 설정(음질·반주·공간감) 그대로 담았어요.");
+    } catch (e) {
+      setStatus("MP3 저장 실패: " + ((e && e.message) || e), true);
+    } finally { $("mp3Btn").disabled = false; }
+  }
+  $("mp3Btn").addEventListener("click", function () { exportMp3(); });
   function setMediaSession(title, state) {
     if (!("mediaSession" in navigator)) return;
     try {

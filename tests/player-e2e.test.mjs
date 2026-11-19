@@ -370,6 +370,21 @@ try {
     assert.ok(st.audioDur > 59 && st.audioDur < 61, '끄기: 원본 60초 그대로(' + st.audioDur.toFixed(1) + 's)');
     ok('✨ 공간감(리버브) 단계 선택: 깊게는 잔향이 길어지고, 끄면 원본 그대로');
 
+    // 8.20) 💾 MP3 저장: 지금 들리는 음원을 디코드→인코드해 파일로 (인코더는 스텁)
+    await page.evaluate(() => {
+      window.lamejs = { Mp3Encoder: function () {
+        this.encodeBuffer = function () { return new Int8Array([1, 2, 3]); };
+        this.flush = function () { return new Int8Array([4]); };
+      } };
+    });
+    const dlPromise = page.waitForEvent('download', { timeout: 15000 });
+    await page.click('#mp3Btn');
+    const dl = await dlPromise;   // (이 헤드리스 빌드는 blob 파일명을 'download'로 보고 — 실제 브라우저에선 제목.mp3)
+    const dlPath = await dl.path();
+    assert.ok(dlPath && (await import('node:fs')).statSync(dlPath).size > 0, '내려받은 MP3에 내용이 있다');
+    await page.waitForFunction(() => /MP3 저장 완료/.test(document.getElementById('status').textContent), undefined, { timeout: 15000 });
+    ok('💾 MP3 저장: 들리는 그대로 디코드·인코드해 파일로 내보낸다');
+
     // 8.2) ⏸ 일시정지 — 가짜 '곡 끝' 이벤트가 와도 다음 곡으로 튀지 않는다
     await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
     const idxBefore = (await page.evaluate(() => window.__player.getState())).curIdx;
