@@ -95,6 +95,24 @@ for (const cfg of PICKER_PAGES) {
   await page.close();
 }
 
+// 다른 탭에서 악보집이 바뀌면(storage 이벤트) 픽커가 즉시 갱신
+{
+  const { page } = await openPage('tab.html');
+  await check('tab.html: 다른 탭의 악보집 변경(storage)이 즉시 반영', async () => {
+    assert.equal((await page.$$eval('#libSel option', os => os.length)), 3, '처음 2곡');
+    await page.evaluate(() => {
+      const lib = JSON.parse(localStorage.getItem('broguard_library'));
+      lib.entries.push({ id: 'p3', title: '방금 받은 곡', added: 9, abc: 'X:1\nT:방금 받은 곡\nK:C\nCDEF|' });
+      localStorage.setItem('broguard_library', JSON.stringify(lib));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'broguard_library' }));
+    });
+    const opts = await page.$$eval('#libSel option', os => os.map(o => o.textContent));
+    assert.equal(opts.length, 4, '즉시 3곡으로: ' + opts.join(','));
+    assert.ok(opts.some(t => /방금 받은 곡/.test(t)));
+  });
+  await page.close();
+}
+
 // interpolate: A/B 두 픽커
 {
   const { page, errors } = await openPage('interpolate.html');

@@ -777,7 +777,11 @@ if (typeof window !== 'undefined') window.AbcMidi = AbcMidi;
     $("abcIn").value = hit.abc;
     doSplit();
   });
-  window.addEventListener("focus", fillLibSel);
+  /* 악보집이 다른 탭(앨범 받기·드라이브 동기화 등)에서 바뀌면 즉시 갱신 —
+     모바일은 탭 전환에 focus가 안 올 때가 많아 storage·visibilitychange·pageshow도 함께 듣는다 */
+  ["focus", "pageshow"].forEach(function (ev) { window.addEventListener(ev, fillLibSel); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) fillLibSel(); });
+  window.addEventListener("storage", function (e) { if (!e || !e.key || e.key === "broguard_library") fillLibSel(); });
   fillLibSel();
   $("shiftLeft").addEventListener("click", function () { shiftAmount -= 1; renderScore(); });
   $("shiftRight").addEventListener("click", function () { shiftAmount += 1; renderScore(); });
