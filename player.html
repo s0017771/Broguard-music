@@ -250,7 +250,7 @@
   } catch (e) {}
 
   /* ── 상태 ── */
-  var curIdx = -1, audioCtx = null, isPlaying = false, isPaused = false, playToken = 0;
+  var curIdx = -1, isPlaying = false, isPaused = false, playToken = 0;
 
   function setStatus(msg, err) { var s = $("status"); s.textContent = msg || ""; s.className = err ? "err" : ""; }
   function renderNow() {
@@ -549,7 +549,33 @@
   }
   /* 재생 중에는 아무 작업도 하지 않는다 — 합성·변환 같은 무거운 일은 곡 시작 전에만.
      (재생 중 다음 곡을 미리 만들던 방식은 일부 폰에서 재생을 뚝뚝 끊어 제거) */
-  function restCtx() { try { if (audioCtx && audioCtx.state === "running") audioCtx.suspend(); } catch (e) {} }
+  /* 🎛 합성(디코드·버퍼 생성) 전용 컨텍스트 — 스피커와 무관한 OfflineAudioContext를 쓴다.
+     일반 AudioContext는 화면이 꺼지면 suspend/resume에 묶여 음원 디코딩이 화면을 켤 때까지
+     멈추는 기기가 있다(1→2곡만 되고 그 뒤가 멈추던 원인). 오프라인 컨텍스트는 하드웨어·
+     화면 상태와 무관해서 백그라운드에서도 디코딩이 끝까지 진행된다. 재생은 <audio>가 담당. */
+  var buildCtx = null;
+  function ensureBuildCtx() {
+    if (!buildCtx) {
+      var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (OAC) {
+        var raw = new OAC(2, 441, 44100);
+        /* abcjs prime()은 컨텍스트가 suspended면 resume()이 끝나길 기다린다 — 화면이 꺼진 폰에선
+           resume이 화면을 켤 때까지 보류돼 준비가 통째로 멈추는 진짜 원인이었다.
+           오프라인 컨텍스트를 '항상 running'으로 보이게 감싸서 그 분기를 아예 지나가지 않게 한다.
+           (합성에 실제로 쓰이는 건 decodeAudioData·createBuffer·sampleRate뿐) */
+        buildCtx = {
+          sampleRate: raw.sampleRate,
+          currentTime: 0,
+          state: "running",
+          resume: function () { return Promise.resolve(); },
+          suspend: function () { return Promise.resolve(); },
+          createBuffer: function () { return raw.createBuffer.apply(raw, arguments); },
+          decodeAudioData: function () { return raw.decodeAudioData.apply(raw, arguments); }
+        };
+      } else { var AC = window.AudioContext || window.webkitAudioContext; buildCtx = new AC(); }   /* 아주 오래된 브라우저 폴백 */
+    }
+    return buildCtx;
+  }
   /* idx번 곡을 렌더 → 신디로 통째 합성 → WAV 블랍 URL */
   async function buildWavFor(idx) {
     var it = playlist[idx];
@@ -568,14 +594,14 @@
     var sfu = SOUNDFONTS[$("soundSel").value];
     if (sfu) o.soundFontUrl = sfu;
     try {
-      await sy.init({ audioContext: audioCtx, visualObj: vo, options: o });
+      await sy.init({ audioContext: ensureBuildCtx(), visualObj: vo, options: o });
       await sy.prime();
     } catch (e) {
       if (!sfu) throw e;
       /* 고음질 음원을 못 받으면(오프라인 등) 기본 음원으로 한 번 더 */
       sy = new ABCJS.synth.CreateSynth();
       delete o.soundFontUrl;
-      await sy.init({ audioContext: audioCtx, visualObj: vo, options: o });
+      await sy.init({ audioContext: ensureBuildCtx(), visualObj: vo, options: o });
       await sy.prime();
     }
     var url = sy.download();
@@ -719,14 +745,6 @@
     $("playBtn").disabled = false;
     renderPlaylist();
   }
-  async function ensureAudio() {
-    if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; audioCtx = new AC(); }
-    /* 주의: resume()을 '기다리지' 않는다 — 화면이 꺼진 상태에선 resume이 화면을 켤 때까지
-       보류되는 기기가 있어, 기다리면 다음 곡 준비가 통째로 멈춘다(켜면 그제야 재생되는 증상).
-       우리 파이프라인(음 디코드·버퍼 생성·WAV 변환)은 일시정지(suspended) 상태에서도 동작하고,
-       실제 소리는 <audio> 요소가 내므로 오디오 회로의 실행 상태가 필요 없다. */
-    try { var p = audioCtx.resume(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
-  }
   var failStreak = 0;   /* 연속으로 건너뛴 곡 수 — 전부 실패하면 무한 루프 대신 정지 */
   function skipNext(token, why) {
     failStreak++;
@@ -755,7 +773,6 @@
       nextCache = null;
     }
     if (!r) {
-      try { await ensureAudio(); } catch (e) { setStatus("이 브라우저에서 오디오를 시작할 수 없습니다.", true); stopAll(); return; }
       setStatus("♪ 준비 중… " + it.title);
       /* 워치독: 준비가 60초 넘게 걸리면(백그라운드 네트워크 정지 등) 실패로 보고 재시도/건너뛰기 */
       try {
@@ -764,7 +781,6 @@
           new Promise(function (_, rej) { setTimeout(function () { rej(new Error("build timeout")); }, 60000); })
         ]);
       } catch (e) { r = null; }
-      restCtx();   /* 합성 끝 → 재생 중엔 오디오 회로를 재워 끊김 원인 제거 */
     }
     if (token !== playToken) { if (r && r.url && r.url !== curUrl) revokeUrl(r.url); return; }   /* 준비 중 다른 곡으로 이동함 */
     if (!r || !r.url) {
@@ -809,24 +825,39 @@
      통째로 만들어 두고, 곡이 끝나면 합성 없이 음원 교체만 한다 — 교체는 즉각적이다. */
   var nextCache = null;              /* { idx, key, url, fx } */
   var PREFETCH_DELAY = 8000;         /* 재생이 자리 잡은 뒤에 시작(시작 직후 끊김 예방) */
+  var PREFETCH_AFTER_SEC = 9;        /* 재생 위치 기반 예비 트리거(타이머가 묶여도 동작) */
+  var prefetchBusy = false;
   function settingsKey() {
     return [$("chordAccChk").checked, $("accSel").value, $("soundSel").value, $("instSel").value, $("reverbSel").value].join("|");
   }
   function clearNextCache() { if (nextCache) { revokeUrl(nextCache.url); nextCache = null; } }
   async function prefetchNext(token) {
+    if (prefetchBusy) return;
     if (token !== playToken || !isPlaying || isPaused) return;
     var ni = (curIdx + 1 < playlist.length) ? curIdx + 1 : ($("loopChk").checked && playlist.length ? 0 : -1);
     if (ni < 0 || ni === curIdx) return;
     var key = settingsKey();
     if (nextCache && nextCache.idx === ni && nextCache.key === key) return;
     clearNextCache();
+    prefetchBusy = true;
     var r = null;
     try { r = await buildWavFor(ni); } catch (e) { r = null; }
-    restCtx();
+    prefetchBusy = false;
     if (!r || !r.url) return;
     if (token !== playToken || !isPlaying || nextCache) { revokeUrl(r.url); return; }
     nextCache = { idx: ni, key: key, url: r.url, fx: lastBuildFx };
   }
+  /* 타이머(setTimeout)는 백그라운드에서 묶일 수 있어, 재생 위치(timeupdate)로도 미리 준비를 건다.
+     timeupdate는 실제 재생에 묶여 있어 화면이 꺼져도 계속 들어온다. */
+  audioEl.addEventListener("timeupdate", function () {
+    if (PREFETCH_DELAY <= 0) return;   /* 테스트·수동 모드에서 끔 */
+    if (!isPlaying || isPaused || prefetchBusy || nextCache) return;
+    if (BRIDGE_URL && audioEl.src === BRIDGE_URL) return;
+    if (audioEl.currentTime > PREFETCH_AFTER_SEC) {
+      var p = prefetchNext(playToken);
+      if (p && p.catch) p.catch(function () {});
+    }
+  });
   function startFrom(i) { playAt(i); }
 
   /* ── 컨트롤 ── */
@@ -968,7 +999,7 @@
     playAt: playAt, slurSameToTie: slurSameToTie, injectMelodyProgram: injectMelodyProgram, addBlockChords: addBlockChords,
     prefetchNext: function () { return prefetchNext(playToken); },
     hasNextCache: function () { return !!nextCache; },
-    setPrefetchDelay: function (ms) { PREFETCH_DELAY = ms; }
+    setPrefetchDelay: function (ms, afterSec) { PREFETCH_DELAY = ms; if (afterSec != null) PREFETCH_AFTER_SEC = afterSec; }
   };
 })();
 </script>
