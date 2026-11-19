@@ -313,6 +313,34 @@ await check('윗줄 숫자키: 8=높은라, 9=높은시, 0=더높은도, 7=높�
   await page.click('#stopBtn');
 });
 
+if (abcjsSrc) await check('조옮김: 옥타브·반음 내리면 음과 조표가 함께 바뀐다', async () => {
+  await page.waitForFunction(() => !!(window.ABCJS && window.ABCJS.strTranspose), undefined, { timeout: 5000 });
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:조옮김곡\nM:4/4\nL:1/8\nK:C\nc2 e2 g2 c\'2 |';
+  });
+  await page.selectOption('#modeSel', 'wait');
+  // -1옥타브: 높은도(72) → 가온도(60)
+  await page.selectOption('#transSel', '-12');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 5000 });
+  let st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.song.seq[0].midi, 60, '-1옥타브: c→가온도');
+  assert.equal(st.song.transposed, -12, '조옮김 적용 표시');
+  await page.click('#stopBtn');
+  // -2 반음: K:C → K:Bb, 첫 음 70
+  await page.selectOption('#transSel', '-2');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 5000 });
+  st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.song.seq[0].midi, 70, '-2반음: c→시b');
+  assert.equal(st.song.keyName, 'Bb', '조표도 함께 바뀜(K:Bb)');
+  await page.click('#stopBtn');
+  await page.selectOption('#transSel', '0');
+});
+
 await check('parseSong: 임시표가 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', async () => {
   const r = await page.evaluate(() => {
     const P = window.__practice.parseSong;

@@ -125,6 +125,21 @@
       </select>
     </label>
     <label class="fld">BPM <input type="number" id="bpmInput" min="30" max="220" value="90"></label>
+    <label class="fld" title="곡 전체를 올리거나 내려서 연습해요 — 악보의 조표도 함께 바뀌어요">조옮김
+      <select id="transSel">
+        <option value="12">+1옥타브</option>
+        <option value="2">+2</option>
+        <option value="1">+1</option>
+        <option value="0" selected>원래 조</option>
+        <option value="-1">-1</option>
+        <option value="-2">-2</option>
+        <option value="-3">-3</option>
+        <option value="-4">-4</option>
+        <option value="-5">-5</option>
+        <option value="-12">-1옥타브</option>
+        <option value="-24">-2옥타브</option>
+      </select>
+    </label>
     <button id="startBtn" class="btn-brass" type="button">&#9654; 연습 시작</button>
     <button id="stopBtn" class="btn-ghost" type="button">&#9632; 중지</button>
     <button id="listenBtn" class="btn-ghost" type="button">&#128266; 곡 들어보기</button>
@@ -1375,6 +1390,32 @@
     }
     return SONGS[sel];
   }
+  /* ── 조옮김: 악보 문자열 자체를 옮긴다(조표·임시표까지 abcjs가 정확히 다시 적음).
+     주의: strTranspose는 '방금 렌더한 바로 그 문자열'에만 좌표가 맞는다(연구소에서 배운 교훈). ── */
+  function applyTranspose(abc) {
+    var n = +($("transSel").value || 0);
+    if (!n || !abc) return { abc: abc, n: n, done: !n };
+    if (window.ABCJS && ABCJS.strTranspose) {
+      try {
+        var holder = document.getElementById("transHolder");
+        if (!holder) { holder = document.createElement("div"); holder.id = "transHolder"; holder.style.display = "none"; document.body.appendChild(holder); }
+        var vo = ABCJS.renderAbc("transHolder", abc, { add_classes: false });
+        return { abc: ABCJS.strTranspose(abc, vo, n), n: n, done: true };
+      } catch (e) {}
+    }
+    return { abc: abc, n: n, done: false };   /* 엔진이 없으면 옥타브 단위만 아래 폴백으로 */
+  }
+  function prepareSong(abc) {
+    var t = applyTranspose(abc);
+    var s = parseSong(t.abc);
+    if (!t.done && t.n && t.n % 12 === 0) {   /* abcjs 없이도 옥타브는 가능: 파싱된 음만 이동 */
+      s.seq.forEach(function (x) { if (!x.rest) x.midi += t.n; });
+      if (s.bassSeq) s.bassSeq.forEach(function (x) { if (!x.rest) x.midi += t.n; });
+      t.done = true;
+    }
+    s.transposed = t.done ? t.n : 0;
+    return s;
+  }
   /* ── 악보집(broguard_library)에서 불러오기 ── */
   var libMap = {};
   function libEntries() {
@@ -1442,7 +1483,7 @@
         : "악보가 비어 있어요. 곡을 고르거나 ABC를 붙여넣어주세요.");
       return;
     }
-    song = parseSong(abc);
+    song = prepareSong(abc);
     song.seq.forEach(function (n) { n.hit = false; });
     totalNotes = song.seq.filter(function (n) { return !n.rest; }).length;
     if (!totalNotes) { setStatus("음표를 찾지 못했어요. ABC 형식을 확인해주세요."); return; }
@@ -1471,7 +1512,7 @@
       $("laneWrap").style.display = "none";
       idx = 0; skipRests();
       updateGuideWait();
-      setStatus("'" + (song.title || "곡") + "' — 기다려주기 모드. 다음 음을 치면 진행돼요." + (song.keyName !== "C" && song.keyName !== "Am" ? " (조성 " + song.keyName + " 자동 반영)" : ""));
+      setStatus("'" + (song.title || "곡") + "' — 기다려주기 모드. 다음 음을 치면 진행돼요." + (song.keyName !== "C" && song.keyName !== "Am" ? " (조성 " + song.keyName + " 자동 반영)" : "") + (song.transposed ? " · 조옮김 " + (song.transposed > 0 ? "+" : "") + song.transposed : ""));
     } else {
       timedIdx = 0;
       countInMs = beatMs * song.mnum;
@@ -1497,7 +1538,7 @@
         : "들려드릴 악보가 없어요.");
       return;
     }
-    song = parseSong(abc);
+    song = prepareSong(abc);
     renderScore(); buildKeyboard();
     var bpm = parseInt($("bpmInput").value, 10) || song.bpm;
     var cMs = (60000 / bpm) / song.beatCells;
@@ -1699,6 +1740,11 @@
     e.target.value = "";
   });
   $("octaveFree").addEventListener("change", function () { $("octaveFree").blur(); wakeAudio(); });
+  $("transSel").addEventListener("change", function () {
+    $("transSel").blur(); wakeAudio();
+    if (song && playing) { stopAll(); start(); }   /* 새 조로 즉시 다시 시작 */
+    else if (song) setStatus("조옮김을 바꿨어요 — ▶ 연습 시작을 누르면 적용돼요.");
+  });
   $("sustainChk").addEventListener("change", function () { $("sustainChk").blur(); wakeAudio(); });
   $("chordMode").addEventListener("change", function () { $("chordMode").blur(); wakeAudio(); });
   /* 🎹 피아노 음색: 선택 저장 + 켜면 현재 곡 샘플 미리 받기 */
