@@ -149,6 +149,8 @@
     <div id="resultAbc">먼저 두 곡을 넣고 ‘섞기’를 누르세요.</div>
     <div id="staffBox"></div>
     <div class="btn-row">
+      <button class="act btn-go" id="playBtn" disabled>▶ 듣기</button>
+      <button class="act btn-ink" id="stopBtn" disabled>■ 정지</button>
       <button class="act btn-ink" id="copyBtn" disabled>📋 ABC 복사</button>
       <button class="act btn-ghost" id="toLabBtn" disabled>🎼 악보연구소로 보내기</button>
       <button class="act btn-ghost" id="toTabBtn" disabled>🎸 타브로 보내기</button>
@@ -197,10 +199,20 @@ var MixerCore = (function () {
   function lenToAbc(v) {
     if (v === 1) return '';
     if (Math.abs(v - Math.round(v)) < 1e-6 && v > 1) return '' + Math.round(v);
+    function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+    /* 셋잇단(2/3) 같은 분수도 정확히 — 작은 분모부터 찾는다 */
+    for (var d2 = 2; d2 <= 24; d2++) {
+      var n2 = v * d2;
+      if (Math.abs(n2 - Math.round(n2)) < 1e-6) {
+        n2 = Math.round(n2);
+        var g2 = gcd(n2, d2) || 1; n2 /= g2; d2 /= g2;
+        if (d2 === 1) return n2 === 1 ? '' : '' + n2;
+        return (n2 === 1 ? '' : '' + n2) + '/' + d2;
+      }
+    }
     var den = 1, num = v;
     for (var i = 0; i < 6 && Math.abs(num - Math.round(num)) > 1e-6; i++) { num *= 2; den *= 2; }
     num = Math.round(num);
-    function gcd(a, b) { return b ? gcd(b, a % b) : a; }
     var g = gcd(num, den) || 1; num /= g; den /= g;
     if (den === 1) return num === 1 ? '' : '' + num;
     return (num === 1 ? '' : '' + num) + '/' + den;
@@ -242,8 +254,34 @@ var MixerCore = (function () {
   // 마디를 음표 단위로 분해(길이 포함) — 반마디 분할용
   function parseBarElements(bar) {
     bar = String(bar).replace(/\{[^}]*\}/g, '').replace(/![^!]*!/g, '').replace(/\[[A-Za-z]:[^\]]*\]/g, '');   /* 꾸밈음·지시·인라인 필드([K: 등]) 제거 */
-    var RE = /("(?:[^"]*)")?\s*(\[[^\]]*\]|[_^=]*[A-Ga-g][,']*|[zxZX])([0-9]*\/*[0-9]*)(-?)/g, els = [], m;
-    while ((m = RE.exec(bar))) els.push({ pre: m[1] || '', core: m[2], dur: lenValue(m[3]), tie: m[4] || '' });
+    /* 셋잇단((3 등)·화음 내부 음길이([C2E2])·당김리듬(> <)까지 길이를 정확히 —
+       길이가 틀리면 두 성부가 마디마다 조금씩 어긋나 점점 벌어진다 */
+    var RE = /("(?:[^"]*)")?\s*(?:\((\d)(?::(\d*))?(?::(\d*))?|(\[[^\]]*\]|[_^=]*[A-Ga-g][,']*|[zxZX])([0-9]*\/*[0-9]*)(-?)|([<>]))/g;
+    var els = [], m, tupLeft = 0, tupFactor = 1, brokenNext = 1, pendingPre = '';
+    while ((m = RE.exec(bar))) {
+      if (m[2]) {                                   /* (p:q:r 잇단음표: 다음 r개 음을 q/p 배로 */
+        var p = +m[2], q = m[3] ? +m[3] : ((p === 3 || p === 6) ? 2 : (p === 2 || p === 4 || p === 8) ? 3 : 2);
+        tupLeft = m[4] ? +m[4] : p; tupFactor = q / p;
+        if (m[1]) pendingPre = m[1];
+        continue;
+      }
+      if (m[8]) {                                   /* 당김리듬: 앞 음 ×1.5, 뒤 음 ×0.5 (< 는 반대) */
+        var lastEl = els[els.length - 1];
+        if (m[8] === '>') { if (lastEl) lastEl.dur *= 1.5; brokenNext = 0.5; }
+        else { if (lastEl) lastEl.dur *= 0.5; brokenNext = 1.5; }
+        continue;
+      }
+      var core = m[5], dur = lenValue(m[6]);
+      if (core.charAt(0) === '[') {                 /* 화음: 내부 음길이의 최대값 × 바깥 길이 */
+        var innRE = /[_^=]*[A-Ga-g][,']*([0-9]*\/*[0-9]*)/g, im, mx = 0;
+        while ((im = innRE.exec(core))) { var v = lenValue(im[1]); if (v > mx) mx = v; }
+        if (mx) dur = mx * lenValue(m[6]);
+      }
+      if (tupLeft > 0) { dur *= tupFactor; tupLeft--; }
+      dur *= brokenNext; brokenNext = 1;
+      els.push({ pre: m[1] || pendingPre, core: core, dur: dur, tie: m[7] || '' });
+      pendingPre = '';
+    }
     return els;
   }
   // 마디를 half(L단위) 지점에서 앞/뒤로 나눔. 경계를 넘는 음은 잘라(재발음) 정확히 반씩.
@@ -395,12 +433,21 @@ var MixerCore = (function () {
     var aCh = barChords(A.bars), bCh = barChords(B.bars);
     var total = B.bars.length;                /* 멜로디 곡(B)이 주인 — A 리듬은 돌려 쓴다 */
     var mel = [], bass = [], aLen = A.bars.length;
+    function barUnits(str) { return parseBarElements(str).reduce(function (t, e) { return t + e.dur; }, 0); }
     for (var i = 0; i < total; i++) {
       var ti = (vari === 1) ? (i + 1) % aLen            /* 변주1: A 리듬 템플릿을 한 마디 밀어 시작 */
              : (vari === 2) ? (aLen - 1 - (i % aLen))   /* 변주2: A 리듬 템플릿 역순 */
              : i % aLen;
-      mel.push(rhythmMelodyBar(A.bars[ti], B.bars[i], vari === 3 ? 'ends' : ''));
-      if (hasBass) bass.push(suitBassBar(AB.bars[ti % AB.bars.length], aCh[ti], bCh[i], B.key, A.key));
+      var mBar = rhythmMelodyBar(A.bars[ti], B.bars[i], vari === 3 ? 'ends' : '');
+      if (hasBass) {
+        var bBar = suitBassBar(AB.bars[ti % AB.bars.length], aCh[ti], bCh[i], B.key, A.key);
+        /* 안전망: 마디마다 두 성부 길이를 맞춰 절대 벌어지지 않게(미세 오차는 쉼표로) */
+        var diff = barUnits(mBar) - barUnits(bBar);
+        if (diff > 1e-4) bBar += ' z' + lenToAbc(diff);
+        else if (diff < -1e-4) mBar += ' z' + lenToAbc(-diff);
+        bass.push(bBar);
+      }
+      mel.push(mBar);
     }
     var head = 'X:1\nT:리듬 옷 입히기 (A리듬옷 + B멜로디' + (vari ? ' · 변주 ' + vari : '') + ')\nM:' + A.meter + '\nL:' + A.unit + (A.tempo ? '\nQ:' + A.tempo : '') + '\n';
     var out, lines = [], j;
@@ -529,7 +576,9 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
     });
   });
 
+  var mixStopPlay = null;
   function doMix() {
+    if (mixStopPlay) mixStopPlay();
     var opts = (gran === 'rm') ? { mode: 'rhythmMelody' } : (gran === 'rmx') ? { mode: 'rmCross' } : (gran === 'suit') ? { mode: 'suit', vari: suitVari } : { ratioB: +$('ratio').value, granularity: gran };
     var res = MixerCore.mix($('abcA').value, $('abcB').value, opts);
     var w = $('warn');
@@ -538,6 +587,7 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
       w.className = 'warnbox bad'; w.innerHTML = (res.warns || []).join('<br>');
       $('strip').innerHTML = ''; $('mixInfo').textContent = '';
       $('copyBtn').disabled = $('toLabBtn').disabled = $('toTabBtn').disabled = true; last = null;
+      $('playBtn').disabled = true; $('stopBtn').disabled = true;
       return;
     }
     last = res;
@@ -569,6 +619,7 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
     else if (res.mode === 'suit') { w.className = 'warnbox ok'; w.innerHTML = '✅ B곡 조성(' + res.toKey + ')·코드는 그대로 두고, A곡의 리듬 옷만 입혔어요.'; }
     else { w.className = 'warnbox ok'; w.innerHTML = '✅ ' + res.fromKey + ' → ' + res.toKey + '조로 맞춰 섞었어요.'; }
     $('copyBtn').disabled = $('toLabBtn').disabled = $('toTabBtn').disabled = false;
+    $('playBtn').disabled = false;
     renderStaff(res.abc);
   }
   $('mixBtn').addEventListener('click', doMix);
@@ -578,6 +629,51 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
     $('abcB').value = 'X:1\nT:B 신나는 곡\nM:4/4\nL:1/8\nK:G\n"G"G2 B2 d2 g2 | "D"D2 ^F2 A2 d2 | "Em"E2 G2 B2 e2 | "C"c2 e2 G2 c2 |';
     setRatio(); doMix();
   });
+
+  /* ── ▶ 믹스 결과 바로 듣기 — 고음질(MusyngKite) 우선, 실패 시 기본 음원 ── */
+  var HQ_SF = 'https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/';
+  function hqOn() { try { return localStorage.getItem('broguard_hq_sound') !== '0'; } catch (e) { return true; } }
+  var playSynth = null, playAc = null;
+  function stopPlay() {
+    if (playSynth) { try { playSynth.stop(); } catch (e) {} playSynth = null; }
+    $('stopBtn').disabled = true;
+    $('playBtn').disabled = !last;
+    $('playBtn').textContent = '▶ 듣기';
+  }
+  mixStopPlay = stopPlay;   /* doMix가 결과를 바꿀 때 재생을 멈추도록 */
+  $('playBtn').addEventListener('click', async function () {
+    if (!last) return;
+    if (typeof ABCJS === 'undefined' || !ABCJS.synth || !ABCJS.synth.supportsAudio || !ABCJS.synth.supportsAudio()) {
+      $('mixInfo').textContent = '이 환경에서는 재생을 지원하지 않아요 — 연구소로 보내 들어보세요.';
+      return;
+    }
+    stopPlay();
+    try {
+      if (!playAc) playAc = new (window.AudioContext || window.webkitAudioContext)();
+      try { var rp = playAc.resume(); if (rp && rp.catch) rp.catch(function () {}); } catch (e2) {}
+      $('playBtn').disabled = true; $('playBtn').textContent = '⏳ 준비 중…';
+      var holder = document.getElementById('playHolder');
+      if (!holder) { holder = document.createElement('div'); holder.id = 'playHolder'; holder.style.display = 'none'; document.body.appendChild(holder); }
+      var vo = ABCJS.renderAbc('playHolder', last.abc, { add_classes: false })[0];
+      async function trySynth(opts) {
+        var sy = new ABCJS.synth.CreateSynth();
+        await sy.init({ audioContext: playAc, visualObj: vo, options: opts });
+        await sy.prime();
+        return sy;
+      }
+      var ended = function () { stopPlay(); };
+      var sy = null;
+      if (hqOn()) { try { sy = await trySynth({ soundFontUrl: HQ_SF, onEnded: ended }); } catch (e3) { sy = null; } }
+      if (!sy) sy = await trySynth({ onEnded: ended });
+      playSynth = sy;
+      sy.start();
+      $('playBtn').textContent = '♪ 재생 중'; $('stopBtn').disabled = false;
+    } catch (e) {
+      stopPlay();
+      $('mixInfo').textContent = '재생 실패: ' + ((e && e.message) || e);
+    }
+  });
+  $('stopBtn').addEventListener('click', stopPlay);
 
   $('copyBtn').addEventListener('click', function () {
     if (!last) return; var self = this;

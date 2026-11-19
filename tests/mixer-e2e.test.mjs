@@ -16,6 +16,12 @@ const server = createServer((req, res) => {
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
+const ABCJS_CANDIDATES = [
+  join(root, 'node_modules/abcjs/dist/abcjs-basic-min.js'),
+  '/tmp/claude-0/-home-user-Broguard-music/c040e24c-4a69-5b46-9c8e-25ca04c1bca0/scratchpad/node_modules/abcjs/dist/abcjs-basic-min.js'
+];
+const abcjsPath = ABCJS_CANDIDATES.find(existsSync);
+const abcjsSrc = abcjsPath ? readFileSync(abcjsPath, 'utf8') : null;
 const browser = await chromium.launch();
 let fail = 0;
 const ok = n => console.log('ok - ' + n);
@@ -24,6 +30,7 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
 {
   const page = await browser.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
+  if (abcjsSrc) await page.route(/abcjs.*\.js/, r => r.fulfill({ contentType: 'application/javascript', body: abcjsSrc }));
   page.on('console', m => { if (m.type() === 'error' && !/abcjs|ABCJS|cdnjs|Failed to load/.test(m.text())) errors.push('C:' + m.text()); });
   try {
     await page.goto(`${base}/mixer.html?autotest=1`, { waitUntil: 'domcontentloaded' });
@@ -94,6 +101,34 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
     await page.waitForTimeout(150);
     assert.ok(await page.$eval('#suitVariRow', el => el.style.display === 'none'), '다른 모드에선 변주 버튼 숨김');
     ok('🎲 변주 1·2·3: 리듬옷 전용 · 결과가 바뀌고 되돌리면 재현된다');
+    // 2.9) ▶ 믹서 안에서 바로 듣기 — 고음질(MusyngKite) 우선 전달 + 정지
+    if (abcjsSrc) {
+      await page.waitForFunction(() => !!(window.ABCJS && window.ABCJS.synth), undefined, { timeout: 5000 });
+      await page.evaluate(() => {
+        window.__inits = [];
+        window.AudioContext = function () { this.state = 'running'; this.resume = function () { return Promise.resolve(); }; };
+        window.webkitAudioContext = window.AudioContext;
+        ABCJS.synth.supportsAudio = function () { return true; };
+        ABCJS.synth.CreateSynth = function () {
+          return {
+            init: function (o) { window.__inits.push({ sf: (o.options && o.options.soundFontUrl) || 'default' }); return Promise.resolve(); },
+            prime: function () { return Promise.resolve(); },
+            start: function () { window.__started = (window.__started || 0) + 1; },
+            stop: function () { window.__stopped = (window.__stopped || 0) + 1; }
+          };
+        };
+      });
+      assert.ok(!(await page.$eval('#playBtn', el => el.disabled)), '결과가 있으면 듣기 가능');
+      await page.click('#playBtn');
+      await page.waitForFunction(() => window.__started > 0, undefined, { timeout: 5000 });
+      const inits = await page.evaluate(() => window.__inits);
+      assert.ok(/MusyngKite/.test(inits[0].sf), '고음질 음원 우선: ' + inits[0].sf);
+      assert.ok(!(await page.$eval('#stopBtn', el => el.disabled)), '정지 버튼 활성');
+      await page.click('#stopBtn');
+      assert.ok((await page.evaluate(() => window.__stopped)) > 0, '정지 동작');
+      assert.ok(/듣기/.test(await page.textContent('#playBtn')), '버튼 복구');
+      ok('▶ 믹서 안에서 바로 듣기(고음질 우선)·정지가 동작한다');
+    }
     // 원래 샘플·마디 모드로 복귀(이후 테스트 영향 없게)
     await page.click('#sampleBtn');
     await page.click('.gran[data-g="bar"]');
