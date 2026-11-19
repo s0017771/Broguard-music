@@ -256,30 +256,32 @@ var MixerCore = (function () {
     bar = String(bar).replace(/\{[^}]*\}/g, '').replace(/![^!]*!/g, '').replace(/\[[A-Za-z]:[^\]]*\]/g, '');   /* 꾸밈음·지시·인라인 필드([K: 등]) 제거 */
     /* 셋잇단((3 등)·화음 내부 음길이([C2E2])·당김리듬(> <)까지 길이를 정확히 —
        길이가 틀리면 두 성부가 마디마다 조금씩 어긋나 점점 벌어진다 */
-    var RE = /("(?:[^"]*)")?\s*(?:\((\d)(?::(\d*))?(?::(\d*))?|(\[[^\]]*\]|[_^=]*[A-Ga-g][,']*|[zxZX])([0-9]*\/*[0-9]*)(-?)|([<>]))/g;
+    /* 따옴표("코드"·"^지시")는 항상 독립 토큰으로 먼저 소비 — 코드와 지시가 연달아 붙으면
+       ("E7""^rit.") 따옴표 안 글자를 음표로 잘못 읽어 유령 박(E 7박!)이 생기던 버그 방지 */
+    var RE = /"[^"]*"|\((\d)(?::(\d*))?(?::(\d*))?|(\[[^\]]*\]|[_^=]*[A-Ga-g][,']*|[zxZX])([0-9]*\/*[0-9]*)(-?)|([<>])/g;
     var els = [], m, tupLeft = 0, tupFactor = 1, brokenNext = 1, pendingPre = '';
     while ((m = RE.exec(bar))) {
-      if (m[2]) {                                   /* (p:q:r 잇단음표: 다음 r개 음을 q/p 배로 */
-        var p = +m[2], q = m[3] ? +m[3] : ((p === 3 || p === 6) ? 2 : (p === 2 || p === 4 || p === 8) ? 3 : 2);
-        tupLeft = m[4] ? +m[4] : p; tupFactor = q / p;
-        if (m[1]) pendingPre = m[1];
+      if (m[0].charAt(0) === '"') { pendingPre += m[0]; continue; }   /* 다음 음표에 붙일 코드·지시 */
+      if (m[1]) {                                   /* (p:q:r 잇단음표: 다음 r개 음을 q/p 배로 */
+        var p = +m[1], q = m[2] ? +m[2] : ((p === 3 || p === 6) ? 2 : (p === 2 || p === 4 || p === 8) ? 3 : 2);
+        tupLeft = m[3] ? +m[3] : p; tupFactor = q / p;
         continue;
       }
-      if (m[8]) {                                   /* 당김리듬: 앞 음 ×1.5, 뒤 음 ×0.5 (< 는 반대) */
+      if (m[7]) {                                   /* 당김리듬: 앞 음 ×1.5, 뒤 음 ×0.5 (< 는 반대) */
         var lastEl = els[els.length - 1];
-        if (m[8] === '>') { if (lastEl) lastEl.dur *= 1.5; brokenNext = 0.5; }
+        if (m[7] === '>') { if (lastEl) lastEl.dur *= 1.5; brokenNext = 0.5; }
         else { if (lastEl) lastEl.dur *= 0.5; brokenNext = 1.5; }
         continue;
       }
-      var core = m[5], dur = lenValue(m[6]);
+      var core = m[4], dur = lenValue(m[5]);
       if (core.charAt(0) === '[') {                 /* 화음: 내부 음길이의 최대값 × 바깥 길이 */
         var innRE = /[_^=]*[A-Ga-g][,']*([0-9]*\/*[0-9]*)/g, im, mx = 0;
         while ((im = innRE.exec(core))) { var v = lenValue(im[1]); if (v > mx) mx = v; }
-        if (mx) dur = mx * lenValue(m[6]);
+        if (mx) dur = mx * lenValue(m[5]);
       }
       if (tupLeft > 0) { dur *= tupFactor; tupLeft--; }
       dur *= brokenNext; brokenNext = 1;
-      els.push({ pre: m[1] || pendingPre, core: core, dur: dur, tie: m[7] || '' });
+      els.push({ pre: pendingPre, core: core, dur: dur, tie: m[6] || '' });
       pendingPre = '';
     }
     return els;
