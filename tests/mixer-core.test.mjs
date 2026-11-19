@@ -218,3 +218,31 @@ test('mixSuit 변주: 결정적(같은 입력=같은 결과) + 변주마다 서�
   assert.ok(/변주 1/.test(v1.abc) && v1.vari === 1, '제목·결과에 변주 번호');
   assert.ok(!/변주/.test(base1.abc), '기본은 변주 표기 없음');
 });
+
+test('parseBarElements: 셋잇단·화음 내부길이·당김리듬까지 마디 길이 정확(성부 벌어짐 방지)', () => {
+  const sum = els => els.reduce((t, e) => t + e.dur, 0);
+  const t1 = MX.parseBarElements('(3CDE F2 G2 A2');
+  assert.ok(Math.abs(sum(t1) - 8) < 1e-6, '셋잇단 포함 8: ' + sum(t1));
+  assert.ok(Math.abs(t1[0].dur - 2 / 3) < 1e-6, '셋잇단 한 음 = 2/3');
+  const t2 = MX.parseBarElements('[C2E2] G2 c4');
+  assert.ok(Math.abs(sum(t2) - 8) < 1e-6, '화음 내부길이 반영 8: ' + sum(t2));
+  const t3 = MX.parseBarElements('C>D E2 F2 G2');
+  assert.ok(Math.abs(t3[0].dur - 1.5) < 1e-6 && Math.abs(t3[1].dur - 0.5) < 1e-6, '당김리듬 1.5/0.5');
+  assert.equal(MX.lenToAbc(2 / 3), '2/3', '셋잇단 길이 표기');
+});
+
+test('mixSuit: 셋잇단 템플릿에도 멜로디·베이스 마디 길이가 항상 같다', () => {
+  const A = 'X:1\nM:4/4\nL:1/8\nK:C\n[V:1] "C"(3CDE (3EFG G2 c2 | "G"B2 A2 G2 D2 |\n[V:2] C,2 G,2 C2 G,2 | G,2 D2 G,2 D2 |';
+  const B = 'X:1\nM:4/4\nL:1/8\nK:Am\n"Am"A2 c2 e2 a2 | "Dm"d2 f2 a2 f2 | "E"e2 ^g2 b2 e2 | "Am"a2 e2 c2 A2 |';
+  const r = MX.mix(A, B, { mode: 'suit' });
+  assert.ok(r.ok);
+  const sum = bar => MX.parseBarElements(bar).reduce((t, e) => t + e.dur, 0);
+  const melLines = r.abc.split('\n').filter(l => l.startsWith('[V:1]'));
+  const bassLines = r.abc.split('\n').filter(l => l.startsWith('[V:2]'));
+  const melBars = melLines.join(' ').replace(/\[V:1\]/g, '').split('|').map(x => x.trim()).filter(Boolean);
+  const bassBars = bassLines.join(' ').replace(/\[V:2\]/g, '').split('|').map(x => x.trim()).filter(Boolean);
+  assert.equal(melBars.length, bassBars.length, '마디 수 동일');
+  for (let i = 0; i < melBars.length; i++) {
+    assert.ok(Math.abs(sum(melBars[i]) - sum(bassBars[i])) < 1e-3, (i + 1) + '마디 길이 일치: ' + sum(melBars[i]) + ' vs ' + sum(bassBars[i]));
+  }
+});
