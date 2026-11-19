@@ -148,6 +148,8 @@ try {
     });
     // ✨ 공간감(리버브)은 전용 검사에서만 켠다 — 60초 오프라인 렌더로 다른 검사가 느려지지 않게
     await page.selectOption('#reverbSel', 'off');
+    // 🔮 자동 미리 준비는 꺼서 검사 흐름을 결정적으로 — 전용 검사에서 수동 호출로 검증
+    await page.evaluate(() => window.__player.setPrefetchDelay(0));
 
     // 5) 재생 → 첫 곡이 <audio>로 실제 재생됨, 기본 음질, 코드 반주 켬
     await page.click('#playBtn');
@@ -177,6 +179,24 @@ try {
     assert.ok(/곡 둘/.test(await page.textContent('#nowTitle')));
     await page.evaluate(() => { window.__initDelay = 0; });
     ok('곡이 끝나면 무음 브리지를 거쳐 자동으로 다음 곡이 이어진다');
+
+    // 6.5) 🔮 다음 곡 미리 준비: 재생 중에 만들어 두면, 곡이 끝났을 때 합성 없이 즉시 교체
+    //       (화면 꺼짐·배터리 절약으로 곡 사이 작업이 멈추는 폰에서도 끊김 없이 이어지는 핵심)
+    await page.evaluate(() => window.__player.prefetchNext());
+    await page.waitForFunction(() => window.__player.hasNextCache(), undefined, { timeout: 6000 });
+    const initsBeforeCache = await page.evaluate(() => window.__inits.length);
+    await page.evaluate(() => window.__ended());
+    await page.waitForFunction(() => {
+      const s = window.__player.getState();
+      return s.curIdx === 2 && s.audioPlaying && !s.bridge;
+    }, undefined, { timeout: 6000 });
+    const initsAfterCache = await page.evaluate(() => window.__inits.length);
+    assert.equal(initsAfterCache, initsBeforeCache, '곡 끝에 새 합성 없음 — 미리 만든 음원으로 즉시 교체');
+    assert.ok(!(await page.evaluate(() => window.__player.hasNextCache())), '캐시는 한 번 쓰고 비움');
+    ok('🔮 다음 곡 미리 준비: 곡이 끝나면 합성 없이 즉시 다음 곡');
+    // 흐름 복구: 둘째 곡으로 되돌아간다 (다음 검사는 마지막 곡 이동부터 시작)
+    await page.click('#prevBtn');
+    await page.waitForFunction(() => window.__player.getState().curIdx === 1 && window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
 
     // 7) 마지막 곡 끝 + 🔁 꺼짐 → 정지 / 🔁 켬 → 처음으로
     await page.click('#nextBtn');   // 3번째(마지막) 곡

@@ -124,6 +124,7 @@
       <button class="preset gran" data-g="half" aria-pressed="false">반마디 (더 촘촘)</button>
       <button class="preset gran" data-g="rm" aria-pressed="false">A리듬 + B멜로디 🎼</button>
       <button class="preset gran" data-g="rmx" aria-pressed="false">반마디 교차 🔀</button>
+      <button class="preset gran" data-g="suit" aria-pressed="false" title="B곡의 멜로디·코드·조성은 그대로 두고 A곡의 템포·마디 리듬·베이스 패턴만 입혀 편곡해요">리듬 옷 입히기 👔</button>
     </div>
     <div class="btn-row">
       <button class="act btn-go" id="mixBtn">🎚️ 섞기</button>
@@ -234,7 +235,7 @@ var MixerCore = (function () {
   function unitDen(u) { var m = /\/(\d+)/.exec(u || '1/8'); return m ? +m[1] : 8; }
   // 마디를 음표 단위로 분해(길이 포함) — 반마디 분할용
   function parseBarElements(bar) {
-    bar = String(bar).replace(/\{[^}]*\}/g, '').replace(/![^!]*!/g, '');
+    bar = String(bar).replace(/\{[^}]*\}/g, '').replace(/![^!]*!/g, '').replace(/\[[A-Za-z]:[^\]]*\]/g, '');   /* 꾸밈음·지시·인라인 필드([K: 등]) 제거 */
     var RE = /("(?:[^"]*)")?\s*(\[[^\]]*\]|[_^=]*[A-Ga-g][,']*|[zxZX])([0-9]*\/*[0-9]*)(-?)/g, els = [], m;
     while ((m = RE.exec(bar))) els.push({ pre: m[1] || '', core: m[2], dur: lenValue(m[3]), tie: m[4] || '' });
     return els;
@@ -282,8 +283,130 @@ var MixerCore = (function () {
     var second = rhythmMelodyBar(b[1], a[1]);  // B 리듬 + A 멜로디 (교차)
     return (first + ' ' + second).trim();
   }
+  /* ── 👔 리듬 옷 입히기(suit): B곡의 멜로디·코드·조성은 그대로,
+     A곡의 리듬 옷(템포·마디 리듬 템플릿·베이스 패턴)만 입혀 편곡.
+     수제 리믹스('고양이 스텝'·'달빛 발라드')에서 배운 규칙을 그대로 코드로:
+     ① 화성 진행·조성은 멜로디 곡(B)의 것  ② 리듬·템포·반주 패턴은 리듬 곡(A)의 것
+     ③ A 베이스는 코드 근음 차이만큼 이동 + 화음 성질(장·단·감)에 맞게 3·5도 보정 ── */
+  function voiceTexts(abc) {
+    var lines = String(abc || '').replace(/\r/g, '').split('\n');
+    var head = [], order = [], by = {}, cur = null, plain = [];
+    lines.forEach(function (ln) {
+      var t = ln.trim();
+      var mi = /^\[V:([^\]\s]+)\]\s*(.*)$/.exec(t);
+      if (mi) { cur = mi[1]; if (!by[cur]) { by[cur] = []; order.push(cur); } if (mi[2]) by[cur].push(mi[2]); return; }
+      var md = /^V:\s*(\S+)/.exec(t);
+      if (md) { cur = md[1]; if (!by[cur]) { by[cur] = []; order.push(cur); } return; }
+      if (/^%/.test(t) || !t) return;
+      if (/^[A-Za-z]:/.test(t)) { head.push(ln); return; }
+      if (cur) by[cur].push(ln); else plain.push(ln);
+    });
+    var h = head.join('\n');
+    if (!order.length) return { melody: h + '\n' + plain.join('\n'), bass: null };
+    return {
+      melody: h + '\n' + by[order[0]].join('\n'),
+      bass: order.length > 1 ? h + '\n' + by[order[1]].join('\n') : null
+    };
+  }
+  function chordInfoFromPre(pre) {
+    var m = /^"\s*([A-G])([#b]?)([^"]*)"/.exec(pre || '');
+    if (!m) return null;
+    var pc = (NOTE_PC[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + 12) % 12;
+    var kind = /^(dim|°)/.test(m[3]) ? 2 : (/^m(?!aj)/.test(m[3]) ? 1 : 0);
+    return { pc: pc, kind: kind };
+  }
+  /* 마디별 '마디 시작 시점 유효 코드'(이어받기 포함) */
+  function barChords(bars) {
+    var cur = null, out = [];
+    bars.forEach(function (bar) {
+      var els = parseBarElements(bar);
+      if (els.length && els[0].pre) cur = els[0].pre;
+      out.push(chordInfoFromPre(cur));
+      els.forEach(function (el) { if (el.pre) cur = el.pre; });
+    });
+    return out;
+  }
+  /* 조표를 아는 음 쓰기: 조표와 다를 때만 임시표(^ _ =)를 붙이고, 마디 안 지속도 흉내 */
+  function midiToNoteKeyed(midi, key, barState) {
+    var useFlats = keyUseFlats(key), accMap = keyAccMap(key);
+    var pc = ((midi % 12) + 12) % 12, nm = (useFlats ? FLAT : SHARP)[pc];
+    var letter = nm[0], accCh = nm.slice(1);
+    var need = accCh === '#' ? 1 : accCh === 'b' ? -1 : 0;
+    var relOct = Math.floor((midi - 60) / 12);
+    var body = (relOct >= 1) ? letter.toLowerCase() + "'".repeat(relOct - 1) : letter + ",".repeat(-relOct);
+    var sk = letter + relOct;
+    var curAcc = (barState && sk in barState) ? barState[sk] : (accMap[letter] || 0);
+    var prefix = need === curAcc ? '' : (need === 1 ? '^' : need === -1 ? '_' : '=');
+    if (barState) barState[sk] = need;
+    return prefix + body;
+  }
+  /* A 베이스 한 마디를 B 코드로 재근음화 */
+  function suitBassBar(aBar, aChord, bChord, bKey, aKey) {
+    var els = parseBarElements(aBar);
+    if (!els.length) return aBar;
+    var accMap = keyAccMap(aKey);
+    var shift = 0;
+    if (aChord && bChord) { shift = ((bChord.pc - aChord.pc) % 12 + 12) % 12; if (shift > 6) shift -= 12; }
+    var state = {};
+    function mv(ac, L, oc) {
+      var midi = noteToMidi(ac, L, oc, accMap) + shift;
+      if (bChord) {
+        var iv = ((midi - bChord.pc) % 12 + 12) % 12;
+        if (iv === 3 && bChord.kind === 0) midi += 1;        /* 장화음 위 단3도 → 장3도 */
+        else if (iv === 4 && bChord.kind === 1) midi -= 1;   /* 단화음 위 장3도 → 단3도 */
+        else if (iv === 7 && bChord.kind === 2) midi -= 1;   /* 감화음은 감5도 */
+        else if (iv === 6 && bChord.kind !== 2) midi += 1;   /* 감5도는 완전5도로 */
+      }
+      return midiToNoteKeyed(midi, bKey, state);
+    }
+    return els.map(function (el) {
+      var d = lenToAbc(el.dur);
+      if (/^[zxZX]/.test(el.core)) return 'z' + d;
+      if (el.core[0] === '[') {
+        var moved = el.core.slice(1, -1).replace(/([_^=]*)([A-Ga-g])([,']*)[0-9]*\/*[0-9]*/g, function (mm, ac, L, oc) { return mv(ac, L, oc); });
+        return '[' + moved + ']' + d;
+      }
+      var m = /^([_^=]*)([A-Ga-g])([,']*)$/.exec(el.core);
+      if (!m) return el.core + d;
+      return mv(m[1], m[2], m[3]) + d;
+    }).join(' ');
+  }
+  function mixSuit(abcA, abcB) {
+    var warns = [];
+    var va = voiceTexts(abcA), vb = voiceTexts(abcB);
+    var A = parseSong(va.melody), B = parseSong(vb.melody);
+    if (!A.bars.length || !B.bars.length) return { ok: false, warns: ['두 곡 모두 악보 내용이 필요해요.'], abc: '' };
+    if (A.meter !== B.meter) return { ok: false, warns: ['리듬 옷 입히기는 두 곡의 박자가 같아야 해요 (A ' + A.meter + ' / B ' + B.meter + '). 박자가 같은 곡을 골라주세요.'], abc: '' };
+    var AB = va.bass ? parseSong(va.bass) : null;
+    var hasBass = !!(AB && AB.bars.length);
+    if (!hasBass) warns.push('A곡에 베이스 성부가 없어 멜로디 리듬만 입혔어요.');
+    if (/\[K:/.test(String(abcA) + String(abcB))) warns.push('곡 중간의 조바꿈([K:])은 아직 지원하지 않아요 — 그 구간은 음이 조금 다르게 들릴 수 있어요.');
+    var aCh = barChords(A.bars), bCh = barChords(B.bars);
+    var total = B.bars.length;                /* 멜로디 곡(B)이 주인 — A 리듬은 돌려 쓴다 */
+    var mel = [], bass = [];
+    for (var i = 0; i < total; i++) {
+      mel.push(rhythmMelodyBar(A.bars[i % A.bars.length], B.bars[i]));
+      if (hasBass) bass.push(suitBassBar(AB.bars[i % AB.bars.length], aCh[i % A.bars.length], bCh[i], B.key, A.key));
+    }
+    var head = 'X:1\nT:리듬 옷 입히기 (A리듬옷 + B멜로디)\nM:' + A.meter + '\nL:' + A.unit + (A.tempo ? '\nQ:' + A.tempo : '') + '\n';
+    var out, lines = [], j;
+    if (hasBass) {
+      head += '%%score { 1 | 2 }\nV:1 clef=treble\nV:2 clef=bass\nK:' + B.key + '\n';
+      for (j = 0; j < total; j += 4) {
+        lines.push('[V:1] ' + mel.slice(j, j + 4).join(' | ') + ' |');
+        lines.push('[V:2] ' + bass.slice(j, j + 4).join(' | ') + ' |');
+      }
+      out = lines.join('\n');
+    } else {
+      head += 'K:' + B.key + '\n';
+      for (j = 0; j < total; j += 4) lines.push(mel.slice(j, j + 4).join(' | ') + ' |');
+      out = lines.join('\n').replace(/\|$/, '|]');
+    }
+    return { ok: true, abc: head + out, mode: 'suit', shift: 0, warns: warns, total: total, fromKey: A.key, toKey: B.key, hasBass: hasBass };
+  }
   function mix(abcA, abcB, opts) {
     opts = opts || {};
+    if (opts.mode === 'suit') return mixSuit(abcA, abcB);
     var ratioB = (opts.ratioB != null) ? opts.ratioB : 70;
     var A = parseSong(abcA), B = parseSong(abcB), warns = [];
     if (!A.bars.length || !B.bars.length) return { ok: false, warns: ['두 곡 모두 악보 내용이 필요해요.'], abc: '' };
@@ -341,7 +464,7 @@ var MixerCore = (function () {
     var header = 'X:1\nT:곡 믹서 (A' + (100 - ratioB) + ' · B' + ratioB + (gran === 2 ? ' · 반마디' : '') + ')\nM:' + A.meter + '\nL:' + A.unit + (A.tempo ? '\nQ:' + A.tempo : '') + '\nK:' + A.key + '\n';
     return { ok: true, abc: header + out, pattern: pat, shift: shift, warns: warns, aCount: aCount, total: total, nSlots: nSlots, slotsPerBar: gran, fromKey: B.key, toKey: A.key };
   }
-  return { parseSong: parseSong, keyTonicPc: keyTonicPc, keyAccMap: keyAccMap, transposeBody: transposeBody, lenValue: lenValue, lenToAbc: lenToAbc, weave: weave, splitBarHalf: splitBarHalf, parseBarElements: parseBarElements, rhythmMelodyBar: rhythmMelodyBar, crossBar: crossBar, mix: mix };
+  return { parseSong: parseSong, keyTonicPc: keyTonicPc, keyAccMap: keyAccMap, transposeBody: transposeBody, lenValue: lenValue, lenToAbc: lenToAbc, weave: weave, splitBarHalf: splitBarHalf, parseBarElements: parseBarElements, rhythmMelodyBar: rhythmMelodyBar, crossBar: crossBar, mix: mix, voiceTexts: voiceTexts, barChords: barChords, suitBassBar: suitBassBar, midiToNoteKeyed: midiToNoteKeyed, mixSuit: mixSuit };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = MixerCore;
 if (typeof window !== 'undefined') window.MixerCore = MixerCore;
@@ -379,13 +502,13 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
       [].forEach.call(document.querySelectorAll('.gran'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
       // A리듬+B멜로디 · 반마디 교차 모드는 비율 무관 → 슬라이더 흐리게
       var rr = document.querySelector('.ratio-head').parentNode;
-      $('ratio').classList.toggle('ratio-off', gran === 'rm' || gran === 'rmx');
+      $('ratio').classList.toggle('ratio-off', gran === 'rm' || gran === 'rmx' || gran === 'suit');
       if (last || ($('abcA').value.trim() && $('abcB').value.trim())) doMix();
     });
   });
 
   function doMix() {
-    var opts = (gran === 'rm') ? { mode: 'rhythmMelody' } : (gran === 'rmx') ? { mode: 'rmCross' } : { ratioB: +$('ratio').value, granularity: gran };
+    var opts = (gran === 'rm') ? { mode: 'rhythmMelody' } : (gran === 'rmx') ? { mode: 'rmCross' } : (gran === 'suit') ? { mode: 'suit' } : { ratioB: +$('ratio').value, granularity: gran };
     var res = MixerCore.mix($('abcA').value, $('abcB').value, opts);
     var w = $('warn');
     if (!res.ok) {
@@ -398,7 +521,10 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
     last = res;
     $('resultAbc').textContent = res.abc;
     var strip = $('strip'); strip.innerHTML = '';
-    if (res.mode === 'rhythmMelody') {
+    if (res.mode === 'suit') {
+      for (var is2 = 0; is2 < res.total; is2++) { var cs = document.createElement('div'); cs.className = 'bar rm'; cs.textContent = '👔'; strip.appendChild(cs); }
+      $('mixInfo').textContent = '리듬 옷 입히기: B곡의 멜로디·코드·조성(' + res.toKey + ') 그대로 + A곡의 템포·리듬' + (res.hasBass ? '·베이스 패턴' : '');
+    } else if (res.mode === 'rhythmMelody') {
       for (var i = 0; i < res.total; i++) { var c = document.createElement('div'); c.className = 'bar rm'; c.textContent = 'A♩+B♪'; strip.appendChild(c); }
       $('mixInfo').textContent = '모든 마디: A곡 리듬 + B곡 멜로디' + (res.shift ? ' · B곡 ' + (res.shift > 0 ? '+' : '') + res.shift + '반음' : '');
     } else if (res.mode === 'rmCross') {
@@ -418,6 +544,7 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
       $('mixInfo').textContent = 'A ' + nA + ' · B ' + nB + ' ' + unitTxt + (spb > 1 ? '(' + res.total + '마디)' : '') + (res.shift ? ' · B곡 ' + (res.shift > 0 ? '+' : '') + res.shift + '반음' : '');
     }
     if (res.warns.length) { w.className = 'warnbox bad'; w.innerHTML = res.warns.map(function (x) { return '<div>⚠ ' + x + '</div>'; }).join(''); }
+    else if (res.mode === 'suit') { w.className = 'warnbox ok'; w.innerHTML = '✅ B곡 조성(' + res.toKey + ')·코드는 그대로 두고, A곡의 리듬 옷만 입혔어요.'; }
     else { w.className = 'warnbox ok'; w.innerHTML = '✅ ' + res.fromKey + ' → ' + res.toKey + '조로 맞춰 섞었어요.'; }
     $('copyBtn').disabled = $('toLabBtn').disabled = $('toTabBtn').disabled = false;
     renderStaff(res.abc);
