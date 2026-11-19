@@ -246,3 +246,16 @@ test('mixSuit: 셋잇단 템플릿에도 멜로디·베이스 마디 길이가 �
     assert.ok(Math.abs(sum(melBars[i]) - sum(bassBars[i])) < 1e-3, (i + 1) + '마디 길이 일치: ' + sum(melBars[i]) + ' vs ' + sum(bassBars[i]));
   }
 });
+
+test('parseBarElements: 코드+지시 연속 따옴표("E7""^rit.")에서 유령 음표가 생기지 않는다', () => {
+  const sum = els => els.reduce((t, e) => t + e.dur, 0);
+  // 예전 버그: "E7"의 E를 7박 음표로, "Gm"의 G를 1박 음표로 잘못 읽어 첫 마디가 길어졌다
+  const t1 = MX.parseBarElements('"E7""^rit."c3 A B4');
+  assert.ok(Math.abs(sum(t1) - 8) < 1e-6, '유령 박 없이 8: ' + sum(t1));
+  assert.equal(t1[0].pre, '"E7""^rit."', '코드·지시는 첫 음표에 함께 붙음');
+  const t2 = MX.parseBarElements('"Gm""^장난스럽게"d2d2 d2dc B2G2 B4');
+  assert.ok(Math.abs(sum(t2) - 16) < 1e-6, '섹션 머리도 정확: ' + sum(t2));
+  const t3 = MX.parseBarElements('"C"C2 E2 G2 c2');   // 단일 따옴표 기존 동작 유지
+  assert.equal(t3[0].pre, '"C"');
+  assert.ok(Math.abs(sum(t3) - 8) < 1e-6);
+});
