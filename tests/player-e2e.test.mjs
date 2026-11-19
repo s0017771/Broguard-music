@@ -198,6 +198,12 @@ try {
     await page.click('#prevBtn');
     await page.waitForFunction(() => window.__player.getState().curIdx === 1 && window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
 
+    // 6.6) ⏱ 재생 위치(timeupdate) 기반 자동 미리 준비 — 백그라운드에서 타이머가 묶여도 동작
+    await page.evaluate(() => window.__player.setPrefetchDelay(600000, 0.1));   // 타이머는 멀리 두고 위치 트리거만
+    await page.waitForFunction(() => window.__player.hasNextCache(), undefined, { timeout: 8000 });
+    ok('⏱ 재생 위치(timeupdate)로도 다음 곡이 자동으로 미리 준비된다');
+    await page.evaluate(() => window.__player.setPrefetchDelay(0));   // 이후 검사 결정성 유지
+
     // 7) 마지막 곡 끝 + 🔁 꺼짐 → 정지 / 🔁 켬 → 처음으로
     await page.click('#nextBtn');   // 3번째(마지막) 곡
     await page.waitForFunction(() => window.__player.getState().curIdx === 2 && window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
