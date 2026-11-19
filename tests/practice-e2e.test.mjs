@@ -294,6 +294,25 @@ if (abcjsSrc) await check('2성부 악보: 하이라이트가 베이스로 새�
   await page.click('#stopBtn');
 });
 
+await check('윗줄 숫자키: 8=높은라, 9=높은시, 0=더높은도, 7=높은솔(/와 중복)', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:고음역\nM:4/4\nL:1/8\nK:C\na2 b2 c\'2 g2 |';   // 높은라·높은시·더높은도·높은솔
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  for (const key of ['8', '9', '0', '7']) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(80);
+  }
+  const st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.correctFirst, 4, '네 음 모두 첫 시도 정답: ' + st.correctFirst + ' (idx ' + st.idx + ')');
+  await page.click('#stopBtn');
+});
+
 await check('parseSong: 임시표가 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', async () => {
   const r = await page.evaluate(() => {
     const P = window.__practice.parseSong;
