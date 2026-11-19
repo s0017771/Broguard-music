@@ -154,3 +154,49 @@ test('mix(rhythmMelody): 모든 마디 A리듬+B멜로디 · B곡을 A조로 이
   // 첫 마디: A의 8분×4 리듬에 B의 G장조 멜로디(C조로 이조)
   assert.ok(/"C"c2 e2 g2 c'2/.test(r.abc), 'A 리듬 유지 + B 멜로디 이조');
 });
+
+test('voiceTexts: 2성부 분리, 단선율은 bass 없음', () => {
+  const v = MX.voiceTexts('X:1\nM:4/4\nL:1/8\nK:C\n[V:1] "C"C2 E2 G2 c2 |\n[V:2] C,4 G,4 |');
+  assert.ok(/C2 E2/.test(v.melody) && !/C,4/.test(v.melody), '멜로디 성부만');
+  assert.ok(/C,4 G,4/.test(v.bass), '베이스 성부');
+  const s = MX.voiceTexts('X:1\nK:C\nC2 E2 |');
+  assert.equal(s.bass, null, '단선율은 베이스 없음');
+});
+
+test('suitBassBar: 근음 차이 이동 + 화음 성질(장·단) 보정', () => {
+  // A: C장화음 베이스 C, E(장3도) → B: Am(단화음) — 근음 -3 이동 후 3도 보정
+  const out = MX.suitBassBar('C,2 E,2 G,2 E,2', { pc: 0, kind: 0 }, { pc: 9, kind: 1 }, 'C', 'C');
+  // C(48)-3=45 A,, / E(52)-3=49 C#→단3도 보정 48 C, / G(55)-3=52 E,
+  assert.equal(out, 'A,,2 C,2 E,2 C,2', 'Am 분산화음으로: ' + out);
+});
+
+test('suitBassBar: 장화음 대상일 때 단3도 → 장3도 보정', () => {
+  // A: Am(단) 베이스 A, C(단3도) → B: C(장) — +3 이동하면 C, Eb → Eb를 E로 보정
+  const out = MX.suitBassBar('A,2 C2', { pc: 9, kind: 1 }, { pc: 0, kind: 0 }, 'C', 'C');
+  assert.equal(out, 'C2 E2', '장3도로 보정: ' + out);
+});
+
+test('mixSuit: B 멜로디·코드·조성 + A 리듬·템포·베이스', () => {
+  const A = 'X:1\nT:리듬곡\nM:4/4\nL:1/16\nQ:1/4=104\nK:C\n[V:1] "C"C2C2 C2D2 E2E2 G4 | "G"D2D2 D2E2 F2F2 A4 |\n[V:2] C,2[CE]2C,2[CE]2 C,2[CE]2C,2[CE]2 | G,2[B,D]2G,2[B,D]2 G,2[B,D]2G,2[B,D]2 |';
+  const B = 'X:1\nT:멜로디곡\nM:4/4\nL:1/8\nQ:1/4=70\nK:Am\n"Am"A2 c2 e2 a2 | "Em"g2 e2 B2 e2 | "F"f2 a2 c2 f2 | "E"e2 ^g2 b2 e2 |';
+  const r = MX.mix(A, B, { mode: 'suit' });
+  assert.ok(r.ok, (r.warns || []).join(','));
+  assert.equal(r.total, 4, 'B의 4마디가 주인');
+  assert.ok(/M:4\/4/.test(r.abc) && /L:1\/16/.test(r.abc) && /Q:1\/4=104/.test(r.abc), '박자·단위·템포는 A');
+  assert.ok(/K:Am/.test(r.abc), '조성은 B');
+  assert.ok(/%%score/.test(r.abc) && /\[V:2\]/.test(r.abc), 'A 베이스 패턴으로 2성부');
+  assert.ok(/"Am"/.test(r.abc) && /"Em"/.test(r.abc) && /"F"/.test(r.abc), 'B의 코드 그대로');
+  // 1마디 베이스: A의 움-파(C,+[CE])가 Am 근음으로: C,→A,, / [CE]→[AC](보정 포함)
+  const v2 = r.abc.split('\n').find(l => l.startsWith('[V:2]'));
+  assert.ok(/A,,2 \[A,C\]2 A,,2 \[A,C\]2/.test(v2), 'Am 움-파 베이스: ' + v2);
+  assert.ok(/E,2 \[\^G,B,\]2/.test(v2), 'E장화음 보정(G#) + 임시표: ' + v2);
+});
+
+test('mixSuit: 박자가 다르면 거절, A에 베이스 없으면 단선율 + 경고', () => {
+  const bad = MX.mix('X:1\nM:3/4\nL:1/8\nK:C\nC2 E2 G2 |', 'X:1\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |', { mode: 'suit' });
+  assert.equal(bad.ok, false);
+  assert.ok(/박자가 같아야/.test(bad.warns[0]));
+  const nb = MX.mix('X:1\nM:4/4\nL:1/8\nK:C\n"C"C2 E2 G2 c2 |', 'X:1\nM:4/4\nL:1/8\nK:G\n"G"G2 B2 d2 g2 |', { mode: 'suit' });
+  assert.ok(nb.ok && !/\[V:2\]/.test(nb.abc), '단선율 출력');
+  assert.ok(nb.warns.some(w => /베이스 성부가 없어/.test(w)), '경고 안내');
+});

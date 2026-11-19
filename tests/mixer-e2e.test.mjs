@@ -63,7 +63,23 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
     assert.ok(/반마디 교차/.test(await page.textContent('#mixInfo')), '반마디 교차 안내');
     assert.ok(/T:곡 믹서 \(반마디 교차\)/.test(await page.textContent('#resultAbc')), '결과 제목');
     ok('반마디 교차 모드가 마디마다 역할을 교차한다');
-    // 다시 마디 모드로 복귀(이후 테스트 영향 없게)
+    // 2.7) 👔 리듬 옷 입히기: A(2성부 리듬곡)의 리듬·템포·베이스 + B의 멜로디·코드·조성
+    await page.evaluate(() => {
+      document.getElementById('abcA').value = 'X:1\nT:리듬곡\nM:4/4\nL:1/16\nQ:1/4=104\nK:C\n[V:1] "C"C2C2 C2D2 E2E2 G4 | "G"D2D2 D2E2 F2F2 A4 |\n[V:2] C,2[CE]2C,2[CE]2 C,2[CE]2C,2[CE]2 | G,2[B,D]2G,2[B,D]2 G,2[B,D]2G,2[B,D]2 |';
+      document.getElementById('abcB').value = 'X:1\nT:멜로디곡\nM:4/4\nL:1/8\nQ:1/4=70\nK:Am\n"Am"A2 c2 e2 a2 | "Em"g2 e2 B2 e2 | "F"f2 a2 c2 f2 | "E"e2 ^g2 b2 e2 |';
+    });
+    await page.click('.gran[data-g="suit"]');
+    await page.waitForTimeout(200);
+    assert.ok(await page.$eval('#ratio', el => el.classList.contains('ratio-off')), '리듬옷 모드도 비율 비활성');
+    const suitAbc = await page.textContent('#resultAbc');
+    assert.ok(/K:Am/.test(suitAbc), '조성은 B(멜로디 곡)');
+    assert.ok(/Q:1\/4=104/.test(suitAbc) && /L:1\/16/.test(suitAbc), '템포·단위는 A(리듬 곡)');
+    assert.ok(/\[V:2\]/.test(suitAbc) && /%%score/.test(suitAbc), 'A 베이스 패턴으로 2성부');
+    assert.ok(/"Em"/.test(suitAbc), 'B 코드 그대로');
+    assert.ok(/리듬 옷 입히기/.test(await page.textContent('#mixInfo')), '안내 문구');
+    ok('👔 리듬 옷 입히기: B 멜로디·코드·조성 + A 리듬·템포·베이스');
+    // 원래 샘플·마디 모드로 복귀(이후 테스트 영향 없게)
+    await page.click('#sampleBtn');
     await page.click('.gran[data-g="bar"]');
     await page.waitForTimeout(150);
 
