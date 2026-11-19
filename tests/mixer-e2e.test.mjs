@@ -78,6 +78,22 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
     assert.ok(/"Em"/.test(suitAbc), 'B 코드 그대로');
     assert.ok(/리듬 옷 입히기/.test(await page.textContent('#mixInfo')), '안내 문구');
     ok('👔 리듬 옷 입히기: B 멜로디·코드·조성 + A 리듬·템포·베이스');
+
+    // 2.8) 🎲 변주 1·2·3: 리듬옷 모드에서만 보이고, 누르면 결과가 바뀌며, 기본으로 돌아오면 원래대로
+    assert.ok(await page.$eval('#suitVariRow', el => el.style.display !== 'none'), '리듬옷 모드에서 변주 버튼 표시');
+    await page.click('.svari[data-v="1"]');
+    await page.waitForTimeout(200);
+    const v1Abc = await page.textContent('#resultAbc');
+    assert.notEqual(v1Abc, suitAbc, '변주 1은 기본과 다른 결과');
+    assert.ok(/변주 1/.test(v1Abc), '제목에 변주 번호');
+    assert.ok(/변주 1/.test(await page.textContent('#mixInfo')), '안내에도 변주 번호');
+    await page.click('.svari[data-v="0"]');
+    await page.waitForTimeout(200);
+    assert.equal(await page.textContent('#resultAbc'), suitAbc, '기본으로 돌아오면 완전히 동일(재현성)');
+    await page.click('.gran[data-g="rm"]');
+    await page.waitForTimeout(150);
+    assert.ok(await page.$eval('#suitVariRow', el => el.style.display === 'none'), '다른 모드에선 변주 버튼 숨김');
+    ok('🎲 변주 1·2·3: 리듬옷 전용 · 결과가 바뀌고 되돌리면 재현된다');
     // 원래 샘플·마디 모드로 복귀(이후 테스트 영향 없게)
     await page.click('#sampleBtn');
     await page.click('.gran[data-g="bar"]');

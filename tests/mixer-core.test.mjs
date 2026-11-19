@@ -200,3 +200,21 @@ test('mixSuit: 박자가 다르면 거절, A에 베이스 없으면 단선율 + 
   assert.ok(nb.ok && !/\[V:2\]/.test(nb.abc), '단선율 출력');
   assert.ok(nb.warns.some(w => /베이스 성부가 없어/.test(w)), '경고 안내');
 });
+
+test('mixSuit 변주: 결정적(같은 입력=같은 결과) + 변주마다 서로 다른 배치', () => {
+  const A = 'X:1\nM:4/4\nL:1/8\nK:C\n[V:1] "C"C2C2 D2E2 | "F"F4 A2c2 | "G"GGAB c2d2 |\n[V:2] C,2[CE]2C,2[CE]2 | F,8 | G,2G,2G,2G,2 |';
+  const B = 'X:1\nM:4/4\nL:1/8\nK:Am\n"Am"A2 B2 c2 e2 | "Dm"d2 f2 a2 d2 | "E"e2 ^g2 b2 e2 |';
+  const base1 = MX.mix(A, B, { mode: 'suit', vari: 0 });
+  const base2 = MX.mix(A, B, { mode: 'suit', vari: 0 });
+  assert.equal(base1.abc, base2.abc, '기본: 두 번 돌려도 동일');
+  const v1 = MX.mix(A, B, { mode: 'suit', vari: 1 });
+  const v2 = MX.mix(A, B, { mode: 'suit', vari: 2 });
+  const v3 = MX.mix(A, B, { mode: 'suit', vari: 3 });
+  assert.equal(MX.mix(A, B, { mode: 'suit', vari: 1 }).abc, v1.abc, '변주1도 재현 가능');
+  assert.notEqual(v1.abc, base1.abc, '변주1 ≠ 기본 (리듬 한 마디 밀기)');
+  assert.notEqual(v2.abc, base1.abc, '변주2 ≠ 기본 (리듬 역순)');
+  assert.notEqual(v2.abc, v1.abc, '변주2 ≠ 변주1');
+  assert.notEqual(v3.abc, base1.abc, '변주3 ≠ 기본 (멜로디 양끝 강조)');
+  assert.ok(/변주 1/.test(v1.abc) && v1.vari === 1, '제목·결과에 변주 번호');
+  assert.ok(!/변주/.test(base1.abc), '기본은 변주 표기 없음');
+});
