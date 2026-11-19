@@ -552,6 +552,18 @@ if (typeof window !== 'undefined') window.MixerCore = MixerCore;
     });
   }
   fillLib($('libA')); fillLib($('libB'));
+  function refreshLibs() {
+    ['libA', 'libB'].forEach(function (id) {
+      var sel = $(id), keep = sel.value;
+      while (sel.options.length > 1) sel.remove(1);   /* 자리표시만 남기고 */
+      fillLib(sel);
+      sel.value = keep; if (sel.selectedIndex < 0) sel.selectedIndex = 0;
+    });
+  }
+  /* 악보집이 다른 탭(앨범 받기·드라이브 동기화 등)에서 바뀌면 즉시 갱신 */
+  ['focus', 'pageshow'].forEach(function (ev) { window.addEventListener(ev, refreshLibs); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) refreshLibs(); });
+  window.addEventListener('storage', function (e) { if (!e || !e.key || e.key === 'broguard_library') refreshLibs(); });
   $('libA').addEventListener('change', function () { var o = this.selectedOptions[0]; if (o && o.dataset.abc) $('abcA').value = o.dataset.abc; });
   $('libB').addEventListener('change', function () { var o = this.selectedOptions[0]; if (o && o.dataset.abc) $('abcB').value = o.dataset.abc; });
 

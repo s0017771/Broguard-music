@@ -193,6 +193,18 @@ await check('악보집(broguard_library)에서 불러오기 목록이 생긴다'
   await page.click('#stopBtn');
 });
 
+await check('악보집이 다른 탭에서 바뀌면(storage 이벤트) 목록이 즉시 갱신된다', async () => {
+  await page.evaluate(() => {
+    localStorage.setItem('broguard_library', JSON.stringify({ entries: [
+      { id: 'st1', title: '앨범으로 새로 받은 곡', abc: 'X:1\nT:앨범으로 새로 받은 곡\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |', added: 50 }
+    ] }));
+    /* 다른 탭이 바꿨을 때 브라우저가 쏘는 이벤트를 그대로 재현 */
+    window.dispatchEvent(new StorageEvent('storage', { key: 'broguard_library' }));
+  });
+  const opts = await page.$$eval('#songSel optgroup[data-lib] option', els => els.map(o => o.textContent));
+  assert.deepEqual(opts, ['앨범으로 새로 받은 곡'], '포커스 없이도 목록 갱신: ' + opts.join(','));
+});
+
 await check('악보집이 나중에 바뀌어도(동기화로 id 변경) 곡을 제목으로 다시 찾아 시작한다', async () => {
   await page.evaluate(() => {
     localStorage.setItem('broguard_library', JSON.stringify({ entries: [

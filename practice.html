@@ -1723,7 +1723,11 @@
   });
   /* 악보집 목록: 처음 + 창으로 돌아올 때(다른 탭에서 저장했을 수 있음) 갱신 */
   populateLibrary();
-  window.addEventListener("focus", populateLibrary);
+  /* 악보집이 다른 탭(앨범 받기·드라이브 동기화 등)에서 바뀌면 즉시 갱신 —
+     모바일은 탭 전환에 focus가 안 올 때가 많아 storage·visibilitychange·pageshow도 함께 듣는다 */
+  ["focus", "pageshow"].forEach(function (ev) { window.addEventListener(ev, populateLibrary); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) populateLibrary(); });
+  window.addEventListener("storage", function (e) { if (!e || !e.key || e.key === "broguard_library") populateLibrary(); });
   $("modeSel").addEventListener("change", function () { $("modeSel").blur(); });
   $("loadFileBtn").addEventListener("click", function () { $("fileInput").click(); });
   $("fileInput").addEventListener("change", function (e) {

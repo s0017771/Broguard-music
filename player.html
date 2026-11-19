@@ -1045,7 +1045,11 @@
     savePrefs(); clearNextCache();
     if (isPlaying && !isPaused && curIdx >= 0) playAt(curIdx);
   });
-  window.addEventListener("focus", renderLibrary);
+  /* 악보집이 다른 탭(앨범 받기·드라이브 동기화 등)에서 바뀌면 즉시 갱신 —
+     모바일은 탭 전환에 focus가 안 올 때가 많아 storage·visibilitychange·pageshow도 함께 듣는다 */
+  ["focus", "pageshow"].forEach(function (ev) { window.addEventListener(ev, renderLibrary); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) renderLibrary(); });
+  window.addEventListener("storage", function (e) { if (!e || !e.key || e.key === "broguard_library") renderLibrary(); });
 
   renderLibrary();
   renderNow();
