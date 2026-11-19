@@ -125,21 +125,13 @@
       </select>
     </label>
     <label class="fld">BPM <input type="number" id="bpmInput" min="30" max="220" value="90"></label>
-    <label class="fld" title="곡 전체를 올리거나 내려서 연습해요 — 악보의 조표도 함께 바뀌어요">조옮김
-      <select id="transSel">
-        <option value="12">+1옥타브</option>
-        <option value="2">+2</option>
-        <option value="1">+1</option>
-        <option value="0" selected>원래 조</option>
-        <option value="-1">-1</option>
-        <option value="-2">-2</option>
-        <option value="-3">-3</option>
-        <option value="-4">-4</option>
-        <option value="-5">-5</option>
-        <option value="-12">-1옥타브</option>
-        <option value="-24">-2옥타브</option>
-      </select>
-    </label>
+    <span class="fld" title="곡 전체를 올리거나 내려서 연습해요 — 악보의 조표도 함께 바뀌어요" style="display:inline-flex; align-items:center; gap:4px;">조옮김
+      <button type="button" id="transFlat" class="btn-ghost" style="padding:4px 9px;">♭ -1</button>
+      <button type="button" id="transSharp" class="btn-ghost" style="padding:4px 9px;">♯ +1</button>
+      <button type="button" id="transOctDn" class="btn-ghost" style="padding:4px 9px;">-1옥타브</button>
+      <button type="button" id="transReset" class="btn-ghost" style="padding:4px 9px;">원조</button>
+      <b id="transVal" style="min-width:2em; text-align:center;">0</b>
+    </span>
     <button id="startBtn" class="btn-brass" type="button">&#9654; 연습 시작</button>
     <button id="stopBtn" class="btn-ghost" type="button">&#9632; 중지</button>
     <button id="listenBtn" class="btn-ghost" type="button">&#128266; 곡 들어보기</button>
@@ -640,7 +632,7 @@
     delete voices[handle];
     try {
       var now = audioCtx.currentTime;
-      var rel = $("sustainChk").checked ? 1.7 : 0.3;
+      var rel = $("sustainChk").checked ? 3.0 : 0.3;   /* 연음을 더 길게 */
       if (vc.sample) {   /* 샘플 음: 자연스러운 릴리즈 후 정지 */
         vc.g.gain.cancelScheduledValues(now);
         vc.g.gain.setValueAtTime(Math.max(0.0001, vc.v), now);
@@ -1288,11 +1280,13 @@
         if (song.chords[barNo]) playChordPattern(song.chords[barNo], beatMs, song.mnum);
       }
     }
-    /* 🎹 원곡 베이스(왼손) 자동 연주 — 시계에 맞춰 제 자리에 */
+    /* 🎹 원곡 베이스(왼손) 자동 연주 — '자동 반주(소리)' 체크가 토글.
+       꺼져 있어도 위치는 따라가서, 중간에 켜도 밀린 음이 한꺼번에 쏟아지지 않는다 */
     if (song.bassSeq) {
+      var playBass = $("autoComp").checked;
       while (bassPtr < song.bassSeq.length && song.bassSeq[bassPtr].start * cellMs <= el) {
         var bn = song.bassSeq[bassPtr++];
-        if (!bn.rest) playShort(bn.midi, Math.min(1400, bn.len * cellMs * 0.92));
+        if (playBass && !bn.rest) playShort(bn.midi, Math.min(1400, bn.len * cellMs * 0.92));
       }
     }
     /* 지나간 음 처리 */
@@ -1392,8 +1386,9 @@
   }
   /* ── 조옮김: 악보 문자열 자체를 옮긴다(조표·임시표까지 abcjs가 정확히 다시 적음).
      주의: strTranspose는 '방금 렌더한 바로 그 문자열'에만 좌표가 맞는다(연구소에서 배운 교훈). ── */
+  var transN = 0;   /* 조옮김 (반음 단위, ♭/♯ 버튼으로 누적) */
   function applyTranspose(abc) {
-    var n = +($("transSel").value || 0);
+    var n = transN;
     if (!n || !abc) return { abc: abc, n: n, done: !n };
     if (window.ABCJS && ABCJS.strTranspose) {
       try {
@@ -1544,8 +1539,8 @@
     var cMs = (60000 / bpm) / song.beatCells;
     applyChords(song);
     prefetchSong(song);
-    /* 🎹 원곡 베이스(왼손)가 있으면 그대로 함께 연주 — 쿵짝 추정 반주보다 우선 */
-    if (song.bassSeq) {
+    /* 🎹 원곡 베이스(왼손): '자동 반주(소리)' 체크가 토글 — 켜면 쿵짝 추정 대신 원곡 연주 */
+    if (song.bassSeq && $("autoComp").checked) {
       song.bassSeq.forEach(function (bn) {
         if (bn.rest) return;
         listenBassTimers.push(setTimeout(function () {
@@ -1566,7 +1561,7 @@
       listenTimer = setTimeout(step, n.len * cMs);
       i++;
     }
-    setStatus("곡을 들려드릴게요… (BPM " + bpm + ")" + (song.bassSeq ? " — 원곡 베이스와 함께 🎹" : ""));
+    setStatus("곡을 들려드릴게요… (BPM " + bpm + ")" + (song.bassSeq && $("autoComp").checked ? " — 원곡 베이스와 함께 🎹" : ""));
     step();
   }
   function flash(kind) {
@@ -1744,11 +1739,17 @@
     e.target.value = "";
   });
   $("octaveFree").addEventListener("change", function () { $("octaveFree").blur(); wakeAudio(); });
-  $("transSel").addEventListener("change", function () {
-    $("transSel").blur(); wakeAudio();
+  function setTranspose(n) {
+    transN = Math.max(-24, Math.min(24, n | 0));
+    $("transVal").textContent = (transN > 0 ? "+" : "") + transN;
+    wakeAudio();
     if (song && playing) { stopAll(); start(); }   /* 새 조로 즉시 다시 시작 */
-    else if (song) setStatus("조옮김을 바꿨어요 — ▶ 연습 시작을 누르면 적용돼요.");
-  });
+    else if (song) setStatus("조옮김 " + (transN > 0 ? "+" : "") + transN + " — ▶ 연습 시작을 누르면 적용돼요.");
+  }
+  $("transFlat").addEventListener("click", function () { setTranspose(transN - 1); });
+  $("transSharp").addEventListener("click", function () { setTranspose(transN + 1); });
+  $("transOctDn").addEventListener("click", function () { setTranspose(transN - 12); });
+  $("transReset").addEventListener("click", function () { setTranspose(0); });
   $("sustainChk").addEventListener("change", function () { $("sustainChk").blur(); wakeAudio(); });
   $("chordMode").addEventListener("change", function () { $("chordMode").blur(); wakeAudio(); });
   /* 🎹 피아노 음색: 선택 저장 + 켜면 현재 곡 샘플 미리 받기 */
@@ -1785,7 +1786,7 @@
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__practice = {
     parseSong: parseSong, attempt: attempt, generateChords: generateChords, chordAtCell: chordAtCell, staffY: staffY, injectChordsIntoAbc: injectChordsIntoAbc, wakeAudio: wakeAudio,
-    abcjsFallback: abcjsFallback, smfTracks: smfTracks, loadSample: loadSample, noteOn: noteOn, noteOff: noteOff,
+    abcjsFallback: abcjsFallback, smfTracks: smfTracks, loadSample: loadSample, noteOn: noteOn, noteOff: noteOff, setTranspose: setTranspose,
     sampleStats: function () { return { loaded: Object.keys(sampleBuf).length, voices: Object.keys(voices).map(function (k) { return !!voices[k].sample; }) }; },
     parseChordSym: parseChordSym, chordsFromAbc: chordsFromAbc, populateLibrary: populateLibrary,
     midiToAbcToken: midiToAbcToken, buildRecAbc: buildRecAbc, classifyDur: classifyDur,

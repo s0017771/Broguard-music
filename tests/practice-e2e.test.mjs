@@ -334,23 +334,48 @@ if (abcjsSrc) await check('조옮김: 옥타브·반음 내리면 음과 조표�
     ta.value = 'X:1\nT:조옮김곡\nM:4/4\nL:1/8\nK:C\nc2 e2 g2 c\'2 |';
   });
   await page.selectOption('#modeSel', 'wait');
-  // -1옥타브: 높은도(72) → 가온도(60)
-  await page.selectOption('#transSel', '-12');
+  // -1옥타브 버튼: 높은도(72) → 가온도(60)
+  await page.click('#transOctDn');
+  assert.equal(await page.textContent('#transVal'), '-12', '버튼 표시');
   await page.click('#startBtn');
   await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 5000 });
   let st = await page.evaluate(() => window.__practice.getState());
   assert.equal(st.song.seq[0].midi, 60, '-1옥타브: c→가온도');
   assert.equal(st.song.transposed, -12, '조옮김 적용 표시');
   await page.click('#stopBtn');
-  // -2 반음: K:C → K:Bb, 첫 음 70
-  await page.selectOption('#transSel', '-2');
+  // ♭ 버튼 두 번(원조에서 -2): K:C → K:Bb, 첫 음 70
+  await page.click('#transReset');
+  await page.click('#transFlat');
+  await page.click('#transFlat');
+  assert.equal(await page.textContent('#transVal'), '-2', '♭ 누적 표시');
   await page.click('#startBtn');
   await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 5000 });
   st = await page.evaluate(() => window.__practice.getState());
   assert.equal(st.song.seq[0].midi, 70, '-2반음: c→시b');
   assert.equal(st.song.keyName, 'Bb', '조표도 함께 바뀜(K:Bb)');
   await page.click('#stopBtn');
-  await page.selectOption('#transSel', '0');
+  await page.click('#transReset');
+});
+
+await check('자동 반주(소리) 체크가 원곡 베이스 연주의 토글이다', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:토글곡\nM:4/4\nL:1/8\nK:C\n[V:1] C2 E2 G2 c2 |\n[V:2] C,4 G,4 |';
+  });
+  const chk = await page.$eval('#autoComp', el => el.checked);
+  if (chk) await page.uncheck('#autoComp');
+  await page.click('#listenBtn');
+  let stText = await page.textContent('#status');
+  assert.ok(!/원곡 베이스와 함께/.test(stText), '꺼짐: 베이스 안내 없음');
+  await page.click('#stopBtn');
+  await page.check('#autoComp');
+  await page.click('#listenBtn');
+  stText = await page.textContent('#status');
+  assert.ok(/원곡 베이스와 함께/.test(stText), '켜짐: 원곡 베이스와 함께 — ' + stText);
+  await page.click('#stopBtn');
+  await page.uncheck('#autoComp');
 });
 
 await check('parseSong: 임시표가 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', async () => {
