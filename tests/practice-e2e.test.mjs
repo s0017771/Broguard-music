@@ -255,6 +255,45 @@ await check('레인이 일정한 속도로 흐른다(rAF 등속 구동)', async 
   await page.click('#stopBtn');
 });
 
+await check('parseSong: 베이스 성부(bassSeq)도 읽는다 — 어떤 성부 표기든', async () => {
+  const r = await page.evaluate(() => {
+    const P = window.__practice.parseSong;
+    const midis = sq => (sq || []).filter(x => !x.rest).map(x => x.midi);
+    const two = P('X:1\nM:4/4\nL:1/8\n%%score { 1 | 2 }\nV:1 clef=treble\nV:2 clef=bass\nK:C\n[V:1] "C"C2 E2 G2 c2 |\n[V:2] C,4 G,4 |');
+    const blk = P('X:1\nM:4/4\nL:1/8\nK:C\nV:RH\nC4 E4 |\nV:LH\nC,4 G,4 |');
+    const solo = P('X:1\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |');
+    return { two: midis(two.bassSeq), twoStarts: (two.bassSeq || []).map(x => x.start), blk: midis(blk.bassSeq), solo: solo.bassSeq };
+  });
+  assert.deepEqual(r.two, [48, 55], '인라인 2성부의 베이스');
+  assert.deepEqual(r.twoStarts, [0, 4], '베이스 위치(cell)');
+  assert.deepEqual(r.blk, [48, 55], 'V: 블록 형식도');
+  assert.equal(r.solo, null, '단선율은 bassSeq 없음');
+});
+
+if (abcjsSrc) await check('2성부 악보: 하이라이트가 베이스로 새지 않는다 (멜로디 성부만 추적)', async () => {
+  await page.waitForFunction(() => !!window.ABCJS, undefined, { timeout: 5000 });
+  await page.evaluate(() => {
+    localStorage.setItem('broguard_library', JSON.stringify({ entries: [
+      { id: 'tv1', title: '두성부곡', added: 99, abc: 'X:1\nT:두성부곡\nM:4/4\nL:1/8\n%%score { 1 | 2 }\nV:1 clef=treble\nV:2 clef=bass\nK:C\n[V:1] "C"C2 E2 G2 c2 | "G"d2 B2 G2 A2 |\n[V:2] C,4 G,4 | G,4 D4 |' }
+    ] }));
+    window.__practice.populateLibrary();
+  });
+  await page.selectOption('#songSel', 'lib:tv1');
+  await page.selectOption('#modeSel', 'wait');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 5000 });
+  const r = await page.evaluate(() => {
+    const all = document.querySelectorAll('#score .abcjs-note').length;
+    const v0 = document.querySelectorAll('#score .abcjs-note.abcjs-v0').length;
+    const st = window.__practice.getState();
+    return { all, v0, melodyNotes: st.song.seq.filter(n => !n.rest).length, bass: (st.song.bassSeq || []).filter(n => !n.rest).length };
+  });
+  assert.ok(r.all > r.v0, '화면엔 두 성부 음표가 모두 있음: ' + r.all + ' > ' + r.v0);
+  assert.equal(r.v0, r.melodyNotes, '추적 대상 = 멜로디 성부 음표 수 (베이스 제외)');
+  assert.equal(r.bass, 4, '베이스도 읽어 둠(들어보기·박자 모드에서 연주)');
+  await page.click('#stopBtn');
+});
+
 await check('parseSong: 임시표가 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', async () => {
   const r = await page.evaluate(() => {
     const P = window.__practice.parseSong;
