@@ -57,8 +57,27 @@
               "year": "1725",
               "collection": "안나 막달레나 바흐를 위한 음악 수첩",
               "note": "실제 작곡가는 크리스티안 페촐트",
-              "status": "planned",
-              "scores": []
+              "status": "done",
+              "scores": [
+                {
+                  "level": "intermediate",
+                  "id": "classical-bach-anh114-1",
+                  "title": "바흐 · 미뉴에트 G장조 [1 인터미디어트]",
+                  "file": "bach/minuet-g-anh114-1-intermediate.abc"
+                },
+                {
+                  "level": "advanced",
+                  "id": "classical-bach-anh114-2",
+                  "title": "바흐 · 미뉴에트 G장조 [2 어드밴스]",
+                  "file": "bach/minuet-g-anh114-2-advanced.abc"
+                },
+                {
+                  "level": "original",
+                  "id": "classical-bach-anh114-3",
+                  "title": "바흐 · 미뉴에트 G장조 [3 원곡]",
+                  "file": "bach/minuet-g-anh114-3-original.abc"
+                }
+              ]
             },
             {
               "id": "bach-anh115",
