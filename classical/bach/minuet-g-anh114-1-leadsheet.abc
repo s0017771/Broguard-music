@@ -1,0 +1,33 @@
+X:1
+T:바흐 · 미뉴에트 G장조 [1 리드시트]
+T:(Minuet in G major, BWV Anh. 114 — Lead Sheet)
+C:크리스티안 페촐트 (오랫동안 J.S. 바흐 작품으로 알려짐)
+R:Minuet
+M:3/4
+L:1/8
+Q:1/4=108
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 1 리드시트 — 오른손은 원곡 멜로디(꾸밈음만 뺌), 왼손은 코드 기호를 보고 넣는 반주
+% 반주 기법: 왈츠 베이스(쿵-짝-짝). 1박에 코드의 뿌리음(슬래시 코드면 / 뒤의 음)을 낮게, 2·3박에 나머지 화음을 가볍게.
+% 7화음(D7 등)은 뿌리음을 빼고 3음·5음·7음으로. 화음은 앞 화음과 가까운 자리바꿈을 골라 손이 덜 움직이게 했다.
+% ===== 앞부분 (1-16마디) =====
+[V:1] |:!mf!"G"d2 GABc | d2 G2 G2 | "C"e2 cdef | "G"g2 G2 G2 |
+[V:2] |:"_반주: 왈츠 베이스 (쿵-짝-짝)"G,,2 [D,G,B,]2 [D,G,B,]2 | G,,2 [D,G,B,]2 [D,G,B,]2 | C,2 [E,G,C]2 [E,G,C]2 | G,,2 [D,G,B,]2 [D,G,B,]2 |
+[V:1] "Am"c2 dcBA | "G"B2 cBAG | "D"F2 "G"GABG | "D"A6 |
+[V:2] A,,2 [E,A,C]2 [E,A,C]2 | G,,2 [D,G,B,]2 [D,G,B,]2 | D,,2 [D,G,B,]2 [D,G,B,]2 | D,,2 [D,F,A,]2 [D,F,A,]2 |
+[V:1] "G/B"d2 GABc | "G"d2 G2 G2 | "C"e2 cdef | "G"g2 G2 G2 |
+[V:2] B,,2 [D,G,B,]2 [D,G,B,]2 | G,,2 [D,G,B,]2 [D,G,B,]2 | C,2 [E,G,C]2 [E,G,C]2 | G,,2 [D,G,B,]2 [D,G,B,]2 |
+[V:1] "D/F#"c2 dcBA | "G"B2 cBAG | "D7"A2 BAGF | "G"G6 :|
+[V:2] F,,2 [D,F,A,]2 [D,F,A,]2 | G,,2 [D,G,B,]2 [D,G,B,]2 | D,,2 [F,A,C]2 [F,A,C]2 | G,,2 [G,B,D]2 [G,B,D]2 :|
+% ===== 뒷부분 (17-32마디) =====
+[V:1] |:!mp!"G"b2 gabg | "D"a2 defd | "Em"g2 efgd | "A7"^c2 B^c A2 |
+[V:2] |:G,,2 [G,B,D]2 [G,B,D]2 | D,,2 [F,A,D]2 [F,A,D]2 | E,,2 [E,G,B,]2 [E,G,B,]2 | A,,2 [E,G,^C]2 [E,G,C]2 |
+[V:1] "A7"AB^cdef | "G"g2 "D"f2 "A"e2 | "D"f2 A2 "A"^c2 | "D"d6 |
+[V:2] A,,2 [E,G,^C]2 [E,G,C]2 | G,,2 [F,A,D]2 [E,A,^C]2 | D,,2 [F,A,D]2 [E,A,^C]2 | D,,2 [F,A,D]2 [F,A,D]2 |
+[V:1] !mf!"G/B"d2 GF G2 | "C"e2 GF G2 | "G"d2 c2 B2 | "D"AGFG A2 |
+[V:2] B,,2 [G,B,D]2 [G,B,D]2 | C,2 [E,G,C]2 [E,G,C]2 | G,,2 [D,G,B,]2 [D,G,B,]2 | D,,2 [D,F,A,]2 [D,F,A,]2 |
+[V:1] "D7"DEFGAB | "Am"c2 B2 A2 | "G"Bd G2 "D"F2 | "G"[B,DG]6 :|
+[V:2] D,,2 [F,A,C]2 [F,A,C]2 | A,,2 [E,A,C]2 [E,A,C]2 | G,,2 [D,G,B,]2 [D,F,A,]2 | H[G,,D,]6 :|
