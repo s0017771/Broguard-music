@@ -562,6 +562,7 @@
   var lastCompBar = -1;
   var autoPtr = 0;         /* 자동 연주 성부(안 고른 손) 위치 (박자 모드) */
   var waitAutoPtr = 0;     /* 자동 연주 성부 위치 (기다려주기 모드) */
+  var bassWaitIdx = 0;     /* 두 손 연습(기다려주기): 왼손 진행 위치 */
   var practiceVoice = 0;   /* 하이라이트 추적 성부: 0=멜로디(오른손), 1=베이스(왼손) */
 
   var $ = function (id) { return document.getElementById(id); };
@@ -844,17 +845,18 @@
       var el = noteEls[vi];
       if (el) { el.classList.remove("pr-cur"); if (cls) el.classList.add(cls); }
     }
-    var lb = laneEls[vi];
-    if (lb) {
-      var color = cls === "pr-done" ? "var(--good)" : cls === "pr-late" ? "var(--hint)" : cls === "pr-miss" ? "var(--miss)" : "var(--ink)";
-      lb.setAttribute("data-state", cls || "");
-      Array.prototype.forEach.call(lb.querySelectorAll(".nh"), function (e) {
-        if (e.classList.contains("nh-open")) { e.setAttribute("stroke", color); e.setAttribute("fill", "#fff"); }
-        else { e.setAttribute("fill", color); e.setAttribute("stroke", color); }
-      });
-      Array.prototype.forEach.call(lb.querySelectorAll(".nstem,.nledger,.nflag"), function (e) { e.setAttribute("stroke", color); });
-      Array.prototype.forEach.call(lb.querySelectorAll(".nlabel"), function (e) { e.setAttribute("fill", color); });
-    }
+    paintLaneEl(laneEls[vi], cls);
+  }
+  function paintLaneEl(lb, cls) {
+    if (!lb) return;
+    var color = cls === "pr-done" ? "var(--good)" : cls === "pr-late" ? "var(--hint)" : cls === "pr-miss" ? "var(--miss)" : "var(--ink)";
+    lb.setAttribute("data-state", cls || "");
+    Array.prototype.forEach.call(lb.querySelectorAll(".nh"), function (e) {
+      if (e.classList.contains("nh-open")) { e.setAttribute("stroke", color); e.setAttribute("fill", "#fff"); }
+      else { e.setAttribute("fill", color); e.setAttribute("stroke", color); }
+    });
+    Array.prototype.forEach.call(lb.querySelectorAll(".nstem,.nledger,.nflag"), function (e) { e.setAttribute("stroke", color); });
+    Array.prototype.forEach.call(lb.querySelectorAll(".nlabel"), function (e) { e.setAttribute("fill", color); });
   }
 
   /* ── 흐르는 오선지 레인 ── */
@@ -866,6 +868,7 @@
   var LABEL_Y = 256;       /* 계이름 라벨 y */
   var SVGNS = "http://www.w3.org/2000/svg";
   var laneEls = [];
+  var otherLaneEls = [];   /* 반대 손(표시 전용) 레인 블록 */
   var laneG = null;
   var laneWidth = 900;
   /* 음이름 → 오선 세로 위치 (다이어토닉 계단, 높은음자리표 기준) */
@@ -882,7 +885,7 @@
       natPc = flatKey ? (pc + 1) % 12 : (pc - 1 + 12) % 12;
     }
     var octave = Math.floor(midi / 12) - 1;
-    var bottomLineY = STAFF_TOP + 4 * STAFF_GAP;
+    var bottomLineY = (arguments.length > 3 && arguments[3] != null ? arguments[3] : STAFF_TOP) + 4 * STAFF_GAP;
     var step = (clef === "bass")
       ? (DIATONIC_STEP[natPc] - DIATONIC_STEP[7]) + (octave - 2) * 7
       : (DIATONIC_STEP[natPc] - DIATONIC_STEP[4]) + (octave - 4) * 7;
@@ -919,26 +922,44 @@
     var svg = $("laneSvg");
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     laneEls = [];
+    otherLaneEls = [];
     if (!song) return;
-    /* 왼손 연습이면 레인도 악보처럼 낮은음자리표로 */
-    var laneClefKind = practiceVoice === 1 ? "bass" : "treble";
-    try { $("laneClef").textContent = laneClefKind === "bass" ? "\uD834\uDD22" : "\uD834\uDD1E"; } catch (e) {}
+    /* 두 성부 악보면 레인도 악보처럼 두 보표(위 멜로디 𝄞 · 아래 베이스 𝄢) */
+    var twoStaff = !!song.bassSeq;
+    var topT = twoStaff ? 46 : STAFF_TOP;
+    var topB = 240;
+    var H = twoStaff ? 430 : LANE_H;
+    var labelYT = twoStaff ? topT + 4 * STAFF_GAP + 38 : LABEL_Y;
+    var labelYB = topB + 4 * STAFF_GAP + 38;
+    try {
+      $("laneWrap").style.height = H + "px";
+      if (twoStaff) $("laneClef").style.display = "none";
+      else {
+        $("laneClef").style.display = "";
+        $("laneClef").textContent = practiceVoice === 1 ? "\uD834\uDD22" : "\uD834\uDD1E";
+      }
+    } catch (e) {}
     var lastEnd = song.totalCells;
     laneWidth = HIT_X + lastEnd * cellMs * LANE_SPEED + 200;
-    svg.setAttribute("viewBox", "0 0 " + laneWidth + " " + LANE_H);
+    svg.setAttribute("viewBox", "0 0 " + laneWidth + " " + H);
     svg.setAttribute("width", laneWidth);
     var g = svgEl("g", { id: "laneG" });
     laneG = g;
-    /* 오선 5줄 */
-    for (var s = 0; s < 5; s++) {
-      var y = STAFF_TOP + s * STAFF_GAP;
-      g.appendChild(svgEl("line", { x1: 0, y1: y, x2: laneWidth, y2: y, stroke: "#cfc6b0", "stroke-width": 1 }));
+    /* 오선 */
+    function staffLines(topY) {
+      for (var s2 = 0; s2 < 5; s2++) {
+        var y = topY + s2 * STAFF_GAP;
+        g.appendChild(svgEl("line", { x1: 0, y1: y, x2: laneWidth, y2: y, stroke: "#cfc6b0", "stroke-width": 1 }));
+      }
     }
-    /* 마디선 */
+    staffLines(topT);
+    if (twoStaff) staffLines(topB);
+    /* 마디선 — 두 보표를 관통 */
     var cellsPerBar = song.mnum * song.beatCells;
+    var barBot = (twoStaff ? topB : topT) + 4 * STAFF_GAP + 2;
     for (var bar = 0; bar * cellsPerBar <= lastEnd; bar++) {
       var bx = HIT_X + bar * cellsPerBar * cellMs * LANE_SPEED;
-      g.appendChild(svgEl("line", { x1: bx, y1: STAFF_TOP - 2, x2: bx, y2: STAFF_TOP + 4 * STAFF_GAP + 2, stroke: "#b9ae94", "stroke-width": 1.5 }));
+      g.appendChild(svgEl("line", { x1: bx, y1: topT - 2, x2: bx, y2: barBot, stroke: "#b9ae94", "stroke-width": 1.5 }));
     }
     /* 코드명 — 음표와 같은 레인에 얹어 함께 흐름.
        악보에 코드가 적혀 있으면 적힌 위치 그대로(마디 중간 포함), 없으면 자동 코드(마디 단위) */
@@ -948,89 +969,93 @@
         : (song.chords || []).map(function (c) { return { cell: c.startCell, name: c.name }; });
       chordMarks.forEach(function (c) {
         var cxx = HIT_X + c.cell * cellMs * LANE_SPEED;
-        var ct = svgEl("text", { x: cxx + 7, y: STAFF_TOP - 12, "font-size": 17, "font-weight": 700, fill: "var(--lh)", class: "lchord" });
+        var ct = svgEl("text", { x: cxx + 7, y: topT - 12, "font-size": 17, "font-weight": 700, fill: "var(--lh)", class: "lchord" });
         ct.textContent = c.name;
         g.appendChild(ct);
       });
     }
-    /* 음표 */
+    /* 음표 — isPractice 성부는 판정 색칠 대상(laneEls), 반대 손은 옅은 색 표시 전용(otherLaneEls) */
     var acc = song.acc || {};
-    song.seq.forEach(function (n) {
-      if (n.rest) return;
-      /* 머리는 음의 '시작'에, 지속선은 거기서 길이만큼 — 전엔 머리가 길이의 가운데라
-         금색 선에 음길이의 절반만큼 늦게 닿아, 제때 나는 소리(자동 성부·드럼)가 빨라 보였다 */
-      var cx = HIT_X + n.start * cellMs * LANE_SPEED;
-      var cy = staffY(n.midi, null, laneClefKind);
-      /* 화음이면 구성음을 악보처럼 쌓아 그린다 (머리 여러 개 + 기둥 하나) */
-      var members = (n.chord && n.chord.length > 1) ? n.chord : [n.midi];
-      var cys = members.map(function (m2) { return staffY(m2, null, laneClefKind); });
-      var cyTop = Math.min.apply(null, cys), cyBot = Math.max.apply(null, cys);
-      var ng = svgEl("g", { class: "lnoteG", "data-state": "" });
-      /* 지속선 */
-      var wpx = n.len * cellMs * LANE_SPEED;
-      ng.appendChild(svgEl("rect", { x: cx, y: cy - 5, width: Math.max(6, wpx - 8), height: 10, rx: 5, fill: "rgba(176,138,46,.14)" }));
-      /* 덧줄 (화음은 가장 높은·낮은 머리 기준) */
-      addLedgers(ng, cx, cyTop);
-      if (cyBot !== cyTop) addLedgers(ng, cx, cyBot);
-      /* 임시표: 이 음이 놓이는 흰건반 계이름(baseWhitePc)을 조표가 이미 변화시키는지 확인 */
-      var pc = ((n.midi % 12) + 12) % 12;
-      var accSym = "";
-      if (DIATONIC_STEP[pc] === undefined) {
-        /* 검은건반: staffY와 동일하게 어느 흰건반 위치에 그렸는지 판단 */
-        var flatKey = false; for (var kk in acc) { if (acc[kk] === -1) { flatKey = true; break; } }
-        var baseWhitePc = flatKey ? (pc + 1) % 12 : (pc - 1 + 12) % 12;
-        /* 조표가 이 흰건반을 같은 방향으로 이미 바꾸면 기호 생략 */
-        if (flatKey && acc[baseWhitePc] === -1) accSym = "";
-        else if (!flatKey && acc[baseWhitePc] === 1) accSym = "";
-        else accSym = flatKey ? "\u266D" : "\u266F";
-      } else {
-        /* 흰건반인데 조표가 이 음을 변화시키면(즉 원음 복귀) 내추럴 표시 */
-        if (acc[pc]) accSym = "\u266E";
-      }
-      if (accSym) {
-        var sh = svgEl("text", { x: cx - 26, y: cy + 7, "font-size": 26, fill: "var(--ink)", class: "nlabel" });
-        sh.textContent = accSym;
-        ng.appendChild(sh);
-      }
-      /* 음표 모양: 실제 음 길이(beats)에 따라 머리(채움/빈)·부점·기둥·꼬리 결정 */
-      var beats = n.len / (song.beatCells || 1);
-      var d = classifyDur(beats);
-      var stemUp = (cyTop + cyBot) / 2 > STAFF_TOP + 2 * STAFF_GAP;
-      /* 머리 (2분·온음표는 빈 머리) — 화음은 구성음마다 */
-      cys.forEach(function (cy2) {
-        ng.appendChild(svgEl("ellipse", { cx: cx, cy: cy2, rx: 11.5, ry: 8.5,
-          fill: d.hollow ? "#fff" : "var(--ink)", stroke: "var(--ink)", "stroke-width": d.hollow ? 2.4 : 1,
-          class: d.hollow ? "nh nh-open" : "nh", transform: "rotate(-18 " + cx + " " + cy2 + ")" }));
-      });
-      /* 부점(점음표) */
-      if (d.dot) ng.appendChild(svgEl("circle", { cx: cx + 18, cy: cy - 5, r: 2.7, fill: "var(--ink)", class: "nh" }));
-      /* 기둥 — 화음은 맨 아래 머리에서 맨 위 머리 너머까지 */
-      if (d.stem) {
-        var sx = cx + (stemUp ? 10 : -10);
-        var sy2 = stemUp ? cyTop - 56 : cyBot + 56;
-        var syBase = stemUp ? cyBot : cyTop;
-        ng.appendChild(svgEl("line", { x1: sx, y1: syBase, x2: sx, y2: sy2, stroke: "var(--ink)", "stroke-width": 2, class: "nstem" }));
-        /* 꼬리(꼬리 1개=8분, 2개=16분) */
-        for (var fl = 0; fl < d.flags; fl++) {
-          var fy = stemUp ? sy2 + fl * 13 : sy2 - fl * 13;
-          var fd = stemUp
-            ? "M " + sx + " " + fy + " Q " + (sx + 20) + " " + (fy + 4) + " " + (sx + 13) + " " + (fy + 28)
-            : "M " + sx + " " + fy + " Q " + (sx + 20) + " " + (fy - 4) + " " + (sx + 13) + " " + (fy - 28);
-          ng.appendChild(svgEl("path", { d: fd, stroke: "var(--ink)", "stroke-width": 4, fill: "none", "stroke-linecap": "round", class: "nflag" }));
+    function drawSeq(sq, topY, clef, labelY, isPractice) {
+      if (!sq) return;
+      var ink = isPractice ? "var(--ink)" : "#b2a98f";
+      sq.forEach(function (n) {
+        if (n.rest) return;
+        /* 머리는 음의 '시작'에, 지속선은 거기서 길이만큼 */
+        var cx = HIT_X + n.start * cellMs * LANE_SPEED;
+        var cy = staffY(n.midi, null, clef, topY);
+        /* 화음이면 구성음을 악보처럼 쌓아 그린다 (머리 여러 개 + 기둥 하나) */
+        var members = (n.chord && n.chord.length > 1) ? n.chord : [n.midi];
+        var cys = members.map(function (m2) { return staffY(m2, null, clef, topY); });
+        var cyTop = Math.min.apply(null, cys), cyBot = Math.max.apply(null, cys);
+        var ng = svgEl("g", { class: isPractice ? "lnoteG" : "lnoteO", "data-state": "" });
+        var wpx = n.len * cellMs * LANE_SPEED;
+        ng.appendChild(svgEl("rect", { x: cx, y: cy - 5, width: Math.max(6, wpx - 8), height: 10, rx: 5, fill: "rgba(176,138,46,.14)" }));
+        addLedgers(ng, cx, cyTop, topY);
+        if (cyBot !== cyTop) addLedgers(ng, cx, cyBot, topY);
+        /* 임시표 */
+        var pc = ((n.midi % 12) + 12) % 12;
+        var accSym = "";
+        if (DIATONIC_STEP[pc] === undefined) {
+          var flatKey = false; for (var kk in acc) { if (acc[kk] === -1) { flatKey = true; break; } }
+          var baseWhitePc = flatKey ? (pc + 1) % 12 : (pc - 1 + 12) % 12;
+          if (flatKey && acc[baseWhitePc] === -1) accSym = "";
+          else if (!flatKey && acc[baseWhitePc] === 1) accSym = "";
+          else accSym = flatKey ? "\u266D" : "\u266F";
+        } else if (acc[pc]) accSym = "\u266E";
+        if (accSym) {
+          var sh = svgEl("text", { x: cx - 26, y: cy + 7, "font-size": 26, fill: ink, class: "nlabel" });
+          sh.textContent = accSym;
+          ng.appendChild(sh);
         }
-      }
-      /* 계이름 라벨 */
-      var lbl = svgEl("text", { x: cx, y: LABEL_Y, "font-size": 16, fill: "var(--ink-soft)", "text-anchor": "middle", class: "nlabel" });
-      lbl.textContent = n.name;
-      ng.appendChild(lbl);
-      g.appendChild(ng);
-      laneEls.push(ng);
-    });
+        var beats = n.len / (song.beatCells || 1);
+        var d = classifyDur(beats);
+        var stemUp = (cyTop + cyBot) / 2 > topY + 2 * STAFF_GAP;
+        cys.forEach(function (cy2) {
+          ng.appendChild(svgEl("ellipse", { cx: cx, cy: cy2, rx: 11.5, ry: 8.5,
+            fill: d.hollow ? "#fff" : ink, stroke: ink, "stroke-width": d.hollow ? 2.4 : 1,
+            class: d.hollow ? "nh nh-open" : "nh", transform: "rotate(-18 " + cx + " " + cy2 + ")" }));
+        });
+        if (d.dot) ng.appendChild(svgEl("circle", { cx: cx + 18, cy: cy - 5, r: 2.7, fill: ink, class: "nh" }));
+        if (d.stem) {
+          var sx = cx + (stemUp ? 10 : -10);
+          var sy2 = stemUp ? cyTop - 56 : cyBot + 56;
+          var syBase = stemUp ? cyBot : cyTop;
+          ng.appendChild(svgEl("line", { x1: sx, y1: syBase, x2: sx, y2: sy2, stroke: ink, "stroke-width": 2, class: "nstem" }));
+          for (var fl = 0; fl < d.flags; fl++) {
+            var fy = stemUp ? sy2 + fl * 13 : sy2 - fl * 13;
+            var fd = stemUp
+              ? "M " + sx + " " + fy + " Q " + (sx + 20) + " " + (fy + 4) + " " + (sx + 13) + " " + (fy + 28)
+              : "M " + sx + " " + fy + " Q " + (sx + 20) + " " + (fy - 4) + " " + (sx + 13) + " " + (fy - 28);
+            ng.appendChild(svgEl("path", { d: fd, stroke: ink, "stroke-width": 4, fill: "none", "stroke-linecap": "round", class: "nflag" }));
+          }
+        }
+        var lbl = svgEl("text", { x: cx, y: labelY, "font-size": 16, fill: isPractice ? "var(--ink-soft)" : "#b2a98f", "text-anchor": "middle", class: "nlabel" });
+        lbl.textContent = n.name;
+        ng.appendChild(lbl);
+        g.appendChild(ng);
+        (isPractice ? laneEls : otherLaneEls).push(ng);
+      });
+    }
+    if (twoStaff) {
+      var practiceTop = practiceVoice !== 1;
+      drawSeq(practiceTop ? song.seq : song.autoSeq, topT, "treble", labelYT, practiceTop);
+      drawSeq(practiceTop ? song.bassSeq : song.seq, topB, "bass", labelYB, !practiceTop);
+    } else {
+      drawSeq(song.seq, topT, practiceVoice === 1 ? "bass" : "treble", labelYT, true);
+    }
     svg.appendChild(g);
+    if (twoStaff) {   /* 음자리표는 흐르지 않게 svg에 고정 */
+      var c1 = svgEl("text", { x: 8, y: topT + 4 * STAFF_GAP + 10, "font-size": 92, fill: "var(--ink)", class: "laneClefSvg" });
+      c1.textContent = "\uD834\uDD1E";
+      var c2 = svgEl("text", { x: 14, y: topB + 3 * STAFF_GAP + 8, "font-size": 58, fill: "var(--ink)", class: "laneClefSvg" });
+      c2.textContent = "\uD834\uDD22";
+      svg.appendChild(c1); svg.appendChild(c2);
+    }
     $("laneKey").textContent = (song.keyName && song.keyName !== "C") ? song.keyName + " 조" : "";
   }
-  function addLedgers(ng, cx, cy) {
-    var topLine = STAFF_TOP, botLine = STAFF_TOP + 4 * STAFF_GAP;
+  function addLedgers(ng, cx, cy, topY) {
+    var topLine = (topY == null ? STAFF_TOP : topY), botLine = topLine + 4 * STAFF_GAP;
     var yy;
     if (cy < topLine - 1) {
       for (yy = topLine - STAFF_GAP; yy >= cy - 2; yy -= STAFF_GAP)
@@ -1271,7 +1296,7 @@
     if (e.code in LEFT_SCALE) {
       var lbase = scaleToMidi(LEFT_SCALE[e.code], 48);
       var lm = modKey(lbase, e.shiftKey, e.altKey);
-      attempt(lm, true); /* pcOnly: 계이름 일치로 판정 (오디오보다 먼저) */
+      attempt(lm);   /* 소리 나는 실제 음으로 판정 — 왼손 연습일 때만 옥타브 무시 */
       recordNote(lm);
       var lh = e.code + "_" + Math.random();
       noteOn(lh, lm, 0.26);
@@ -1305,8 +1330,8 @@
   function pcOf(m) { return ((m % 12) + 12) % 12; }
   function matches(midi, target, pcOnly) {
     var ms = target.chord || [target.midi];   /* 화음은 구성음 아무거나 정답 */
-    /* 왼손 연습의 화음은 자판 범위를 벗어나기 쉬워 옥타브도 무시 */
-    var free = pcOnly || $("octaveFree").checked || (practiceVoice === 1 && !!target.chord);
+    /* 옥타브: 오른손(멜로디)은 정확한 옥타브로, 왼손 연습은 자판 범위 때문에 옥타브 무시 */
+    var free = pcOnly || $("octaveFree").checked || practiceVoice === 1;
     for (var i = 0; i < ms.length; i++) {
       if (free ? pcOf(midi) === pcOf(ms[i]) : midi === ms[i]) return true;
     }
@@ -1317,10 +1342,28 @@
     if (mode === "wait") attemptWait(midi, pcOnly);
     else attemptTimed(midi, pcOnly);
   }
+  /* 두 손 연습(기다려주기)의 왼손 차례 */
+  function bassCur() {
+    if (!song || !song.bassWait) return null;
+    while (bassWaitIdx < song.bassWait.length && song.bassWait[bassWaitIdx].rest) bassWaitIdx++;
+    return bassWaitIdx < song.bassWait.length ? song.bassWait[bassWaitIdx] : null;
+  }
+  function markBassDone(bT, cls) {
+    var el = otherNoteEls[bT.ei];
+    if (el) { el.classList.remove("pr-cur"); el.classList.add(cls); }
+    paintLaneEl(otherLaneEls[bT.ei], cls);
+  }
+  function checkFinishWait() {
+    if (idx >= song.seq.length && !bassCur()) finishWait();
+  }
   function attemptWait(midi, pcOnly) {
     var target = curNote();
-    if (!target) return;
-    if (matches(midi, target, pcOnly)) {
+    var bT = bassCur();
+    if (!target && !bT) return;
+    var mS = target ? target.start : Infinity;
+    var bS = bT ? bT.start : Infinity;
+    /* 두 손 연습: 시간 순서대로 — 같은 시점이면 멜로디·베이스를 둘 다 쳐야 진행 */
+    if (target && mS <= bS && matches(midi, target, pcOnly)) {
       if (firstTry) correctFirst++;
       /* 자동 반주: 이 음이 새 마디의 첫 음이면 쿵짝 패턴 */
       if ($("autoComp").checked && !song.bassSeq && song.chords) {
@@ -1336,14 +1379,24 @@
       waitAutoCatchUp(target);
       clearTargets();
       updateGuideWait();
-      if (idx >= song.seq.length) finishWait();
-    } else {
-      mistakes++;
-      firstTry = false;
-      flash("bad");
-      highlightTarget(target, true);
-      setStatus("방금 친 음은 " + SOLFA[pcOf(midi)] + " — 목표는 " + target.name + "이에요. 노란 건반을 쳐보세요.");
+      checkFinishWait();
+      return;
     }
+    if (bT && bS <= mS && matches(midi, bT, true)) {   /* 왼손은 옥타브 무시 */
+      markBassDone(bT, "pr-done");
+      bassWaitIdx++;
+      flash("good");
+      clearTargets();
+      updateGuideWait();
+      checkFinishWait();
+      return;
+    }
+    mistakes++;
+    firstTry = false;
+    flash("bad");
+    var need = (bT && bS < mS) ? bT : (target || bT);
+    highlightTarget(need, true);
+    setStatus("방금 친 음은 " + SOLFA[pcOf(midi)] + " — 목표는 " + need.name + ((bT && bS < mS) ? "(왼손)" : "") + "이에요. 노란 건반을 쳐보세요.");
   }
   /* 안 고른 손: 친 순간을 기준으로 다음 목표 전까지의 자동 성부를 '원래 리듬대로' 예약.
      (한꺼번에 쏟아내면 왼손 연습에서 오른손 한 마디가 한 방에 나와 박자를 잡을 수 없다) */
@@ -1371,6 +1424,18 @@
     if (!playing || !song) return;
     if (mode === "wait") {
       var target = curNote();
+      var bT = bassCur();
+      if (!target && !bT) return;
+      if (bT && (!target || bT.start < target.start)) {   /* 왼손 차례면 왼손을 패스 */
+        playSeqNote(bT, 600);
+        markBassDone(bT, "pr-late");
+        bassWaitIdx++;
+        flash("late");
+        clearTargets();
+        updateGuideWait();
+        checkFinishWait();
+        return;
+      }
       if (!target) return;
       playSeqNote(target, 600);
       setNoteClass(idx, "pr-late");
@@ -1381,7 +1446,7 @@
       waitAutoCatchUp(target);
       clearTargets();
       updateGuideWait();
-      if (idx >= song.seq.length) finishWait();
+      checkFinishWait();
     } else if (paused) {   /* 하이브리드 멈춤 중에도 */
       while (timedIdx < song.seq.length && song.seq[timedIdx].rest) timedIdx++;
       var n = song.seq[timedIdx];
@@ -1400,7 +1465,15 @@
   }
   function updateGuideWait() {
     var t = curNote();
-    $("nextNote").textContent = t ? t.name : "—";
+    var txt = t ? t.name : "—";
+    if (song && song.bassWait) {
+      var bT = bassCur();
+      if (bT) {
+        if (!t || bT.start < t.start) txt = "🫲" + bT.name;
+        else if (bT.start === t.start) txt = t.name + "+🫲" + bT.name;
+      }
+    }
+    $("nextNote").textContent = txt;
     var done = 0;
     for (var i = 0; i < idx && i < song.seq.length; i++) if (!song.seq[i].rest) done++;
     $("progressFill").style.width = totalNotes ? Math.round(done / totalNotes * 100) + "%" : "0%";
@@ -1751,6 +1824,7 @@
         song.autoSeq = song.bassSeq;
       } else {                               /* 두 손 연습 */
         song.bothHands = true;
+        song.bassWait = song.bassSeq;          /* 기다려주기: 왼손(베이스)도 쳐야 진행 */
       }
     }
     song.seq.forEach(function (n) { n.hit = false; });
@@ -1765,6 +1839,7 @@
     lastCompBar = -1;
     autoPtr = 0;
     waitAutoPtr = 0;
+    bassWaitIdx = 0;
     drumSchedBeat = -1;
     applyChords(song);
     prefetchSong(song);   /* 🎹 필요한 피아노 샘플 미리 받기 */
@@ -2089,7 +2164,7 @@
         stems: svg.querySelectorAll(".nstem").length, flags: svg.querySelectorAll(".nflag").length,
         dots: svg.querySelectorAll("circle").length };
     },
-    getState: function () { return { autoTimers: waitAutoTimers.length, practiceVoice: practiceVoice, idx: idx, mode: mode, playing: playing, paused: paused, correctFirst: correctFirst, totalNotes: totalNotes, mistakes: mistakes, hits: hits, missCount: missCount, lateCount: lateCount, timedIdx: timedIdx, song: song, cellMs: cellMs, countInMs: countInMs, laneCount: laneEls.length }; }
+    getState: function () { return { autoTimers: waitAutoTimers.length, bassWaitIdx: bassWaitIdx, practiceVoice: practiceVoice, idx: idx, mode: mode, playing: playing, paused: paused, correctFirst: correctFirst, totalNotes: totalNotes, mistakes: mistakes, hits: hits, missCount: missCount, lateCount: lateCount, timedIdx: timedIdx, song: song, cellMs: cellMs, countInMs: countInMs, laneCount: laneEls.length }; }
   };
 })();
 </script>
