@@ -357,25 +357,88 @@ if (abcjsSrc) await check('조옮김: 옥타브·반음 내리면 음과 조표�
   await page.click('#transReset');
 });
 
-await check('자동 반주(소리) 체크가 원곡 베이스 연주의 토글이다', async () => {
+await check('들어보기: 원곡 베이스 성부는 항상 함께 연주된다(화음 포함)', async () => {
   await page.selectOption('#songSel', 'custom');
   await page.evaluate(() => {
     const ta = document.getElementById('abcInput');
     ta.style.display = 'block';
-    ta.value = 'X:1\nT:토글곡\nM:4/4\nL:1/8\nK:C\n[V:1] C2 E2 G2 c2 |\n[V:2] C,4 G,4 |';
+    ta.value = 'X:1\nT:토글곡\nM:4/4\nL:1/8\nK:C\n[V:1] C2 E2 G2 c2 |\n[V:2] [C,E,G,]4 G,4 |';
   });
   const chk = await page.$eval('#autoComp', el => el.checked);
-  if (chk) await page.uncheck('#autoComp');
+  if (chk) await page.uncheck('#autoComp');   // 쿵짝 반주가 꺼져 있어도 원곡 베이스는 나온다
   await page.click('#listenBtn');
-  let stText = await page.textContent('#status');
-  assert.ok(!/원곡 베이스와 함께/.test(stText), '꺼짐: 베이스 안내 없음');
+  const stText = await page.textContent('#status');
+  assert.ok(/원곡 베이스와 함께/.test(stText), '베이스 안내: ' + stText);
+  const b0 = await page.evaluate(() => window.__practice.getState().song.bassSeq[0]);
+  assert.deepEqual(b0.chord, [48, 52, 55], '왼손 화음을 통째로 읽음');
+  assert.equal(b0.len, 4, '화음 길이 = 바깥 숫자');
   await page.click('#stopBtn');
-  await page.check('#autoComp');
-  await page.click('#listenBtn');
-  stText = await page.textContent('#status');
-  assert.ok(/원곡 베이스와 함께/.test(stText), '켜짐: 원곡 베이스와 함께 — ' + stText);
+});
+
+await check('파서: !mf! 셈여림은 음표가 아니고(첫 음 레·밀림 없음), 이음줄은 한 번만 친다', async () => {
+  const r = await page.evaluate(() => {
+    const P = window.__practice.parseSong;
+    const bach = P('X:1\nM:3/4\nL:1/8\nK:G\n[V:1] !mf!"G"d2 G2 B2 | d2 G2 G2 |\n[V:2] [D,G,B,]6 | [D,G,B,]6 |');
+    const tie = P('X:1\nM:4/4\nL:1/8\nK:C\nC2- C2 E2- | E2 G4 |');
+    return {
+      first: bach.seq[0].midi, count: bach.seq.filter(n => !n.rest).length,
+      bass0: bach.bassSeq[0], bassStarts: bach.bassSeq.map(n => n.start),
+      tieMidis: tie.seq.filter(n => !n.rest).map(n => n.midi),
+      tieLens: tie.seq.filter(n => !n.rest).map(n => n.len)
+    };
+  });
+  assert.equal(r.first, 74, '첫 음 = 레(D5) — !mf!의 f가 끼어들지 않음: ' + r.first);
+  assert.equal(r.count, 6, '여섯 음 그대로(밀림 없음)');
+  assert.deepEqual(r.bass0.chord, [50, 55, 59], '왼손 화음 [D,G,B,] 통째로');
+  assert.equal(r.bass0.len, 6, '화음 길이 6칸(낱개 3음으로 쪼개지지 않음)');
+  assert.deepEqual(r.bassStarts, [0, 6], '베이스 위치 정확');
+  assert.deepEqual(r.tieMidis, [60, 64, 67], '이음줄 묶음은 한 음');
+  assert.deepEqual(r.tieLens, [4, 4, 4], '길이는 이어 붙음(마디 넘는 이음줄 포함)');
+});
+
+await check('연습할 손: 왼손만 → 베이스가 연습 대상(화음은 아랫음), 멜로디는 자동', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:손토글\nM:4/4\nL:1/8\nK:C\n[V:1] C2 E2 G2 c2 |\n[V:2] [C,E,G,]4 G,4 |';
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.uncheck('#handR');
+  await page.check('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  let st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.practiceVoice, 1, '하이라이트·레인도 왼손 성부');
+  assert.deepEqual(st.song.seq.filter(n => !n.rest).map(n => n.midi), [48, 55], '연습 대상 = 베이스');
+  assert.equal(st.song.autoSeq.filter(n => !n.rest).length, 4, '자동 성부 = 멜로디 4음');
+  await page.evaluate(() => window.__practice.attempt(48, true));   // 도(C) — 화음의 근음
+  st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.idx, 1, '근음을 치면 진행');
   await page.click('#stopBtn');
-  await page.uncheck('#autoComp');
+});
+
+await check('연습할 손: 오른손만=왼손 자동 · 둘 다=드럼 박자 · 둘 다 끄면 들어보기', async () => {
+  await page.check('#handR'); await page.uncheck('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  let st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.practiceVoice, 0, '멜로디 연습');
+  assert.equal(st.song.autoSeq.filter(n => !n.rest).length, 2, '자동 성부 = 베이스(자동 반주 체크와 무관)');
+  await page.click('#stopBtn');
+  await page.check('#handL');          // 둘 다
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.song.autoSeq, null, '두 손 연습: 자동 성부 없음');
+  assert.ok(st.song.bothHands, '드럼 박자 모드');
+  await page.click('#stopBtn');
+  await page.uncheck('#handR'); await page.uncheck('#handL');   // 둘 다 끄면
+  await page.click('#startBtn');
+  const stText = await page.textContent('#status');
+  assert.ok(/들려드릴게요/.test(stText), '들어보기로 전환: ' + stText);
+  await page.click('#stopBtn');
+  await page.check('#handR');          // 기본값 원복
 });
 
 await check('parseSong: 임시표가 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', async () => {
