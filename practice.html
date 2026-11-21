@@ -734,26 +734,27 @@
       setTimeout(function () { noteOff(h); }, ms2);
     });
   }
-  /* 두 손 연습용 작은 드럼: 강박=쿵(저음), 약박=칙(노이즈) */
-  function drumTick(strong) {
+  /* 두 손 연습용 작은 드럼: 강박=쿵(저음)+틱, 약박=칙(노이즈).
+     delaySec만큼 뒤의 '정확한 시각'에 오디오 시계로 예약해서 타이머 지터·무른 어택 없이 박자에 딱 맞는다. */
+  function drumTick(strong, delaySec) {
     try {
-      var ctx = ensureAudio(), now = ctx.currentTime;
+      var ctx = ensureAudio(), at = ctx.currentTime + Math.max(0, delaySec || 0);
       if (strong) {
         var o = ctx.createOscillator(), g = ctx.createGain();
         o.type = "sine";
-        o.frequency.setValueAtTime(150, now);
-        o.frequency.exponentialRampToValueAtTime(50, now + 0.12);
-        g.gain.setValueAtTime(0.4, now);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+        o.frequency.setValueAtTime(160, at);
+        o.frequency.exponentialRampToValueAtTime(55, at + 0.09);
+        g.gain.setValueAtTime(0.5, at);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.13);
         o.connect(g); g.connect(ctx.destination);
-        o.start(now); o.stop(now + 0.2);
-      } else {
-        var len = Math.floor(ctx.sampleRate * 0.04), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
-        for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-        var src = ctx.createBufferSource(); src.buffer = buf;
-        var g2 = ctx.createGain(); g2.gain.value = 0.1;
-        src.connect(g2); g2.connect(ctx.destination); src.start(now);
+        o.start(at); o.stop(at + 0.16);
       }
+      /* 또렷한 어택: 강·약 모두 짧은 노이즈 틱을 박 머리에 */
+      var len = Math.floor(ctx.sampleRate * 0.03), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      var src = ctx.createBufferSource(); src.buffer = buf;
+      var g2 = ctx.createGain(); g2.gain.value = strong ? 0.16 : 0.1;
+      src.connect(g2); g2.connect(ctx.destination); src.start(at);
     } catch (e) {}
   }
   function click(strong) {
@@ -858,8 +859,9 @@
   var laneWidth = 900;
   /* 음이름 → 오선 세로 위치 (다이어토닉 계단, 높은음자리표 기준) */
   var DIATONIC_STEP = { 0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6 }; /* 도레미파솔라시 */
-  function staffY(midi, keyName) {
-    /* 미4(E4=64)를 오선 맨 아래 줄로 잡음. 한 다이어토닉 스텝 = STAFF_GAP/2 */
+  function staffY(midi, keyName, clef) {
+    /* 높은음자리표: 미4(E4)가 맨 아래 줄. 낮은음자리표: 솔2(G2)가 맨 아래 줄.
+       한 다이어토닉 스텝 = STAFF_GAP/2 */
     var pc = ((midi % 12) + 12) % 12;
     var natPc = pc;
     if (DIATONIC_STEP[natPc] === undefined) {
@@ -869,9 +871,11 @@
       natPc = flatKey ? (pc + 1) % 12 : (pc - 1 + 12) % 12;
     }
     var octave = Math.floor(midi / 12) - 1;
-    var stepFromE4 = (DIATONIC_STEP[natPc] - DIATONIC_STEP[4]) + (octave - 4) * 7;
     var bottomLineY = STAFF_TOP + 4 * STAFF_GAP;
-    return bottomLineY - stepFromE4 * (STAFF_GAP / 2);
+    var step = (clef === "bass")
+      ? (DIATONIC_STEP[natPc] - DIATONIC_STEP[7]) + (octave - 2) * 7
+      : (DIATONIC_STEP[natPc] - DIATONIC_STEP[4]) + (octave - 4) * 7;
+    return bottomLineY - step * (STAFF_GAP / 2);
   }
   function svgEl(tag, attrs) {
     var e = document.createElementNS(SVGNS, tag);
@@ -905,6 +909,9 @@
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     laneEls = [];
     if (!song) return;
+    /* 왼손 연습이면 레인도 악보처럼 낮은음자리표로 */
+    var laneClefKind = practiceVoice === 1 ? "bass" : "treble";
+    try { $("laneClef").textContent = laneClefKind === "bass" ? "\uD834\uDD22" : "\uD834\uDD1E"; } catch (e) {}
     var lastEnd = song.totalCells;
     laneWidth = HIT_X + lastEnd * cellMs * LANE_SPEED + 200;
     svg.setAttribute("viewBox", "0 0 " + laneWidth + " " + LANE_H);
@@ -939,14 +946,21 @@
     var acc = song.acc || {};
     song.seq.forEach(function (n) {
       if (n.rest) return;
-      var cx = HIT_X + (n.start + n.len / 2) * cellMs * LANE_SPEED;
-      var cy = staffY(n.midi);
+      /* 머리는 음의 '시작'에, 지속선은 거기서 길이만큼 — 전엔 머리가 길이의 가운데라
+         금색 선에 음길이의 절반만큼 늦게 닿아, 제때 나는 소리(자동 성부·드럼)가 빨라 보였다 */
+      var cx = HIT_X + n.start * cellMs * LANE_SPEED;
+      var cy = staffY(n.midi, null, laneClefKind);
+      /* 화음이면 구성음을 악보처럼 쌓아 그린다 (머리 여러 개 + 기둥 하나) */
+      var members = (n.chord && n.chord.length > 1) ? n.chord : [n.midi];
+      var cys = members.map(function (m2) { return staffY(m2, null, laneClefKind); });
+      var cyTop = Math.min.apply(null, cys), cyBot = Math.max.apply(null, cys);
       var ng = svgEl("g", { class: "lnoteG", "data-state": "" });
       /* 지속선 */
       var wpx = n.len * cellMs * LANE_SPEED;
       ng.appendChild(svgEl("rect", { x: cx, y: cy - 5, width: Math.max(6, wpx - 8), height: 10, rx: 5, fill: "rgba(176,138,46,.14)" }));
-      /* 덧줄 */
-      addLedgers(ng, cx, cy);
+      /* 덧줄 (화음은 가장 높은·낮은 머리 기준) */
+      addLedgers(ng, cx, cyTop);
+      if (cyBot !== cyTop) addLedgers(ng, cx, cyBot);
       /* 임시표: 이 음이 놓이는 흰건반 계이름(baseWhitePc)을 조표가 이미 변화시키는지 확인 */
       var pc = ((n.midi % 12) + 12) % 12;
       var accSym = "";
@@ -970,18 +984,21 @@
       /* 음표 모양: 실제 음 길이(beats)에 따라 머리(채움/빈)·부점·기둥·꼬리 결정 */
       var beats = n.len / (song.beatCells || 1);
       var d = classifyDur(beats);
-      var stemUp = cy > STAFF_TOP + 2 * STAFF_GAP;
-      /* 머리 (2분·온음표는 빈 머리) */
-      ng.appendChild(svgEl("ellipse", { cx: cx, cy: cy, rx: 11.5, ry: 8.5,
-        fill: d.hollow ? "#fff" : "var(--ink)", stroke: "var(--ink)", "stroke-width": d.hollow ? 2.4 : 1,
-        class: d.hollow ? "nh nh-open" : "nh", transform: "rotate(-18 " + cx + " " + cy + ")" }));
+      var stemUp = (cyTop + cyBot) / 2 > STAFF_TOP + 2 * STAFF_GAP;
+      /* 머리 (2분·온음표는 빈 머리) — 화음은 구성음마다 */
+      cys.forEach(function (cy2) {
+        ng.appendChild(svgEl("ellipse", { cx: cx, cy: cy2, rx: 11.5, ry: 8.5,
+          fill: d.hollow ? "#fff" : "var(--ink)", stroke: "var(--ink)", "stroke-width": d.hollow ? 2.4 : 1,
+          class: d.hollow ? "nh nh-open" : "nh", transform: "rotate(-18 " + cx + " " + cy2 + ")" }));
+      });
       /* 부점(점음표) */
       if (d.dot) ng.appendChild(svgEl("circle", { cx: cx + 18, cy: cy - 5, r: 2.7, fill: "var(--ink)", class: "nh" }));
-      /* 기둥 */
+      /* 기둥 — 화음은 맨 아래 머리에서 맨 위 머리 너머까지 */
       if (d.stem) {
         var sx = cx + (stemUp ? 10 : -10);
-        var sy2 = stemUp ? cy - 56 : cy + 56;
-        ng.appendChild(svgEl("line", { x1: sx, y1: cy, x2: sx, y2: sy2, stroke: "var(--ink)", "stroke-width": 2, class: "nstem" }));
+        var sy2 = stemUp ? cyTop - 56 : cyBot + 56;
+        var syBase = stemUp ? cyBot : cyTop;
+        ng.appendChild(svgEl("line", { x1: sx, y1: syBase, x2: sx, y2: sy2, stroke: "var(--ink)", "stroke-width": 2, class: "nstem" }));
         /* 꼬리(꼬리 1개=8분, 2개=16분) */
         for (var fl = 0; fl < d.flags; fl++) {
           var fy = stemUp ? sy2 + fl * 13 : sy2 - fl * 13;
@@ -1024,6 +1041,35 @@
   }
   function startLaneAnim() { stopLaneAnim(); laneRaf = requestAnimationFrame(laneFrame); }
   function stopLaneAnim() { if (laneRaf) { cancelAnimationFrame(laneRaf); laneRaf = null; } }
+  /* 지금 치는 음이 화면 가운데쯤 있도록 천천히 스크롤 — 벗어났을 때만, 700ms에 걸쳐 이동 */
+  var scrollAnim = null;
+  function smoothScrollTo(targetY, ms) {
+    var startY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    var dist = targetY - startY;
+    if (Math.abs(dist) < 6) return;
+    if (scrollAnim) cancelAnimationFrame(scrollAnim);
+    var t0s = performance.now();
+    function stepFn(now) {
+      var p = Math.min(1, (now - t0s) / ms);
+      var e2 = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;   /* ease-in-out */
+      window.scrollTo(0, startY + dist * e2);
+      scrollAnim = (p < 1) ? requestAnimationFrame(stepFn) : null;
+    }
+    scrollAnim = requestAnimationFrame(stepFn);
+  }
+  function centerScoreOn(seqIdx) {
+    if (!noteEls.length || !song || seqIdx < 0 || seqIdx >= song.seq.length) return;
+    var el = noteEls[noteElIndexOf(seqIdx)];
+    if (!el) return;
+    try {
+      var r = el.getBoundingClientRect();
+      var vh = window.innerHeight || document.documentElement.clientHeight || 600;
+      if (r.top < vh * 0.2 || r.bottom > vh * 0.6) {
+        var y = (window.pageYOffset || document.documentElement.scrollTop || 0) + r.top + r.height / 2 - vh * 0.4;
+        smoothScrollTo(Math.max(0, y), 700);
+      }
+    } catch (e) {}
+  }
   function highlightScore(seqIdx) {
     if (!noteEls.length || !song) return;
     noteEls.forEach(function (el) { el.classList.remove("pr-cur"); });
@@ -1104,10 +1150,11 @@
     el.addEventListener("pointerleave", up);
     el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   }
-  function highlightTarget(midi, on) {
+  function highlightTarget(t, on) {   /* t: 음(숫자) 또는 seq 항목 — 화음이면 구성음 전부 */
+    var ms = (t && t.chord) ? t.chord : [typeof t === "object" && t ? t.midi : t];
     var els = document.querySelectorAll(".wkey, .bkey");
     Array.prototype.forEach.call(els, function (el) {
-      if (+el.dataset.midi === midi && on) el.classList.add("target");
+      if (on && ms.indexOf(+el.dataset.midi) >= 0) el.classList.add("target");
       else el.classList.remove("target");
     });
   }
@@ -1218,7 +1265,12 @@
   function skipRests() { while (idx < song.seq.length && song.seq[idx].rest) idx++; }
   function pcOf(m) { return ((m % 12) + 12) % 12; }
   function matches(midi, target, pcOnly) {
-    return (pcOnly || $("octaveFree").checked) ? pcOf(midi) === pcOf(target.midi) : midi === target.midi;
+    var ms = target.chord || [target.midi];   /* 화음은 구성음 아무거나 정답 */
+    var free = pcOnly || $("octaveFree").checked;
+    for (var i = 0; i < ms.length; i++) {
+      if (free ? pcOf(midi) === pcOf(ms[i]) : midi === ms[i]) return true;
+    }
+    return false;
   }
   function attempt(midi, pcOnly) {
     if (!playing || !song) return;
@@ -1245,7 +1297,7 @@
       if (song.autoSeq) {
         var nt = curNote();
         var limitCell = nt ? nt.start : target.start + target.len;
-        while (waitAutoPtr < song.autoSeq.length && song.autoSeq[waitAutoPtr].start < limitCell + 0.001) {
+        while (waitAutoPtr < song.autoSeq.length && song.autoSeq[waitAutoPtr].start < limitCell) {
           var an = song.autoSeq[waitAutoPtr++];
           if (!an.rest) playSeqNote(an, an.len * cellMs * 0.92, practiceVoice === 1 ? 0.3 : undefined);
         }
@@ -1257,7 +1309,7 @@
       mistakes++;
       firstTry = false;
       flash("bad");
-      highlightTarget(target.midi, true);
+      highlightTarget(target, true);
       setStatus("방금 친 음은 " + SOLFA[pcOf(midi)] + " — 목표는 " + target.name + "이에요. 노란 건반을 쳐보세요.");
     }
   }
@@ -1269,6 +1321,7 @@
     $("progressFill").style.width = totalNotes ? Math.round(done / totalNotes * 100) + "%" : "0%";
     $("progressText").textContent = done + " / " + totalNotes + "음";
     highlightScore(idx);
+    centerScoreOn(idx);
     moveLineToSeq(idx, 0);
   }
   function finishWait() {
@@ -1337,9 +1390,18 @@
     mistakes++;
     flash("bad");
   }
+  var drumSchedBeat = -1;   /* 양손 드럼: 예약해 둔 박 번호 */
+  function scheduleDrum(el) {
+    var nb = Math.floor(el / beatMs) + 1;        /* 다음 박 */
+    if (nb <= drumSchedBeat) return;
+    drumTick(((nb % song.mnum) + song.mnum) % song.mnum === 0, (nb * beatMs - el) / 1000);
+    drumSchedBeat = nb;
+  }
   function tick() {
     if (paused) return;
     var el = nowMs() - t0;   /* 레인 이동은 rAF(laneFrame)가 담당 */
+    /* 양손 연습: 다음 박의 드럼을 미리 정확한 시각으로 예약 (첫 박 포함) */
+    if (song.bothHands && el >= -beatMs) scheduleDrum(el);
     /* 예비박 표시 */
     if (el < 0) {
       var beatsLeft = Math.ceil(-el / beatMs);
@@ -1353,7 +1415,7 @@
     var b = Math.floor(el / beatMs);
     if (b !== lastBeat) {
       lastBeat = b;
-      (song.bothHands ? drumTick : click)(b % song.mnum === 0);
+      if (!song.bothHands) click(b % song.mnum === 0);   /* 양손 드럼은 위에서 예약 */
       showBeat(b % song.mnum);
       /* 자동 반주: 악보에 베이스 성부가 있으면 쿵짝 추정 대신 안 고른 손을 아래 autoPtr가 연주 */
       if ($("autoComp").checked && !song.bassSeq && song.chords && b % song.mnum === 0) {
@@ -1378,7 +1440,7 @@
           if (mode === "hybrid") {
             paused = true;
             pausedAt = nowMs();
-            highlightTarget(n.midi, true);
+            highlightTarget(n, true);
             setNoteClass(timedIdx, "pr-late");
             $("nextNote").textContent = n.name;
             setStatus("여기서 기다릴게요 — " + n.name + "을(를) 치면 이어서 가요. (노란 건반)");
@@ -1604,6 +1666,7 @@
     lastCompBar = -1;
     autoPtr = 0;
     waitAutoPtr = 0;
+    drumSchedBeat = -1;
     applyChords(song);
     prefetchSong(song);   /* 🎹 필요한 피아노 샘플 미리 받기 */
     playing = true;
@@ -1666,13 +1729,17 @@
     var compBar = -1, cellsPerBar = song.mnum * song.beatCells;
     var i = 0;
     function step() {
-      if (i >= song.seq.length) { listenTimer = null; setStatus("연주 끝! 이제 '연습 시작'으로 직접 쳐보세요."); return; }
+      if (i >= song.seq.length) { listenTimer = null; highlightScore(-1); setStatus("연주 끝! 이제 '연습 시작'으로 직접 쳐보세요."); return; }
       var n = song.seq[i];
       if ($("autoComp").checked && !song.bassSeq && song.chords) {
         var barNo = Math.floor(n.start / cellsPerBar);
         if (barNo !== compBar) { compBar = barNo; if (song.chords[barNo]) playChordPattern(song.chords[barNo], cMs * song.beatCells, song.mnum); }
       }
-      if (!n.rest) playShort(n.midi, Math.min(1400, n.len * cMs * 0.92));
+      if (!n.rest) {
+        playShort(n.midi, Math.min(1400, n.len * cMs * 0.92));
+        highlightScore(i);          /* 🔶 지금 나는 음을 악보에 노란색으로 */
+        centerScoreOn(i);
+      }
       listenTimer = setTimeout(step, n.len * cMs);
       i++;
     }
@@ -1908,7 +1975,7 @@
     startRecording: startRecording, stopRecording: stopRecording, recordNote: recordNote,
     setRecStart: function (ms) { recStartMs = ms; }, getRecEvents: function () { return recEvents; },
     renderLaneFor: function (abc) {
-      song = parseSong(abc); cellMs = 200;
+      song = parseSong(abc); cellMs = 200; practiceVoice = 0;
       buildLane();
       var svg = $("laneSvg");
       return { notes: svg.querySelectorAll(".lnoteG").length, open: svg.querySelectorAll(".nh-open").length,
