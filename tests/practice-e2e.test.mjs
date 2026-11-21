@@ -1,7 +1,7 @@
 // 피아노 교실 E2E — 실제 브라우저(Chromium)에서 practice.html 동작 확인
 // 실행: node tests/practice-e2e.test.mjs
 import { createServer } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname } from 'node:path';
 import { createRequire } from 'node:module';
@@ -394,6 +394,51 @@ await check('파서: !mf! 셈여림은 음표가 아니고(첫 음 레·밀림 �
   assert.deepEqual(r.bassStarts, [0, 6], '베이스 위치 정확');
   assert.deepEqual(r.tieMidis, [60, 64, 67], '이음줄 묶음은 한 음');
   assert.deepEqual(r.tieLens, [4, 4, 4], '길이는 이어 붙음(마디 넘는 이음줄 포함)');
+});
+
+await check('파서: 꾸밈음 {cB}는 박자에서 제외·[K:] 조 바꿈 적용·짧은 음표(c/)는 분수 칸', async () => {
+  const r = await page.evaluate(() => {
+    const P = window.__practice.parseSong;
+    const notes = s2 => s2.seq.filter(n => !n.rest);
+    const grace = P('X:1\nM:4/4\nL:1/8\nK:C\n[V:1] {cB}c2 d2 |\n[V:2] C,4 |');
+    const keych = P('X:1\nM:4/4\nL:1/8\nK:C\n[V:1] F2 z2 | [K:D] F2 z2 |]\n[V:2] C,4 | [K:D] C,4 |]');
+    const shortN = P('X:1\nM:4/4\nL:1/8\nK:C\nc/d/ e |');
+    return {
+      graceN: notes(grace).map(n => n.midi), graceCells: grace.totalCells,
+      keyMidis: notes(keych).map(n => n.midi),
+      shortInfo: notes(shortN).map(n => ({ m: n.midi, s: n.start, l: n.len }))
+    };
+  });
+  assert.deepEqual(r.graceN, [72, 74], '꾸밈음은 음표로 끼지 않음(도·레 2개): ' + r.graceN.join(','));
+  assert.equal(r.graceCells, 4, '칸 합 4 (꾸밈음은 박자 제외)');
+  assert.deepEqual(r.keyMidis, [65, 66], '[K:D] 뒤의 F는 파#(66), 없는 음 안 낌: ' + r.keyMidis.join(','));
+  assert.deepEqual(r.shortInfo, [
+    { m: 72, s: 0, l: 0.5 }, { m: 74, s: 0.5, l: 0.5 }, { m: 76, s: 1, l: 1 }
+  ], '16분음표는 반 칸: ' + JSON.stringify(r.shortInfo));
+});
+
+await check('회귀: 저장소의 두 성부 악보 전체에서 오른손·왼손 끝 위치가 같다', async () => {
+  const dirs = ['scores', 'classical/bach'];
+  const files = [];
+  for (const d of dirs) {
+    const dp = join(root, d);
+    if (!existsSync(dp)) continue;
+    for (const f of readdirSync(dp)) if (f.endsWith('.abc')) files.push({ name: d + '/' + f, abc: readFileSync(join(dp, f), 'utf8') });
+  }
+  assert.ok(files.length > 80, '악보를 읽음: ' + files.length);
+  const bad = await page.evaluate(list => {
+    const P = window.__practice.parseSong;
+    const end = q => (q || []).reduce((mx, n) => Math.max(mx, n.start + n.len), 0);
+    const out = [];
+    for (const f of list) {
+      let s2; try { s2 = P(f.abc); } catch (e) { out.push(f.name + ': 파싱 오류 ' + e.message); continue; }
+      if (!s2.bassSeq) continue;
+      const a = end(s2.seq), b = end(s2.bassSeq);
+      if (Math.abs(a - b) > 0.001) out.push(f.name + ': ' + a + ' vs ' + b);
+    }
+    return out;
+  }, files);
+  assert.deepEqual(bad, [], '어긋나는 곡 없음:\n' + bad.join('\n'));
 });
 
 await check('연습할 손: 왼손만 → 베이스가 연습 대상(화음은 아랫음), 멜로디는 자동', async () => {
