@@ -62,9 +62,9 @@ REMOVE_TEXT_NOTES = True
 REMOVE_LYRICS = False
 
 # 성부가 여러 개로 인식되면 첫 번째 성부(맨 위 멜로디)만 남길지.
-# 뮤직랩의 줄별 듣기·커서 4마디는 멜로디 한 줄짜리 악보에서만 동작합니다.
-# 피아노 왼손까지 살리고 싶으면 False로 바꾸세요.
-MELODY_ONLY = True
+# 기본 False: 피아노 왼손(베이스)까지 살립니다 — 피아노 교실의 두 손 연습·왼손 연습에 필요.
+# 멜로디 한 줄만 원하면(뮤직랩의 줄별 듣기·커서 4마디용) True로 바꾸세요.
+MELODY_ONLY = False
 
 # 폴더를 몇 초마다 확인할지 (지켜보기 모드)
 POLL_SECONDS = 5
