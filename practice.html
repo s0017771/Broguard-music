@@ -45,6 +45,11 @@
   #laneWrap { position: relative; height: 280px; overflow: hidden; background: #fdfbf5; border: 1px solid var(--line); border-radius: 12px; display: none; }
   #hitLine { position: absolute; left: 130px; top: 14px; bottom: 42px; width: 3px; background: var(--brass); border-radius: 2px; z-index: 3; box-shadow: 0 0 9px rgba(176,138,46,.72); }
   #hitLine::before { content: "\25BC"; position: absolute; top: -18px; left: -8px; color: var(--brass); font-size: 1.2rem; }
+  #hitLine.beat { animation: hlbeat .32s ease-out; }
+  @keyframes hlbeat {
+    0% { transform: scaleX(2.4) scaleY(1.03); box-shadow: 0 0 18px rgba(176,138,46,.95); }
+    100% { transform: none; box-shadow: 0 0 9px rgba(176,138,46,.72); }
+  }
   #laneSvg { position: absolute; top: 0; left: 0; height: 100%; width: auto; }
   #laneClef { position: absolute; left: 16px; top: 45%; transform: translateY(-58%); font-size: 7rem; color: var(--ink); z-index: 2; pointer-events: none; line-height: 1; }
   #laneKey { position: absolute; left: 92px; top: 12px; font-size: .9rem; color: var(--brass-deep); font-weight: 700; z-index: 2; }
@@ -162,6 +167,7 @@
   <div>
     <div style="font-size:.75rem; color:var(--ink-soft); text-align:center; margin-bottom:4px;">다음 음</div>
     <div id="nextNote">&mdash;</div>
+    <button id="passBtn" class="btn-ghost" type="button" title="자판에 없는 음(너무 높거나 낮은 음)은 이 버튼으로 넘어가요 — 그 음을 들려주고 노란색으로 표시한 뒤 진행" style="margin-top:6px; width:100%; padding:5px 0;">&#9197; 패스</button>
   </div>
   <div id="progressWrap">
     <div id="beatDots"></div>
@@ -186,7 +192,8 @@
   <p><b>검은건반: Shift+음키 = #, 왼쪽 Alt+음키 = ♭</b> &mdash; 예: Shift+J=레#, Alt+K=미♭. 오른쪽 Alt 자리는 한/영 키라 <b>왼쪽 Alt</b>를 쓰세요. 엘리제의 레#은 Shift+M!</p>
   <p><span class="lh-tag">왼손 자판 (A=도 S=레 D=미 F=파 W=솔 E=라 R=시, Z X C=낮은솔라시, Space=높은도)</span> &mdash; 한 옥타브 아래 소리가 나고 <b>계이름이 맞으면 판정 인정</b>. <b>"왼손 화음" 체크</b> 시 <b>근음 자판이 화음</b>이 돼요: A(도)=C, S(레)=Dm, D(미)=Em, F(파)=F, G(솔)=G, E(라)=Am, R(시)=Bdim (자유 반주·판정 제외). <b>체크 해제</b> 시 단일 베이스음으로 판정에 참여해요. 조성 있는 곡은 양손 모두 샵/플랫 자동 반영.</p>
   <p><b>연습할 손</b> &mdash; 🫱오른손만: 왼손 반주가 자동으로 나와요. 🫲왼손만: 오른손 멜로디가 자동으로 나오고, 악보 하이라이트와 레인도 왼손을 따라가요(화음은 맨 아랫음을 치면 돼요). 둘 다 켜면 두 손 연습(박자 모드에선 작은 드럼이 박자를 잡아줘요), 둘 다 끄면 &lsquo;연습 시작&rsquo;이 곡 들어보기가 돼요.</p>
-  <p><b>박자+기다려주기(하이브리드)</b> &mdash; 예비박 후 <b>아래 레인의 음 블록이 금색 선에 닿는 순간</b> 치세요. 블록 길이가 곧 음 길이라 리듬이 눈에 보여요. 제때 치면 초록, 놓치면 멈춰서 기다려주고(노랑), 치면 이어서 가요. <b>박자(안 멈춤)</b>는 놓쳐도 계속 흘러가는 도전 모드예요.</p>
+  <p><b>박자+기다려주기(하이브리드)</b> &mdash; 예비박 후 <b>아래 레인의 음 블록이 금색 선에 닿는 순간</b> 치세요. 블록 길이가 곧 음 길이라 리듬이 눈에 보여요. 제때 치면 초록, 놓치면 <b>그 음 블록이 금색 선으로 돌아와</b> 기다려주고(노랑), 치면 이어서 가요. <b>박자(안 멈춤)</b>는 놓쳐도 계속 흘러가는 도전 모드예요. 금색 선은 박마다 심장처럼 두근거려요.</p>
+  <p><b>⏭ 패스</b> &mdash; 자판에 없는 음(너무 높거나 낮은 음)이 나오면 '다음 음' 아래 패스 버튼으로 넘어가요. 그 음을 들려주고 노란색으로 표시해요. 왼손 연습의 화음은 옥타브가 달라도 계이름만 맞으면 정답이에요.</p>
 </details>
 
 <details id="recordPanel" style="margin-top:2px;">
@@ -546,6 +553,7 @@
   var song = null, idx = -1, playing = false, mode = "wait";
   var firstTry = true, correctFirst = 0, totalNotes = 0, mistakes = 0;
   var noteEls = [];
+  var otherNoteEls = [];   /* 반대 손(자동 성부) 음표 요소 */
   /* 박자 모드 */
   var timedIdx = 0, hits = 0, missCount = 0, lateCount = 0, timedTimer = null;
   var t0 = 0, cellMs = 250, beatMs = 500, countInMs = 0, lastBeat = -999;
@@ -785,6 +793,9 @@
       var allNotes = document.querySelectorAll("#score .abcjs-note");
       var vNotes = document.querySelectorAll("#score .abcjs-note.abcjs-v" + practiceVoice);
       noteEls = Array.prototype.slice.call((vNotes.length && vNotes.length < allNotes.length) ? vNotes : allNotes);
+      /* 반대 손(자동 성부·들어보기 베이스)도 노란색으로 따라가도록 */
+      otherNoteEls = Array.prototype.slice.call(document.querySelectorAll("#score .abcjs-note.abcjs-v" + (1 - practiceVoice)));
+      if (otherNoteEls.length >= allNotes.length) otherNoteEls = [];
     } catch (e) { noteEls = []; }
   }
   /* 각 마디 첫 음 앞에 "코드" 기호 삽입 (표시 전용, 원본 song.abc는 불변) */
@@ -1070,6 +1081,11 @@
       }
     } catch (e) {}
   }
+  function highlightOther(k) {   /* 자동으로 나는 반대 손 음을 노란색으로 */
+    if (!otherNoteEls.length) return;
+    otherNoteEls.forEach(function (el) { el.classList.remove("pr-cur"); });
+    if (k >= 0 && otherNoteEls[k]) otherNoteEls[k].classList.add("pr-cur");
+  }
   function highlightScore(seqIdx) {
     if (!noteEls.length || !song) return;
     noteEls.forEach(function (el) { el.classList.remove("pr-cur"); });
@@ -1266,7 +1282,8 @@
   function pcOf(m) { return ((m % 12) + 12) % 12; }
   function matches(midi, target, pcOnly) {
     var ms = target.chord || [target.midi];   /* 화음은 구성음 아무거나 정답 */
-    var free = pcOnly || $("octaveFree").checked;
+    /* 왼손 연습의 화음은 자판 범위를 벗어나기 쉬워 옥타브도 무시 */
+    var free = pcOnly || $("octaveFree").checked || (practiceVoice === 1 && !!target.chord);
     for (var i = 0; i < ms.length; i++) {
       if (free ? pcOf(midi) === pcOf(ms[i]) : midi === ms[i]) return true;
     }
@@ -1293,15 +1310,7 @@
       idx++;
       skipRests();
       firstTry = true;
-      /* 안 고른 손: 내 속도에 맞춰 — 다음 목표 전까지의 자동 성부 음을 지금 낸다 */
-      if (song.autoSeq) {
-        var nt = curNote();
-        var limitCell = nt ? nt.start : target.start + target.len;
-        while (waitAutoPtr < song.autoSeq.length && song.autoSeq[waitAutoPtr].start < limitCell) {
-          var an = song.autoSeq[waitAutoPtr++];
-          if (!an.rest) playSeqNote(an, an.len * cellMs * 0.92, practiceVoice === 1 ? 0.3 : undefined);
-        }
-      }
+      waitAutoCatchUp(target);
       clearTargets();
       updateGuideWait();
       if (idx >= song.seq.length) finishWait();
@@ -1311,6 +1320,48 @@
       flash("bad");
       highlightTarget(target, true);
       setStatus("방금 친 음은 " + SOLFA[pcOf(midi)] + " — 목표는 " + target.name + "이에요. 노란 건반을 쳐보세요.");
+    }
+  }
+  /* 안 고른 손: 내 속도에 맞춰 — 다음 목표 전까지의 자동 성부 음을 지금 내고 노란색으로 */
+  function waitAutoCatchUp(target) {
+    if (!song.autoSeq) return;
+    var nt = curNote();
+    var limitCell = nt ? nt.start : target.start + target.len;
+    while (waitAutoPtr < song.autoSeq.length && song.autoSeq[waitAutoPtr].start < limitCell) {
+      var an = song.autoSeq[waitAutoPtr++];
+      if (!an.rest) { playSeqNote(an, an.len * cellMs * 0.92, practiceVoice === 1 ? 0.3 : undefined); highlightOther(an.ei); }
+    }
+  }
+  /* ⏭ 패스: 자판에 없는 음(너무 높거나 낮은)을 들려주고 노란색으로 표시한 뒤 넘어간다 */
+  function passNote() {
+    if (!playing || !song) return;
+    if (mode === "wait") {
+      var target = curNote();
+      if (!target) return;
+      playSeqNote(target, 600);
+      setNoteClass(idx, "pr-late");
+      flash("late");
+      idx++;
+      skipRests();
+      firstTry = true;
+      waitAutoCatchUp(target);
+      clearTargets();
+      updateGuideWait();
+      if (idx >= song.seq.length) finishWait();
+    } else if (paused) {   /* 하이브리드 멈춤 중에도 */
+      while (timedIdx < song.seq.length && song.seq[timedIdx].rest) timedIdx++;
+      var n = song.seq[timedIdx];
+      if (!n) return;
+      playSeqNote(n, 600);
+      n.hit = true;
+      lateCount++;
+      setNoteClass(timedIdx, "pr-late");
+      flash("late");
+      timedIdx++;
+      t0 += nowMs() - pausedAt;
+      paused = false;
+      clearTargets();
+      updateGuideTimed(nowMs() - t0);
     }
   }
   function updateGuideWait() {
@@ -1427,7 +1478,7 @@
     if (song.autoSeq) {
       while (autoPtr < song.autoSeq.length && song.autoSeq[autoPtr].start * cellMs <= el) {
         var bn = song.autoSeq[autoPtr++];
-        if (!bn.rest) playSeqNote(bn, bn.len * cellMs * 0.92, practiceVoice === 1 ? 0.3 : undefined);
+        if (!bn.rest) { playSeqNote(bn, bn.len * cellMs * 0.92, practiceVoice === 1 ? 0.3 : undefined); highlightOther(bn.ei); }
       }
     }
     /* 지나간 음 처리 */
@@ -1440,6 +1491,11 @@
           if (mode === "hybrid") {
             paused = true;
             pausedAt = nowMs();
+            /* 놓친 음 블록을 금색 선으로 되돌려, 무슨 음이었는지 보이게 */
+            t0 = pausedAt - n.start * cellMs;
+            lastBeat = Math.floor((n.start * cellMs) / beatMs);
+            drumSchedBeat = lastBeat;
+            moveLane(n.start * cellMs);
             highlightTarget(n, true);
             setNoteClass(timedIdx, "pr-late");
             $("nextNote").textContent = n.name;
@@ -1457,6 +1513,9 @@
     if (el > song.totalCells * cellMs + 250) finishTimed();
   }
   function showBeat(i) {
+    if (i >= 0) {   /* 금색 기준선이 박마다 두근 — 심장박동처럼 */
+      try { var hl = $("hitLine"); hl.classList.remove("beat"); void hl.offsetWidth; hl.classList.add("beat"); } catch (e) {}
+    }
     var dots = $("beatDots").children;
     for (var k = 0; k < dots.length; k++) {
       dots[k].className = (k === i) ? (i === 0 ? "on first" : "on") : "";
@@ -1559,6 +1618,9 @@
       t.done = true;
     }
     s.transposed = t.done ? t.n : 0;
+    /* 각 성부의 몇 번째 음표인지(쉼표 제외) — 악보 하이라이트 연결용 */
+    var k1 = 0; (s.seq || []).forEach(function (n) { if (!n.rest) n.ei = k1++; });
+    var k2 = 0; (s.bassSeq || []).forEach(function (n) { if (!n.rest) n.ei = k2++; });
     return s;
   }
   /* ── 악보집(broguard_library)에서 불러오기 ── */
@@ -1723,13 +1785,14 @@
         if (bn.rest) return;
         listenBassTimers.push(setTimeout(function () {
           playSeqNote(bn, bn.len * cMs * 0.92);
+          highlightOther(bn.ei);   /* 왼손도 노란색으로 따라가기 */
         }, bn.start * cMs));
       });
     }
     var compBar = -1, cellsPerBar = song.mnum * song.beatCells;
     var i = 0;
     function step() {
-      if (i >= song.seq.length) { listenTimer = null; highlightScore(-1); setStatus("연주 끝! 이제 '연습 시작'으로 직접 쳐보세요."); return; }
+      if (i >= song.seq.length) { listenTimer = null; highlightScore(-1); highlightOther(-1); setStatus("연주 끝! 이제 '연습 시작'으로 직접 쳐보세요."); return; }
       var n = song.seq[i];
       if ($("autoComp").checked && !song.bassSeq && song.chords) {
         var barNo = Math.floor(n.start / cellsPerBar);
@@ -1906,6 +1969,7 @@
   document.addEventListener("visibilitychange", function () { if (!document.hidden) populateLibrary(); });
   window.addEventListener("storage", function (e) { if (!e || !e.key || e.key === "broguard_library") populateLibrary(); });
   $("modeSel").addEventListener("change", function () { $("modeSel").blur(); });
+  $("passBtn").addEventListener("click", function () { this.blur(); passNote(); });
   $("loadFileBtn").addEventListener("click", function () { $("fileInput").click(); });
   $("fileInput").addEventListener("change", function (e) {
     var f = e.target.files[0];

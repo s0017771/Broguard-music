@@ -498,11 +498,52 @@ await check('왼손 연습: 레인이 화음을 악보처럼 쌓아 그리고, �
   await page.selectOption('#modeSel', 'wait');
   await page.click('#startBtn');
   await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
-  await page.evaluate(() => window.__practice.attempt(52, true));   // 화음 가운데 음(미3)
+  await page.evaluate(() => window.__practice.attempt(64));   // 미4 — 다른 옥타브의 구성음(왼손 화음은 옥타브 무시)
   const st = await page.evaluate(() => window.__practice.getState());
-  assert.equal(st.idx, 1, '구성음(미)으로도 진행: idx ' + st.idx);
+  assert.equal(st.idx, 1, '다른 옥타브 구성음(미4)도 정답: idx ' + st.idx);
   await page.click('#stopBtn');
   await page.check('#handR'); await page.uncheck('#handL');
+});
+
+await check('⏭ 패스: 기다려주기에서 자판에 없는 음을 건너뛴다(들려주고 노란색)', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:패스곡\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |';
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.check('#handR'); await page.uncheck('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  await page.click('#passBtn');
+  let st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.idx, 1, '패스로 다음 음으로: idx ' + st.idx);
+  assert.equal(st.correctFirst, 0, '패스는 정답으로 세지 않음');
+  await page.evaluate(() => window.__practice.attempt(64));   // 둘째 음은 직접
+  st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.idx, 2, '패스 뒤에도 정상 진행');
+  await page.click('#stopBtn');
+});
+
+await check('하이브리드: 놓친 음이 금색 선으로 돌아오고, 패스로도 재개 + 기준선 심장박동', async () => {
+  await page.evaluate(() => { document.getElementById('bpmInput').value = 180; });   // 빨리 돌려 금방 놓치게
+  await page.selectOption('#modeSel', 'hybrid');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().paused, undefined, { timeout: 8000 });
+  const r = await page.evaluate(() => {
+    const tf = document.getElementById('laneG').getAttribute('transform') || '';
+    const m = tf.match(/translate\((-?[\d.]+)/);
+    return { x: m ? +m[1] : null, beat: document.getElementById('hitLine').classList.contains('beat') };
+  });
+  assert.ok(r.x !== null && Math.abs(r.x) < 1, '첫 음(시작 0)이 금색 선 위치로 되돌아옴: x=' + r.x);
+  assert.ok(r.beat, '기준선이 박마다 두근(beat 클래스)');
+  await page.click('#passBtn');
+  const st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.paused, false, '패스로 재개');
+  assert.equal(st.lateCount, 1, '늦음 1로 기록');
+  await page.click('#stopBtn');
+  await page.evaluate(() => { document.getElementById('bpmInput').value = 90; });
 });
 
 if (abcjsSrc) await check('들어보기: 지금 나는 음이 악보에 노란색(pr-cur)으로 따라간다', async () => {
@@ -511,14 +552,15 @@ if (abcjsSrc) await check('들어보기: 지금 나는 음이 악보에 노란�
   await page.evaluate(() => {
     const ta = document.getElementById('abcInput');
     ta.style.display = 'block';
-    ta.value = 'X:1\nT:듣기표시\nM:4/4\nL:1/8\nK:C\nC4 E4 | G4 c4 |';
+    ta.value = 'X:1\nT:듣기표시\nM:4/4\nL:1/8\nK:C\n[V:1] C4 E4 | G4 c4 |\n[V:2] C,4 G,4 | E,4 C,4 |';
   });
   await page.click('#listenBtn');
-  await page.waitForFunction(() => document.querySelectorAll('#score .abcjs-note.pr-cur').length === 1, undefined, { timeout: 4000 });
+  await page.waitForFunction(() => document.querySelectorAll('#score .abcjs-note.abcjs-v0.pr-cur').length === 1, undefined, { timeout: 4000 });
+  await page.waitForFunction(() => document.querySelectorAll('#score .abcjs-note.abcjs-v1.pr-cur').length === 1, undefined, { timeout: 4000 });
   await page.waitForFunction(() => {
-    const cur = document.querySelector('#score .abcjs-note.pr-cur');
-    const all = Array.prototype.slice.call(document.querySelectorAll('#score .abcjs-note'));
-    return cur && all.indexOf(cur) >= 1;
+    const cur = document.querySelector('#score .abcjs-note.abcjs-v0.pr-cur');
+    const v0 = Array.prototype.slice.call(document.querySelectorAll('#score .abcjs-note.abcjs-v0'));
+    return cur && v0.indexOf(cur) >= 1;
   }, undefined, { timeout: 6000 });
   await page.click('#stopBtn');
 });
