@@ -1,0 +1,32 @@
+X:1
+T:바흐 · 미뉴에트 G장조 [1 인터미디어트]
+T:(Minuet in G major, BWV Anh. 114 — Intermediate)
+C:크리스티안 페촐트 (오랫동안 J.S. 바흐 작품으로 알려짐)
+R:Minuet
+M:3/4
+L:1/8
+Q:1/4=88
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 1 인터미디어트 — 오른손의 8분음표 달리기를 뼈대 음만 남긴 4분음표로 줄이고, 왼손은 화음 하나씩
+% 조는 원곡과 같은 G장조(샵 하나라 이미 쉬운 조). 반복 없이 32마디, ♩=88
+% ===== 앞부분 (1-16마디) =====
+[V:1] !mf!"G"d2 G2 B2 | d2 G2 G2 | "C"e2 c2 e2 | "G"g2 G2 G2 |
+[V:2] [D,G,B,]6 | [D,G,B,]6 | [E,G,C]6 | [D,G,B,]6 |
+[V:1] "Am"c2 B2 A2 | "G"B2 A2 G2 | "D"F2 "G"G2 B2 | "D"A6 |
+[V:2] [E,A,C]6 | [D,G,B,]6 | [D,F,A,]2 [D,G,B,]4 | [D,F,A,]6 |
+[V:1] "G"d2 G2 B2 | d2 G2 G2 | "C"e2 c2 e2 | "G"g2 G2 G2 |
+[V:2] [D,G,B,]6 | [D,G,B,]6 | [E,G,C]6 | [D,G,B,]6 |
+[V:1] "Am"c2 B2 A2 | "G"B2 A2 G2 | "D7"A2 G2 F2 | "G"G6 |
+[V:2] [E,A,C]6 | [D,G,B,]6 | [D,F,C]6 | [D,G,B,]6 |
+% ===== 뒷부분 (17-32마디) =====
+[V:1] !mp!"G"b2 g2 b2 | "D"a2 d2 f2 | "Em"g2 e2 d2 | "A"^c2 B2 A2 |
+[V:2] [D,G,B,]6 | [D,F,A,]6 | [E,G,B,]6 | [E,A,^C]6 |
+[V:1] "A"A2 ^c2 e2 | "Em"g2 f2 e2 | "D"f2 A2 "A"^c2 | "D"d6 |
+[V:2] [E,A,^C]6 | [E,G,B,]6 | [D,F,A,]4 [E,A,^C]2 | [D,F,A,]6 |
+[V:1] !mf!"G"d2 G2 G2 | "C"e2 G2 G2 | "G"d2 c2 B2 | "D"A2 F2 A2 |
+[V:2] [D,G,B,]6 | [E,G,C]6 | [D,G,B,]6 | [D,F,A,]6 |
+[V:1] "G"D2 G2 B2 | "Am"c2 B2 A2 | "G"B2 G2 "D"F2 | "G"G6 |]
+[V:2] [D,G,B,]6 | [E,A,C]6 | [D,G,B,]4 [D,F,A,]2 | [G,,D,G,]6 |]

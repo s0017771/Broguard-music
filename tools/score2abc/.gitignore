@@ -1,0 +1,7 @@
+inbox/
+output/
+done/
+failed/
+work/
+__pycache__/
+score2abc_gui.json

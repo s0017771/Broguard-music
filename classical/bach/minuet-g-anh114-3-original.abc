@@ -1,0 +1,32 @@
+X:1
+T:바흐 · 미뉴에트 G장조 [3 원곡]
+T:(Minuet in G major, BWV Anh. 114 — Original)
+C:크리스티안 페촐트 (오랫동안 J.S. 바흐 작품으로 알려짐)
+R:Minuet
+M:3/4
+L:1/8
+Q:1/4=116
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 3 원곡 — 안나 막달레나 바흐를 위한 음악 수첩(1725). 두 부분(각 16마디)을 각각 반복
+% 기억에서 옮겨 쓴 것: 오른손은 원곡에 가깝다고 보지만(90%), 왼손 9~32마디는 옛 악보와 대조가 필요하다(60%)
+% ===== 앞부분 (1-16마디) =====
+[V:1] |:!mf!"G"d2 GABc | d2 G2 G2 | "C"e2 cdef | "G"g2 G2 G2 |
+[V:2] |:[G,B,D]4 A,2 | B,6 | C6 | B,6 |
+[V:1] "Am"c2 dcBA | "G"B2 cBAG | "D"F2 "G"GABG | "D"A6 |
+[V:2] A,6 | G,6 | D2 B,2 G,2 | D2 D,2 C2 |
+[V:1] "G/B"d2 GABc | "G"d2 G2 G2 | "C"e2 cdef | "G"g2 G2 G2 |
+[V:2] B,4 A,2 | G,4 B,2 | C6 | B,2 A,2 G,2 |
+[V:1] "Am"c2 dcBA | "G"B2 cBAG | "D7"A2 BAGF | "G"G6 :|
+[V:2] C4 A,2 | B,4 G,2 | D4 D,2 | G,4 G,,2 :|
+% ===== 뒷부분 (17-32마디) =====
+[V:1] |:!mp!"G"b2 gabg | "D"a2 defd | "Em"g2 efgd | "A7"^c2 B^c A2 |
+[V:2] |:G,6 | F,6 | E,4 G,2 | A,4 A,,2 |
+[V:1] "A7"AB^cdef | "G"g2 "D"f2 "A"e2 | "D"f2 A2 "A"^c2 | "D"d6 |
+[V:2] A,6 | B,2 D2 ^C2 | D2 F,2 A,2 | D2 D,2 C2 |
+[V:1] !mf!"G/B"d2 GF G2 | "C"e2 GF G2 | "G"d2 c2 B2 | "D"AGFG A2 |
+[V:2] B,6 | C6 | B,2 A,2 G,2 | D6 |
+[V:1] "G"DEFGAB | "Am"c2 B2 "D/F#"A2 | "G"Bd G2 "D"F2 | "G"G6 :|
+[V:2] G,6 | A,4 F,2 | G,2 D,2 D,,2 | [G,,G,]6 :|

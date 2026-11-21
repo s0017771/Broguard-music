@@ -1,0 +1,32 @@
+X:1
+T:바흐 · 미뉴에트 G장조 [2 어드밴스]
+T:(Minuet in G major, BWV Anh. 114 — Advanced)
+C:크리스티안 페촐트 (오랫동안 J.S. 바흐 작품으로 알려짐)
+R:Minuet
+M:3/4
+L:1/8
+Q:1/4=100
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:G
+% 2 어드밴스 — 오른손은 원곡 그대로, 왼손은 원곡의 베이스 선율 대신 손 모양이 거의 바뀌지 않는 화음
+% 원곡에서 가장 어려운 점(두 손이 각자 다른 선율을 치는 것)만 줄였다. 반복 없이 32마디, ♩=100
+% ===== 앞부분 (1-16마디) =====
+[V:1] !mf!"G"d2 GABc | d2 G2 G2 | "C"e2 cdef | "G"g2 G2 G2 |
+[V:2] [D,G,B,]6 | [D,G,B,]6 | [E,G,C]6 | [D,G,B,]6 |
+[V:1] "Am"c2 dcBA | "G"B2 cBAG | "D"F2 "G"GABG | "D"A6 |
+[V:2] [E,A,C]6 | [D,G,B,]6 | [D,F,A,]2 [D,G,B,]4 | [D,F,A,]6 |
+[V:1] "G"d2 GABc | d2 G2 G2 | "C"e2 cdef | "G"g2 G2 G2 |
+[V:2] [D,G,B,]6 | [D,G,B,]6 | [E,G,C]6 | [D,G,B,]6 |
+[V:1] "Am"c2 dcBA | "G"B2 cBAG | "D7"A2 BAGF | "G"G6 |
+[V:2] [E,A,C]6 | [D,G,B,]6 | [D,F,C]6 | [D,G,B,]6 |
+% ===== 뒷부분 (17-32마디) =====
+[V:1] !mp!"G"b2 gabg | "D"a2 defd | "Em"g2 efgd | "A"^c2 B^c A2 |
+[V:2] [D,G,B,]6 | [D,F,A,]6 | [E,G,B,]6 | [E,A,^C]6 |
+[V:1] "A"AB^cdef | "G"g2 "D"f2 "A"e2 | "D"f2 A2 "A"^c2 | "D"d6 |
+[V:2] [E,A,^C]6 | [D,G,B,]2 [D,F,A,]2 [E,A,^C]2 | [D,F,A,]4 [E,A,^C]2 | [D,F,A,]6 |
+[V:1] !mf!"G"d2 GF G2 | "C"e2 GF G2 | "G"d2 c2 B2 | "D"AGFG A2 |
+[V:2] [D,G,B,]6 | [E,G,C]6 | [D,G,B,]6 | [D,F,A,]6 |
+[V:1] "G"DEFGAB | "Am"c2 B2 A2 | "G"Bd G2 "D"F2 | "G"G6 |]
+[V:2] [D,G,B,]6 | [E,A,C]6 | [D,G,B,]4 [D,F,A,]2 | [G,,D,G,]6 |]
