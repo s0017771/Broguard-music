@@ -404,6 +404,7 @@
       function pushNote(midi, chordMidis, len, tied) {
         if (tieOpen && tieOpen.midi === midi) {   /* 이음줄 뒷음: 한 번 누름으로 길이만 연장 */
           tieOpen.len += len; cellCursor += len;
+          tieOpen.els = (tieOpen.els || 1) + 1;   /* 화면 악보에는 머리가 2개 — 하이라이트 보폭 */
           if (!tied) tieOpen = null;
           return;
         }
@@ -452,6 +453,7 @@
                (셋 이상 묶은 프레이즈 슬러는 반복음도 다시 쳐야 하므로 건드리지 않음) */
             if (added.length === 2 && !added[0].rest && !added[1].rest && added[0].midi === added[1].midi) {
               added[0].len += added[1].len;
+              added[0].els = (added[0].els || 1) + (added[1].els || 1);
               if (tieOpen === added[1]) tieOpen = added[0];
               seq.pop();
             }
@@ -480,6 +482,12 @@
       var bp = parseBody(bl);
       if (bp.seq.some(function (n) { return !n.rest; })) bassSeq = bp.seq;
     }
+    /* 화면 악보·레인 색인: ei = abcjs 음표 머리 누적(이음줄 병합 음은 머리 2개), li = 레인 블록 순번 */
+    function assignIdx(q) {
+      var sheet = 0, lane = 0;
+      (q || []).forEach(function (n) { if (!n.rest) { n.ei = sheet; n.li = lane; sheet += (n.els || 1); lane++; } });
+    }
+    assignIdx(seq); assignIdx(bassSeq);
     /* 박자 계산: beatCells = L분모/M분모 (예 L:1/8 M:4/4 → 2칸=1박) */
     var beatCells = Math.max(1, Math.round(lden / mden));
     return { title: title, keyName: keyName, bpm: bpm, seq: seq, bassSeq: bassSeq, abc: abc, acc: acc, abcChords: abcChords,
@@ -866,17 +874,18 @@
     return out.join("\n");
   }
   function noteElIndexOf(seqIdx) {
-    var n = 0;
-    for (var i = 0; i < seqIdx; i++) if (!song.seq[i].rest) n++;
-    return n;
+    var n = song && song.seq[seqIdx];
+    return (n && n.ei != null) ? n.ei : 0;
   }
   function setNoteClass(seqIdx, cls) {
-    var vi = noteElIndexOf(seqIdx);
-    if (noteEls.length) {
-      var el = noteEls[vi];
+    var n = song && song.seq[seqIdx];
+    if (!n || n.rest) return;
+    var st = n.ei || 0, cnt = n.els || 1;   /* 이음줄로 묶인 머리는 함께 색칠 */
+    for (var k = st; k < st + cnt; k++) {
+      var el = noteEls[k];
       if (el) { el.classList.remove("pr-cur"); if (cls) el.classList.add(cls); }
     }
-    paintLaneEl(laneEls[vi], cls);
+    paintLaneEl(laneEls[n.li != null ? n.li : 0], cls);
   }
   function paintLaneEl(lb, cls) {
     if (!lb) return;
@@ -1168,17 +1177,22 @@
       }
     } catch (e) {}
   }
-  function highlightOther(k) {   /* 자동으로 나는 반대 손 음을 노란색으로 */
+  function highlightOther(n) {   /* 자동으로 나는 반대 손 음을 노란색으로 (음 객체 또는 null) */
     if (!otherNoteEls.length) return;
     otherNoteEls.forEach(function (el) { el.classList.remove("pr-cur"); });
-    if (k >= 0 && otherNoteEls[k]) otherNoteEls[k].classList.add("pr-cur");
+    if (!n || typeof n !== "object" || n.ei == null) return;
+    var cnt = n.els || 1;
+    for (var k = n.ei; k < n.ei + cnt; k++) if (otherNoteEls[k]) otherNoteEls[k].classList.add("pr-cur");
   }
   function highlightScore(seqIdx) {
     if (!noteEls.length || !song) return;
     noteEls.forEach(function (el) { el.classList.remove("pr-cur"); });
     if (seqIdx >= 0 && seqIdx < song.seq.length && !song.seq[seqIdx].rest) {
-      var el = noteEls[noteElIndexOf(seqIdx)];
-      if (el && !el.classList.contains("pr-done") && !el.classList.contains("pr-miss")) el.classList.add("pr-cur");
+      var n = song.seq[seqIdx], st = n.ei || 0, cnt = n.els || 1;
+      for (var k = st; k < st + cnt; k++) {
+        var el = noteEls[k];
+        if (el && !el.classList.contains("pr-done") && !el.classList.contains("pr-miss")) el.classList.add("pr-cur");
+      }
     }
   }
 
@@ -1398,9 +1412,12 @@
     return bassWaitIdx < song.bassWait.length ? song.bassWait[bassWaitIdx] : null;
   }
   function markBassDone(bT, cls) {
-    var el = otherNoteEls[bT.ei];
-    if (el) { el.classList.remove("pr-cur"); el.classList.add(cls); }
-    paintLaneEl(otherLaneEls[bT.ei], cls);
+    var cnt = bT.els || 1;
+    for (var k = bT.ei; k < bT.ei + cnt; k++) {
+      var el = otherNoteEls[k];
+      if (el) { el.classList.remove("pr-cur"); el.classList.add(cls); }
+    }
+    paintLaneEl(otherLaneEls[bT.li != null ? bT.li : 0], cls);
   }
   function checkFinishWait() {
     if (idx >= song.seq.length && !bassCur()) finishWait();
@@ -1461,7 +1478,7 @@
         var delay = Math.max(0, (a2.start - target.start) * cellMs);
         function fire() {
           playSeqNote(a2, a2.len * cellMs * 0.92, practiceVoice === 1 ? 0.3 : undefined);
-          highlightOther(a2.ei);
+          highlightOther(a2);
         }
         if (delay < 1) fire();
         else waitAutoTimers.push(setTimeout(fire, delay));
@@ -1634,7 +1651,7 @@
     if (song.autoSeq) {
       while (autoPtr < song.autoSeq.length && song.autoSeq[autoPtr].start * cellMs <= el) {
         var bn = song.autoSeq[autoPtr++];
-        if (!bn.rest) { playSeqNote(bn, bn.len * cellMs * 0.92, practiceVoice === 1 ? 0.3 : undefined); highlightOther(bn.ei); }
+        if (!bn.rest) { playSeqNote(bn, bn.len * cellMs * 0.92, practiceVoice === 1 ? 0.3 : undefined); highlightOther(bn); }
       }
     }
     /* 지나간 음 처리 */
@@ -1763,7 +1780,7 @@
       if (n.rest) return { rest: true, len: n.len, start: n.start };
       var low = n.chord ? n.chord[0] : n.midi;
       var pc12 = ((low % 12) + 12) % 12;
-      return { midi: low, chord: n.chord || null, name: solfaName(pc12, keyName) + (Math.floor(low / 12) - 1), len: n.len, start: n.start, rest: false };
+      return { midi: low, chord: n.chord || null, name: solfaName(pc12, keyName) + (Math.floor(low / 12) - 1), len: n.len, start: n.start, rest: false, ei: n.ei, li: n.li, els: n.els };
     });
   }
   function prepareSong(abc) {
@@ -1775,9 +1792,6 @@
       t.done = true;
     }
     s.transposed = t.done ? t.n : 0;
-    /* 각 성부의 몇 번째 음표인지(쉼표 제외) — 악보 하이라이트 연결용 */
-    var k1 = 0; (s.seq || []).forEach(function (n) { if (!n.rest) n.ei = k1++; });
-    var k2 = 0; (s.bassSeq || []).forEach(function (n) { if (!n.rest) n.ei = k2++; });
     return s;
   }
   /* ── 악보집(broguard_library)에서 불러오기 ── */
@@ -1946,7 +1960,7 @@
         if (bn.rest) return;
         listenBassTimers.push(setTimeout(function () {
           playSeqNote(bn, bn.len * cMs * 0.92);
-          highlightOther(bn.ei);   /* 왼손도 노란색으로 따라가기 */
+          highlightOther(bn);   /* 왼손도 노란색으로 따라가기 */
         }, bn.start * cMs));
       });
     }
@@ -1956,7 +1970,7 @@
        뒤로 갈수록 베이스(절대 예약)보다 처지면서 양손이 벌어졌다 */
     var listenT0 = performance.now();
     function step() {
-      if (i >= song.seq.length) { listenTimer = null; highlightScore(-1); highlightOther(-1); setStatus("연주 끝! 이제 '연습 시작'으로 직접 쳐보세요."); return; }
+      if (i >= song.seq.length) { listenTimer = null; highlightScore(-1); highlightOther(null); setStatus("연주 끝! 이제 '연습 시작'으로 직접 쳐보세요."); return; }
       var n = song.seq[i];
       if ($("autoComp").checked && !song.bassSeq && song.chords) {
         var barNo = Math.floor(n.start / cellsPerBar);
