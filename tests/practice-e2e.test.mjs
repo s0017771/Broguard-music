@@ -566,6 +566,28 @@ if (abcjsSrc) await check('들어보기: 지금 나는 음이 악보에 노란�
   await page.click('#stopBtn');
 });
 
+await check('키 재배치: N=높은도(P와 동일), H=도 아래 시 브릿지, 도는 Space', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:브릿지곡\nM:4/4\nL:1/8\nK:C\nc2 B,2 C2 z2 |';   // 높은도5 · 시3 · 도4
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.check('#handR'); await page.uncheck('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  await page.keyboard.press('KeyN');    // 높은도(P와 동일, 멜로디 정확 판정)
+  await page.waitForTimeout(80);
+  await page.keyboard.press('KeyH');    // 도 아래 시 브릿지(계이름 판정)
+  await page.waitForTimeout(80);
+  await page.keyboard.press('Space');   // 도 — 스페이스바
+  const st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.mistakes, 0, '실수 0 (idx ' + st.idx + ')');
+  assert.equal(st.correctFirst, 3, '높은도(N)·시(H)·도(Space) 모두 첫 시도 정답');
+  await page.click('#stopBtn');
+});
+
 await check('조표를 거스르는 임시표 키 = 원음: B♭장조에서 Shift+미는 미♮', async () => {
   await page.selectOption('#songSel', 'custom');
   await page.evaluate(() => {
