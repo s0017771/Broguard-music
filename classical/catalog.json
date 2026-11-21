@@ -4,18 +4,13 @@
   "updated": "2026-11-21",
   "levels": [
     {
-      "id": "intermediate",
+      "id": "leadsheet",
       "no": 1,
-      "name": "인터미디어트"
-    },
-    {
-      "id": "advanced",
-      "no": 2,
-      "name": "어드밴스"
+      "name": "리드시트"
     },
     {
       "id": "original",
-      "no": 3,
+      "no": 2,
       "name": "원곡"
     }
   ],
@@ -60,22 +55,16 @@
               "status": "done",
               "scores": [
                 {
-                  "level": "intermediate",
-                  "id": "classical-bach-anh114-1",
-                  "title": "바흐 · 미뉴에트 G장조 [1 인터미디어트]",
-                  "file": "bach/minuet-g-anh114-1-intermediate.abc"
-                },
-                {
-                  "level": "advanced",
-                  "id": "classical-bach-anh114-2",
-                  "title": "바흐 · 미뉴에트 G장조 [2 어드밴스]",
-                  "file": "bach/minuet-g-anh114-2-advanced.abc"
+                  "level": "leadsheet",
+                  "id": "classical-bach-anh114-leadsheet",
+                  "title": "바흐 · 미뉴에트 G장조 [1 리드시트]",
+                  "file": "bach/minuet-g-anh114-1-leadsheet.abc"
                 },
                 {
                   "level": "original",
-                  "id": "classical-bach-anh114-3",
-                  "title": "바흐 · 미뉴에트 G장조 [3 원곡]",
-                  "file": "bach/minuet-g-anh114-3-original.abc"
+                  "id": "classical-bach-anh114-original",
+                  "title": "바흐 · 미뉴에트 G장조 [2 원곡]",
+                  "file": "bach/minuet-g-anh114-2-original.abc"
                 }
               ]
             },
@@ -89,22 +78,16 @@
               "status": "done",
               "scores": [
                 {
-                  "level": "intermediate",
-                  "id": "classical-bach-anh115-1",
-                  "title": "바흐 · 미뉴에트 G단조 [1 인터미디어트]",
-                  "file": "bach/minuet-gm-anh115-1-intermediate.abc"
-                },
-                {
-                  "level": "advanced",
-                  "id": "classical-bach-anh115-2",
-                  "title": "바흐 · 미뉴에트 G단조 [2 어드밴스]",
-                  "file": "bach/minuet-gm-anh115-2-advanced.abc"
+                  "level": "leadsheet",
+                  "id": "classical-bach-anh115-leadsheet",
+                  "title": "바흐 · 미뉴에트 G단조 [1 리드시트]",
+                  "file": "bach/minuet-gm-anh115-1-leadsheet.abc"
                 },
                 {
                   "level": "original",
-                  "id": "classical-bach-anh115-3",
-                  "title": "바흐 · 미뉴에트 G단조 [3 원곡]",
-                  "file": "bach/minuet-gm-anh115-3-original.abc"
+                  "id": "classical-bach-anh115-original",
+                  "title": "바흐 · 미뉴에트 G단조 [2 원곡]",
+                  "file": "bach/minuet-gm-anh115-2-original.abc"
                 }
               ]
             },
@@ -118,22 +101,16 @@
               "status": "done",
               "scores": [
                 {
-                  "level": "intermediate",
-                  "id": "classical-bach-anh126-1",
-                  "title": "바흐 · 뮈제트 D장조 [1 인터미디어트]",
-                  "file": "bach/musette-d-anh126-1-intermediate.abc"
-                },
-                {
-                  "level": "advanced",
-                  "id": "classical-bach-anh126-2",
-                  "title": "바흐 · 뮈제트 D장조 [2 어드밴스]",
-                  "file": "bach/musette-d-anh126-2-advanced.abc"
+                  "level": "leadsheet",
+                  "id": "classical-bach-anh126-leadsheet",
+                  "title": "바흐 · 뮈제트 D장조 [1 리드시트]",
+                  "file": "bach/musette-d-anh126-1-leadsheet.abc"
                 },
                 {
                   "level": "original",
-                  "id": "classical-bach-anh126-3",
-                  "title": "바흐 · 뮈제트 D장조 [3 원곡]",
-                  "file": "bach/musette-d-anh126-3-original.abc"
+                  "id": "classical-bach-anh126-original",
+                  "title": "바흐 · 뮈제트 D장조 [2 원곡]",
+                  "file": "bach/musette-d-anh126-2-original.abc"
                 }
               ]
             },
@@ -146,22 +123,16 @@
               "status": "done",
               "scores": [
                 {
-                  "level": "intermediate",
-                  "id": "classical-bach-939-1",
-                  "title": "바흐 · 작은 전주곡 C장조 [1 인터미디어트]",
-                  "file": "bach/little-prelude-c-bwv939-1-intermediate.abc"
-                },
-                {
-                  "level": "advanced",
-                  "id": "classical-bach-939-2",
-                  "title": "바흐 · 작은 전주곡 C장조 [2 어드밴스]",
-                  "file": "bach/little-prelude-c-bwv939-2-advanced.abc"
+                  "level": "leadsheet",
+                  "id": "classical-bach-939-leadsheet",
+                  "title": "바흐 · 작은 전주곡 C장조 [1 리드시트]",
+                  "file": "bach/little-prelude-c-bwv939-1-leadsheet.abc"
                 },
                 {
                   "level": "original",
-                  "id": "classical-bach-939-3",
-                  "title": "바흐 · 작은 전주곡 C장조 [3 원곡]",
-                  "file": "bach/little-prelude-c-bwv939-3-original.abc"
+                  "id": "classical-bach-939-original",
+                  "title": "바흐 · 작은 전주곡 C장조 [2 원곡]",
+                  "file": "bach/little-prelude-c-bwv939-2-original.abc"
                 }
               ]
             },
@@ -174,22 +145,16 @@
               "status": "done",
               "scores": [
                 {
-                  "level": "intermediate",
-                  "id": "classical-bach-772-1",
-                  "title": "바흐 · 2성 인벤션 1번 C장조 [1 인터미디어트]",
-                  "file": "bach/two-part-invention-1-c-bwv772-1-intermediate.abc"
-                },
-                {
-                  "level": "advanced",
-                  "id": "classical-bach-772-2",
-                  "title": "바흐 · 2성 인벤션 1번 C장조 [2 어드밴스]",
-                  "file": "bach/two-part-invention-1-c-bwv772-2-advanced.abc"
+                  "level": "leadsheet",
+                  "id": "classical-bach-772-leadsheet",
+                  "title": "바흐 · 2성 인벤션 1번 C장조 [1 리드시트]",
+                  "file": "bach/two-part-invention-1-c-bwv772-1-leadsheet.abc"
                 },
                 {
                   "level": "original",
-                  "id": "classical-bach-772-3",
-                  "title": "바흐 · 2성 인벤션 1번 C장조 [3 원곡]",
-                  "file": "bach/two-part-invention-1-c-bwv772-3-original.abc"
+                  "id": "classical-bach-772-original",
+                  "title": "바흐 · 2성 인벤션 1번 C장조 [2 원곡]",
+                  "file": "bach/two-part-invention-1-c-bwv772-2-original.abc"
                 }
               ]
             },
@@ -199,8 +164,21 @@
               "work": "BWV 779",
               "year": "1723",
               "collection": "인벤션과 신포니아",
-              "status": "planned",
-              "scores": []
+              "status": "done",
+              "scores": [
+                {
+                  "level": "leadsheet",
+                  "id": "classical-bach-779-leadsheet",
+                  "title": "바흐 · 2성 인벤션 8번 F장조 [1 리드시트]",
+                  "file": "bach/two-part-invention-8-f-bwv779-1-leadsheet.abc"
+                },
+                {
+                  "level": "original",
+                  "id": "classical-bach-779-original",
+                  "title": "바흐 · 2성 인벤션 8번 F장조 [2 원곡]",
+                  "file": "bach/two-part-invention-8-f-bwv779-2-original.abc"
+                }
+              ]
             },
             {
               "id": "bach-784",

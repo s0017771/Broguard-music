@@ -1,0 +1,43 @@
+X:1
+T:바흐 · 2성 인벤션 8번 F장조 [2 원곡]
+T:(Two-Part Invention No. 8 in F major, BWV 779 — Original)
+C:요한 제바스티안 바흐 (인벤션과 신포니아, 1723)
+R:Invention
+M:3/4
+L:1/16
+Q:1/4=100
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:F
+% 2 원곡 — 저작권이 끝난 바흐 협회판(Bach-Gesellschaft)을 옮긴 Mutopia 판(id=61)과 대조해 옮김. 34마디, 반복 없음
+% 왼손이 오른손을 한 마디 뒤에서 한 옥타브 아래로 그대로 따라 하는 '카논(돌림노래)'으로 시작한다
+% ===== 1-4마디: 오른손이 F장조 화음을 타고 올라가는 주제를 먼저, 왼손이 한 마디 뒤에 똑같이 따라 한다(돌림노래) =====
+[V:1] !mf!"F"z2 F2 A2 F2 c2 F2 | "F"f2 e d c d c B A B A G | "F"F2 A2 c2 A2 f2 c2 | "F"a c' b c' a c' b c' a c' b c' |
+[V:2] z12 | z2 F,2 A,2 F,2 C2 F,2 | F2 E D C D C B, A, B, A, G, | F,2 A,2 C2 A,2 F2 C2 |
+% ===== 5-8마디: 두 손이 한 마디 차이로 같은 음형을 주고받는다. 5-7마디 왼손은 높은음자리표 =====
+[V:1] "F"f a g a f a g a f a g a | "Dm"d f e f d f e f d f e f | "G7"=B2 G2 d2 =B2 f2 d2 | "G7"g a g f "C"e f e d c d c B |
+V:2 clef=treble
+[V:2] A c B c A c B c A c B c | F A G A F A G A F A G A | D F E F D F E F D F E F | =B,2 G,2 C2 G,2 E2 C2 |
+% ===== 9-12마디: C장조로 가서 마침 =====
+[V:1] "Dm"A2 d c "G7"=B c =B A G A G F | "C"E F E D C2 c =B c2 E2 | "Dm"F2 "C"c2 E2 c2 "G7"D2 =B2 | "C"c4 z4 z4 |
+V:2 clef=bass
+[V:2] F G F E D E D C =B, C =B, A, | G,2 C =B, A, =B, A, G, F, G, F, E, | D, E, D, C, G, F, E, F, G,2 G,,2 | z2 C,2 E,2 C,2 G,2 C,2 |
+% ===== 13-16마디: 이번에는 C장조에서 주제를 다시, G단조로 =====
+[V:1] "C"z2 c2 e2 c2 g2 c2 | "C"c'2 =b a g a g f e f e d | "D7"c B c a c a B a c a A a | "Gm"B2 G2 B2 G2 d2 G2 |
+[V:2] C2 =B, A, G, A, G, F, E, F, E, D, | C,2 E,2 G,2 E,2 C2 G,2 | _E2 ^F,2 _E2 ^F,2 _E2 ^F,2 | G,2 F, _E, D, _E, D, C, B,, C, B,, A,, |
+% ===== 17-20마디: G단조 → D단조 =====
+[V:1] "Gm"g2 f _e d _e d c B c B A | "Gm"G2 B2 d2 B2 g2 d2 | "A7/C#"b2 ^c2 b2 ^c2 b2 ^c2 | "Dm"d2 A2 f2 d2 a2 f2 |
+[V:2] G,,2 G,2 B,2 G,2 D2 G,2 | G2 F _E D _E D C B, C B, A, | G, F, G, E G, E F, E G, E E, E | F, E, F, D F, D E, D F, D D, D |
+% ===== 21-24마디: 한 마디씩 내려가는 계단(반복 진행) =====
+[V:1] "C7"g f g b c b d b e b c b | "Dm"f e f a =B a ^c a d a =B a | "A7"e d e g A g =B g ^c g A g | "Dm"f2 d2 "Gm"B2 d2 G2 f2 |
+[V:2] B,2 G,2 E,2 G,2 C,2 E,2 | A,2 F,2 D,2 F,2 =B,,2 D,2 | G,2 E,2 ^C,2 E,2 A,,2 ^C,2 | D,, D, C, D, G,, D, A,, D, B,, D, G,, D, |
+% ===== 25-28마디: B♭장조를 거쳐 =====
+[V:1] "C7"e2 c2 "F7"A2 c2 F2 _e2 | "Bb"d f _e f d f _e f d f _e f | "Bb"B d c d B d c d B d c d | "Gm"G B A B G B A B G B A B |
+[V:2] C,, C, B,, C, F,, C, G,, C, A,, C, F,, C, | B,,2 D,2 F,2 D,2 B,2 F,2 | D F _E F D F _E F D F _E F | B, D C D B, D C D B, D C D |
+% ===== 29-32마디: F장조로 돌아오는 길 =====
+[V:1] "C7"E2 C2 G2 E2 B2 G2 | "C7"c d c B "F7"A B A G F G F _E | "Gm"D2 "C7"G F E F E D C D C B, | "F"A, B, A, G, F,2 F E F2 A,2 |
+[V:2] G, B, A, B, G, B, A, B, G, B, A, B, | E,2 C,2 F,2 C,2 A,2 F,2 | B, C B, A, G, A, G, F, E, F, E, D, | C,2 F, E, D, E, D, C, B,, C, B,, A,, |
+% ===== 33-34마디: 마침 =====
+[V:1] "Gm"B,2 "F/C"F2 A,2 F2 "C7"G,2 E2 | "F"H[A,CF]4 z4 z4 |]
+[V:2] G,, A,, G,, F,, C, B,, A,, B,, C,2 C,,2 | HF,,4 z4 z4 |]

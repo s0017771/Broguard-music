@@ -1,5 +1,5 @@
 X:1
-T:바흐 · 뮈제트 D장조 [3 원곡]
+T:바흐 · 뮈제트 D장조 [2 원곡]
 T:(Musette in D major, BWV Anh. 126 — Original)
 C:작곡자 미상 (안나 막달레나 바흐를 위한 음악 수첩)
 R:Musette
@@ -10,7 +10,7 @@ Q:1/4=116
 V:1 clef=treble name="Piano"
 V:2 clef=bass
 K:D
-% 3 원곡 — 저작권이 끝난 Mutopia 판(바흐 협회판 Bach-Gesellschaft, id=79)을 보고 옮김
+% 2 원곡 — 저작권이 끝난 Mutopia 판(바흐 협회판 Bach-Gesellschaft, id=79)을 보고 옮김
 % 형식: A(8마디, 반복) → B(12마디, 반복) → 다시 A(D.C. al Fine). 뮤직랩이 D.C.를 재생하지 못해서 마지막 A를 풀어 적음
 % 왼손의 옥타브 오가기(D–D, A–A, E–E)가 백파이프의 지속음을 흉내 낸다
 % ===== A (1-8마디) =====

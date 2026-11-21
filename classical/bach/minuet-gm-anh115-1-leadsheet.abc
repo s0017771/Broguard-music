@@ -1,0 +1,33 @@
+X:1
+T:바흐 · 미뉴에트 G단조 [1 리드시트]
+T:(Minuet in G minor, BWV Anh. 115 — Lead Sheet)
+C:크리스티안 페촐트 (오랫동안 J.S. 바흐 작품으로 알려짐)
+R:Minuet
+M:3/4
+L:1/8
+Q:1/4=100
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Gm
+% 1 리드시트 — 오른손은 원곡 멜로디(꾸밈음 뺌, 31마디의 16분음표 두 개는 8분음표 하나로), 왼손은 코드 기호를 보고 넣는 반주
+% 반주 기법: 블록 코드. 코드가 바뀔 때마다 세 음을 한꺼번에 누르고 길게 둔다. 단조의 쓸쓸함을 화음이 받쳐 준다.
+% 자리바꿈(화음의 음 순서 바꾸기)으로 앞 화음과 가까운 음을 골라 손이 거의 움직이지 않게 했다. 슬래시 코드(Eb/G 등)는 / 뒤의 음을 맨 아래에.
+% ===== 앞부분 (1-16마디) =====
+[V:1] |:!mf!"Gm"b2 a2 g2 | "Dm/F"a2 d2 d2 | "Eb"g2 GABc | "D"d6 |
+[V:2] |:"_반주: 블록 코드 (화음을 길게)"[D,G,B,]6 | [F,A,D]6 | [G,B,E]6 | [^F,A,D]6 |
+[V:1] "Eb/G"e2 fe"F/A"dc | "Bb"d2 ed"Gm"cB | "Cm"c2 "D7"dc"Gm"Bc | "D"A6 |
+[V:2] [G,B,E]4 [F,A,C]2 | [F,B,D]4 [G,B,D]2 | [G,CE]2 [^F,CD]2 [G,B,D]2 | [^F,A,D]6 |
+[V:1] "Gm"b2 a2 g2 | "Dm/F"a2 d2 d2 | "Eb"g2 GABc | "D"d6 |
+[V:2] [G,B,D]6 | [F,A,D]6 | [G,B,E]6 | [^F,A,D]6 |
+[V:1] "G7"f2 gfed | "Cm"e2 "F7"fedc | "Bb"d2 "Eb"g2 "F7"c2 | "Bb"[DFB]6 :|
+[V:2] [F,G,=B,]6 | [E,G,C]2 [E,F,A,]4 | [D,F,B,]2 [E,G,B,]2 [E,F,A,]2 | [D,F,B,]6 :|
+% ===== 뒷부분 (17-32마디) =====
+[V:1] |:!mp!"Bb"d2 Bcd=e | "F"f2 g2 a2 | "Gm"b2 "C7"gabg | "F"a2 ga f2 |
+[V:2] |:[D,F,B,]6 | [F,A,C]6 | [G,B,D]2 [=E,B,C]4 | [F,A,C]6 |
+[V:1] "F"FGABcd | "Cm"e2 "Bb"d2 "F7"c2 | "Bb/D"f2 "Eb"B2 "F"A2 | "Bb"B6 |
+[V:2] [F,A,C]6 | [E,G,C]2 [D,F,B,]2 [E,F,A,]2 | [D,F,B,]2 [E,G,B,]2 [F,A,C]2 | [F,B,D]6 |
+[V:1] !mf!"G"G2 dc d2 | "Cm"G2 ed e2 | "Gm"Gd"D7"^Fc"Gm"GB | "D"A4 z2 |
+[V:2] [G,=B,D]6 | [G,CE]6 | [G,B,D]2 [^F,CD]2 [G,B,D]2 | [^F,A,D]6 |
+[V:1] "D7"D=E^FGAB | "Cm"c2 "Gm"B2 "D7"A2 | "Gm"B c "Cm"G2 "D7"^F2 | "Gm"H[B,DG]6 :|
+[V:2] [D,^F,C]6 | [G,CE]2 [G,B,D]2 [^F,CD]2 | [G,B,D]2 [G,CE]2 [^F,CD]2 | H[G,,D,]6 :|
