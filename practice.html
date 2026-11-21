@@ -859,8 +859,9 @@
   var laneWidth = 900;
   /* 음이름 → 오선 세로 위치 (다이어토닉 계단, 높은음자리표 기준) */
   var DIATONIC_STEP = { 0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6 }; /* 도레미파솔라시 */
-  function staffY(midi, keyName) {
-    /* 미4(E4=64)를 오선 맨 아래 줄로 잡음. 한 다이어토닉 스텝 = STAFF_GAP/2 */
+  function staffY(midi, keyName, clef) {
+    /* 높은음자리표: 미4(E4)가 맨 아래 줄. 낮은음자리표: 솔2(G2)가 맨 아래 줄.
+       한 다이어토닉 스텝 = STAFF_GAP/2 */
     var pc = ((midi % 12) + 12) % 12;
     var natPc = pc;
     if (DIATONIC_STEP[natPc] === undefined) {
@@ -870,9 +871,11 @@
       natPc = flatKey ? (pc + 1) % 12 : (pc - 1 + 12) % 12;
     }
     var octave = Math.floor(midi / 12) - 1;
-    var stepFromE4 = (DIATONIC_STEP[natPc] - DIATONIC_STEP[4]) + (octave - 4) * 7;
     var bottomLineY = STAFF_TOP + 4 * STAFF_GAP;
-    return bottomLineY - stepFromE4 * (STAFF_GAP / 2);
+    var step = (clef === "bass")
+      ? (DIATONIC_STEP[natPc] - DIATONIC_STEP[7]) + (octave - 2) * 7
+      : (DIATONIC_STEP[natPc] - DIATONIC_STEP[4]) + (octave - 4) * 7;
+    return bottomLineY - step * (STAFF_GAP / 2);
   }
   function svgEl(tag, attrs) {
     var e = document.createElementNS(SVGNS, tag);
@@ -906,6 +909,9 @@
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     laneEls = [];
     if (!song) return;
+    /* 왼손 연습이면 레인도 악보처럼 낮은음자리표로 */
+    var laneClefKind = practiceVoice === 1 ? "bass" : "treble";
+    try { $("laneClef").textContent = laneClefKind === "bass" ? "\uD834\uDD22" : "\uD834\uDD1E"; } catch (e) {}
     var lastEnd = song.totalCells;
     laneWidth = HIT_X + lastEnd * cellMs * LANE_SPEED + 200;
     svg.setAttribute("viewBox", "0 0 " + laneWidth + " " + LANE_H);
@@ -940,11 +946,13 @@
     var acc = song.acc || {};
     song.seq.forEach(function (n) {
       if (n.rest) return;
-      var cx = HIT_X + (n.start + n.len / 2) * cellMs * LANE_SPEED;
-      var cy = staffY(n.midi);
+      /* 머리는 음의 '시작'에, 지속선은 거기서 길이만큼 — 전엔 머리가 길이의 가운데라
+         금색 선에 음길이의 절반만큼 늦게 닿아, 제때 나는 소리(자동 성부·드럼)가 빨라 보였다 */
+      var cx = HIT_X + n.start * cellMs * LANE_SPEED;
+      var cy = staffY(n.midi, null, laneClefKind);
       /* 화음이면 구성음을 악보처럼 쌓아 그린다 (머리 여러 개 + 기둥 하나) */
       var members = (n.chord && n.chord.length > 1) ? n.chord : [n.midi];
-      var cys = members.map(function (m2) { return staffY(m2); });
+      var cys = members.map(function (m2) { return staffY(m2, null, laneClefKind); });
       var cyTop = Math.min.apply(null, cys), cyBot = Math.max.apply(null, cys);
       var ng = svgEl("g", { class: "lnoteG", "data-state": "" });
       /* 지속선 */
@@ -1033,7 +1041,22 @@
   }
   function startLaneAnim() { stopLaneAnim(); laneRaf = requestAnimationFrame(laneFrame); }
   function stopLaneAnim() { if (laneRaf) { cancelAnimationFrame(laneRaf); laneRaf = null; } }
-  /* 지금 치는 음이 화면 가운데쯤 있도록 부드럽게 스크롤 — 벗어났을 때만 움직여 덜컹거림 방지 */
+  /* 지금 치는 음이 화면 가운데쯤 있도록 천천히 스크롤 — 벗어났을 때만, 700ms에 걸쳐 이동 */
+  var scrollAnim = null;
+  function smoothScrollTo(targetY, ms) {
+    var startY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    var dist = targetY - startY;
+    if (Math.abs(dist) < 6) return;
+    if (scrollAnim) cancelAnimationFrame(scrollAnim);
+    var t0s = performance.now();
+    function stepFn(now) {
+      var p = Math.min(1, (now - t0s) / ms);
+      var e2 = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;   /* ease-in-out */
+      window.scrollTo(0, startY + dist * e2);
+      scrollAnim = (p < 1) ? requestAnimationFrame(stepFn) : null;
+    }
+    scrollAnim = requestAnimationFrame(stepFn);
+  }
   function centerScoreOn(seqIdx) {
     if (!noteEls.length || !song || seqIdx < 0 || seqIdx >= song.seq.length) return;
     var el = noteEls[noteElIndexOf(seqIdx)];
@@ -1041,7 +1064,10 @@
     try {
       var r = el.getBoundingClientRect();
       var vh = window.innerHeight || document.documentElement.clientHeight || 600;
-      if (r.top < vh * 0.2 || r.bottom > vh * 0.6) el.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (r.top < vh * 0.2 || r.bottom > vh * 0.6) {
+        var y = (window.pageYOffset || document.documentElement.scrollTop || 0) + r.top + r.height / 2 - vh * 0.4;
+        smoothScrollTo(Math.max(0, y), 700);
+      }
     } catch (e) {}
   }
   function highlightScore(seqIdx) {
@@ -1949,7 +1975,7 @@
     startRecording: startRecording, stopRecording: stopRecording, recordNote: recordNote,
     setRecStart: function (ms) { recStartMs = ms; }, getRecEvents: function () { return recEvents; },
     renderLaneFor: function (abc) {
-      song = parseSong(abc); cellMs = 200;
+      song = parseSong(abc); cellMs = 200; practiceVoice = 0;
       buildLane();
       var svg = $("laneSvg");
       return { notes: svg.querySelectorAll(".lnoteG").length, open: svg.querySelectorAll(".nh-open").length,
