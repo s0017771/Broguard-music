@@ -434,6 +434,39 @@ await check('슬러 ( ): 같은 음 2개만 묶으면 이음줄로 — 한 번�
   assert.deepEqual(r.bar, ['64x8'], '마디를 넘는 같은 음 슬러도 병합');
 });
 
+if (abcjsSrc) await check('이음줄·슬러 병합 음: 노란 표시가 밀리지 않고 묶인 머리를 함께 칠한다', async () => {
+  await page.waitForFunction(() => !!window.ABCJS, undefined, { timeout: 5000 });
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:이음줄표시\nM:4/4\nL:1/8\nK:C\nC2- C2 E2 z2 | (G2 G2) c2 z2 |]';
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.check('#handR'); await page.uncheck('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  const idxOf = () => page.evaluate(() => {
+    const all = Array.prototype.slice.call(document.querySelectorAll('#score .abcjs-note'));
+    return {
+      total: all.length,
+      cur: all.map((e, i) => e.classList.contains('pr-cur') ? i : -1).filter(i => i >= 0),
+      done: all.map((e, i) => e.classList.contains('pr-done') ? i : -1).filter(i => i >= 0)
+    };
+  });
+  let st = await idxOf();
+  assert.equal(st.total, 6, '화면 머리 6개(이음줄·슬러는 각 2개)');
+  assert.deepEqual(st.cur, [0, 1], '첫 목표: 묶인 두 머리가 함께 노란색: ' + st.cur.join(','));
+  await page.evaluate(() => window.__practice.attempt(60));   // 도4 (C2- C2)
+  st = await idxOf();
+  assert.deepEqual(st.done, [0, 1], '친 뒤 두 머리 모두 초록');
+  assert.deepEqual(st.cur, [2], '다음 노란색 = 미(3번째 머리) — 밀리지 않음');
+  await page.evaluate(() => window.__practice.attempt(64));   // 미4
+  st = await idxOf();
+  assert.deepEqual(st.cur, [3, 4], '슬러 묶음(솔) 두 머리 함께 노란색: ' + st.cur.join(','));
+  await page.click('#stopBtn');
+});
+
 await check('회귀: 저장소의 두 성부 악보 전체에서 오른손·왼손 끝 위치가 같다', async () => {
   const dirs = ['scores', 'classical/bach'];
   const files = [];
