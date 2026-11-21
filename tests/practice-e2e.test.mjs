@@ -566,6 +566,30 @@ if (abcjsSrc) await check('들어보기: 지금 나는 음이 악보에 노란�
   await page.click('#stopBtn');
 });
 
+await check('조표를 거스르는 임시표 키 = 원음: B♭장조에서 Shift+미는 미♮', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:원음곡\nM:4/4\nL:1/8\nK:Bb\n=E2 z6 | E2 B2 z4 |';   // 미♮ | 다음 마디: (조표)미♭, (조표)시♭
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.check('#handR'); await page.uncheck('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  const targets = await page.evaluate(() => window.__practice.getState().song.seq.filter(n => !n.rest).map(n => n.midi));
+  assert.deepEqual(targets, [64, 63, 70], '목표: 미♮·미♭·시♭ — ' + targets.join(','));
+  await page.keyboard.press('Shift+KeyK');   // 미 키 + Shift → 조표가 내린 음이니 원음 미♮(64)
+  await page.waitForTimeout(80);             // 같은 키 연속 입력의 40ms 중복 방지 회피
+  await page.keyboard.press('KeyK');         // 그냥 미 → 조표대로 미♭(63)
+  await page.waitForTimeout(80);
+  await page.keyboard.press('KeyO');         // 그냥 시 → 조표대로 시♭(70)
+  const st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.mistakes, 0, '실수 0 (idx ' + st.idx + ')');
+  assert.equal(st.correctFirst, 3, '세 음 모두 첫 시도 정답(미♮ 포함)');
+  await page.click('#stopBtn');
+});
+
 await check('parseSong: 임시표가 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', async () => {
   const r = await page.evaluate(() => {
     const P = window.__practice.parseSong;
