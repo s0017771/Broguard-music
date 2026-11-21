@@ -412,9 +412,10 @@ await check('연습할 손: 왼손만 → 베이스가 연습 대상(화음은 �
   assert.equal(st.practiceVoice, 1, '하이라이트·레인도 왼손 성부');
   assert.deepEqual(st.song.seq.filter(n => !n.rest).map(n => n.midi), [48, 55], '연습 대상 = 베이스');
   assert.equal(st.song.autoSeq.filter(n => !n.rest).length, 4, '자동 성부 = 멜로디 4음');
-  await page.evaluate(() => window.__practice.attempt(48, true));   // 도(C) — 화음의 근음
+  await page.keyboard.press('a');   // 왼손 자판 '도' — '왼손 화음'이 켜져 있어도 왼손 연습 중엔 단일음 판정
   st = await page.evaluate(() => window.__practice.getState());
-  assert.equal(st.idx, 1, '근음을 치면 진행');
+  assert.equal(st.idx, 1, '왼손 자판으로 진행(왼손 화음 모드 우회): idx ' + st.idx);
+  assert.equal(st.autoTimers, 1, '오른손 멜로디는 원래 리듬대로 예약(한꺼번에 X): ' + st.autoTimers);
   await page.click('#stopBtn');
 });
 
@@ -531,12 +532,12 @@ await check('하이브리드: 놓친 음이 금색 선으로 돌아오고, 패�
   await page.selectOption('#modeSel', 'hybrid');
   await page.click('#startBtn');
   await page.waitForFunction(() => window.__practice.getState().paused, undefined, { timeout: 8000 });
-  const r = await page.evaluate(() => {
+  await page.waitForFunction(() => {   // 0.5초 되감기 애니메이션이 끝나기를 기다림
     const tf = document.getElementById('laneG').getAttribute('transform') || '';
     const m = tf.match(/translate\((-?[\d.]+)/);
-    return { x: m ? +m[1] : null, beat: document.getElementById('hitLine').classList.contains('beat') };
-  });
-  assert.ok(r.x !== null && Math.abs(r.x) < 1, '첫 음(시작 0)이 금색 선 위치로 되돌아옴: x=' + r.x);
+    return m && Math.abs(+m[1]) < 1;
+  }, undefined, { timeout: 3000 });
+  const r = await page.evaluate(() => ({ beat: document.getElementById('hitLine').classList.contains('beat') }));
   assert.ok(r.beat, '기준선이 박마다 두근(beat 클래스)');
   await page.click('#passBtn');
   const st = await page.evaluate(() => window.__practice.getState());
@@ -562,6 +563,52 @@ if (abcjsSrc) await check('들어보기: 지금 나는 음이 악보에 노란�
     const v0 = Array.prototype.slice.call(document.querySelectorAll('#score .abcjs-note.abcjs-v0'));
     return cur && v0.indexOf(cur) >= 1;
   }, undefined, { timeout: 6000 });
+  await page.click('#stopBtn');
+});
+
+await check('키 재배치: N=높은도(P와 동일), H=도 아래 시 브릿지, 도는 Space', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:브릿지곡\nM:4/4\nL:1/8\nK:C\nc2 B,2 C2 z2 |';   // 높은도5 · 시3 · 도4
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.check('#handR'); await page.uncheck('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  await page.keyboard.press('KeyN');    // 높은도(P와 동일, 멜로디 정확 판정)
+  await page.waitForTimeout(80);
+  await page.keyboard.press('KeyH');    // 도 아래 시 브릿지(계이름 판정)
+  await page.waitForTimeout(80);
+  await page.keyboard.press('Space');   // 도 — 스페이스바
+  const st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.mistakes, 0, '실수 0 (idx ' + st.idx + ')');
+  assert.equal(st.correctFirst, 3, '높은도(N)·시(H)·도(Space) 모두 첫 시도 정답');
+  await page.click('#stopBtn');
+});
+
+await check('조표를 거스르는 임시표 키 = 원음: B♭장조에서 Shift+미는 미♮', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:원음곡\nM:4/4\nL:1/8\nK:Bb\n=E2 z6 | E2 B2 z4 |';   // 미♮ | 다음 마디: (조표)미♭, (조표)시♭
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.check('#handR'); await page.uncheck('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  const targets = await page.evaluate(() => window.__practice.getState().song.seq.filter(n => !n.rest).map(n => n.midi));
+  assert.deepEqual(targets, [64, 63, 70], '목표: 미♮·미♭·시♭ — ' + targets.join(','));
+  await page.keyboard.press('Shift+KeyK');   // 미 키 + Shift → 조표가 내린 음이니 원음 미♮(64)
+  await page.waitForTimeout(80);             // 같은 키 연속 입력의 40ms 중복 방지 회피
+  await page.keyboard.press('KeyK');         // 그냥 미 → 조표대로 미♭(63)
+  await page.waitForTimeout(80);
+  await page.keyboard.press('KeyO');         // 그냥 시 → 조표대로 시♭(70)
+  const st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.mistakes, 0, '실수 0 (idx ' + st.idx + ')');
+  assert.equal(st.correctFirst, 3, '세 음 모두 첫 시도 정답(미♮ 포함)');
   await page.click('#stopBtn');
 });
 
