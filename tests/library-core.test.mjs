@@ -185,3 +185,91 @@ test('albumDiff: 제목 없는 항목이 제목 있는 트랙과 잘못 매칭�
   const d = LibraryCore.albumDiff([{ id: 'a', title: '' }], [{ id: 'x', title: '새 곡', file: 'x.abc' }]);
   assert.equal(d.fresh.length, 1, '빈 제목은 무시');
 });
+
+// ── 🏛 클래식 목록(catalog) → 받기 평면화 + 찾아보기 트리 ──
+const CATALOG = {
+  collection: '클래식 악보집', category: '클래식',
+  levels: [
+    { id: 'intermediate', no: 1, name: '인터미디어트' },
+    { id: 'advanced', no: 2, name: '어드밴스' },
+    { id: 'original', no: 3, name: '원곡' }
+  ],
+  eras: [
+    { id: 'baroque', name: '바로크', years: '1600–1750', summary: '대위법의 시대',
+      composers: [
+        { id: 'bach', name: '요한 제바스티안 바흐', shortName: '바흐', years: '1685–1750',
+          nickname: '음악의 아버지', status: 'in-progress',
+          pieces: [
+            { id: 'bach-anh114', title: '미뉴에트 G장조', work: 'BWV Anh. 114', year: '1725', status: 'done',
+              scores: [
+                { level: 'intermediate', id: 'classical-bach-anh114-1', title: '바흐 · 미뉴에트 G장조 [1 인터미디어트]', file: 'bach/minuet-1.abc' },
+                { level: 'original', id: 'classical-bach-anh114-3', title: '바흐 · 미뉴에트 G장조 [3 원곡]', file: 'bach/minuet-3.abc' }
+              ] },
+            { id: 'bach-anh115', title: '미뉴에트 G단조', work: 'BWV Anh. 115', status: 'planned', scores: [] }
+          ] },
+        { id: 'handel', name: '헨델', years: '1685–1759', status: 'planned', pieces: [] }
+      ] },
+    { id: 'classical', name: '고전', years: '1750–1820', summary: '소나타의 시대',
+      composers: [
+        { id: 'mozart', name: '모차르트', years: '1756–1791', status: 'planned', pieces: [] }
+      ] }
+  ]
+};
+
+test('flattenCatalog: 모든 scores를 받기용 트랙으로 펼침(계획만 있는 곡은 제외)', () => {
+  const tracks = LibraryCore.flattenCatalog(CATALOG);
+  assert.deepEqual(tracks.map(t => t.id), ['classical-bach-anh114-1', 'classical-bach-anh114-3']);
+  assert.equal(tracks[0].file, 'bach/minuet-1.abc');
+  assert.ok(/인터미디어트/.test(tracks[0].title));
+  assert.deepEqual(LibraryCore.flattenCatalog(null), []);
+  assert.deepEqual(LibraryCore.flattenCatalog({}), []);
+});
+
+test('classicalTree: 시대·작곡가·곡 순서가 목록 순서 그대로', () => {
+  const t = LibraryCore.classicalTree(CATALOG, []);
+  assert.deepEqual(t.eras.map(e => e.name), ['바로크', '고전'], '역사 순');
+  assert.deepEqual(t.eras[0].composers.map(c => c.id), ['bach', 'handel'], '태어난 순');
+  assert.deepEqual(t.eras[0].composers[0].pieces.map(p => p.id), ['bach-anh114', 'bach-anh115'], '학습 순');
+});
+
+test('classicalTree: planned 표시 — hasScore·scoreCount·슬롯(entry/score/없음)', () => {
+  const entries = [
+    { id: 'classical-bach-anh114-1', title: '바흐 · 미뉴에트 G장조 [1 인터미디어트]', cat: '클래식' }
+  ];
+  const t = LibraryCore.classicalTree(CATALOG, entries);
+  const bach = t.eras[0].composers[0];
+  assert.equal(bach.scoreCount, 1, '악보 있는 곡 수');
+  const p1 = bach.pieces[0], p2 = bach.pieces[1];
+  assert.equal(p1.hasScore, true); assert.equal(p2.hasScore, false, 'planned 곡');
+  assert.equal(p1.slots.length, 3, '단계는 levels 순서대로');
+  assert.deepEqual(p1.slots.map(s => s.no), [1, 2, 3]);
+  assert.ok(p1.slots[0].entry, '1단계: 악보집에 있음(id 일치)');
+  assert.equal(p1.slots[1].score, null, '2단계: 목록에도 없음(준비 중)');
+  assert.ok(p1.slots[2].score && !p1.slots[2].entry, '3단계: 목록엔 있는데 아직 안 받음');
+  const handel = t.eras[0].composers[1];
+  assert.equal(handel.pieces.length, 0); assert.equal(handel.scoreCount, 0, '작곡가 자체가 준비 중');
+});
+
+test('classicalTree: 목록에 없는 클래식 항목은 기타 클래식(others)에 가나다순으로 — 사라지지 않음', () => {
+  const entries = [
+    { id: 'classical-bach-anh114-1', title: '바흐 · 미뉴에트 G장조 [1 인터미디어트]', cat: '클래식' },
+    { id: 'old1', title: '엘리제를 위하여', cat: '클래식' },
+    { id: 'old2', title: '깨진OCR제목#@!', cat: '클래식' }
+  ];
+  const t = LibraryCore.classicalTree(CATALOG, entries);
+  assert.deepEqual(t.others.map(e => e.id).sort(), ['old1', 'old2'], '연결된 곡은 제외, 나머지는 보존');
+  assert.deepEqual(t.others.map(e => e.title), ['깨진OCR제목#@!', '엘리제를 위하여'], '가나다순');
+});
+
+test('classicalTree: 제목으로도 연결(공백 차이) + 빈 목록·빈 악보집 방어', () => {
+  const cat2 = { levels: CATALOG.levels, eras: [{ id: 'e', name: 'E', composers: [{ id: 'c', name: 'C', pieces: [
+    { id: 'p', title: 'P', scores: [{ level: 'original', id: 'classical-x', title: '달빛  소나타', file: 'x.abc' }] }
+  ] }] }] };
+  const entries = [{ id: 'rand9', title: ' 달빛 소나타 ', cat: '클래식' }];
+  const t = LibraryCore.classicalTree(cat2, entries);
+  assert.ok(t.eras[0].composers[0].pieces[0].slots.some(s => s.entry && s.entry.id === 'rand9'), '정규화 제목 일치');
+  assert.equal(t.others.length, 0);
+  assert.deepEqual(LibraryCore.classicalTree(null, entries).eras, [], '빈 목록');
+  assert.equal(LibraryCore.classicalTree(null, entries).others.length, 1, '목록이 없어도 곡은 남음');
+  assert.deepEqual(LibraryCore.classicalTree(CATALOG, null).others, [], '빈 악보집');
+});

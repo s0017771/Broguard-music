@@ -31,6 +31,14 @@
   /* 분류 필터 */
   #catBar button { font-size:.8rem; font-weight:800; background:#fff; color:var(--ink-soft); border:1px solid var(--line); border-radius:999px; padding:5px 12px; }
   #catBar button.on { background:var(--teal); color:#fff; border-color:var(--teal); }
+  .cl-row { display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:6px 0; font:inherit; cursor:pointer; }
+  .cl-row:hover { border-color:var(--teal); }
+  .cl-row.dim { opacity:.55; cursor:default; }
+  .cl-sub { color:var(--ink-soft); font-size:.8rem; font-weight:400; }
+  .cl-tag { font-size:.72rem; font-weight:800; color:var(--ink-soft); border:1px solid var(--line); border-radius:999px; padding:2px 8px; margin-left:6px; }
+  .cl-nav { margin:4px 0 10px; display:flex; align-items:center; gap:8px; font-size:.9rem; flex-wrap:wrap; }
+  .cl-nav a { color:var(--teal); cursor:pointer; font-weight:800; }
+  .cl-lv { margin:12px 0 4px; font-weight:800; }
   .cat-badge { font-size:.68rem; font-weight:800; color:var(--brass-deep); background:#f3ecda; border:1px solid var(--line); border-radius:6px; padding:1px 7px; margin-right:2px; }
   /* 목록 */
   .grp { margin-top:4px; }
@@ -85,7 +93,7 @@
   </div>
 
   <div class="card" id="albumReview" style="display:none; border-color:var(--teal)">
-    <h2 style="color:var(--teal)">🎹 반딧불 앨범 — 새 곡 확인 <span id="albumCount" class="note" style="font-weight:400"></span></h2>
+    <h2 style="color:var(--teal)">🎹 앨범 — 새 곡 확인 <span id="albumCount" class="note" style="font-weight:400"></span></h2>
     <p class="note" id="albumSkip"></p>
     <ol id="albumList" style="max-height:230px; overflow:auto; margin:6px 0; padding-left:20px; font-size:.88rem"></ol>
     <div class="row">
@@ -101,7 +109,7 @@
       <div class="backup">
         <input type="text" id="search" placeholder="🔎 제목 검색" style="width:150px; font-size:.82rem; padding:6px 10px">
         <button id="btnImportAbc" class="ghost">🎼 ABC 불러오기</button>
-        <button id="btnAlbum" class="ghost" title="작곡 세션이 만든 반딧불 앨범의 곡 중 악보집에 없는 것만 받아요">🎹 반딧불 앨범 받기</button>
+        <button id="btnAlbum" class="ghost" title="반딧불 앨범·리믹스·클래식 목록에서 악보집에 없는 곡만 받아요">🎹 앨범 받기</button>
         <button id="btnExport" class="ghost">⬇ 백업</button>
         <button id="btnImport" class="ghost">⬆ 백업 불러오기</button>
         <input type="file" id="importFile" accept=".json,application/json" style="display:none">
@@ -228,6 +236,59 @@ var LibraryCore = (function () {
     });
     return { fresh: fresh, present: present };
   }
+  /* ── 클래식 목록(classical/catalog.json): 시대 → 작곡가 → 곡 → 단계 ── */
+  /* 목록의 모든 악보(scores)를 받기용 평면 배열로 */
+  function flattenCatalog(cat) {
+    var out = [];
+    if (!cat || !Array.isArray(cat.eras)) return out;
+    cat.eras.forEach(function (era) {
+      (era.composers || []).forEach(function (comp) {
+        (comp.pieces || []).forEach(function (piece) {
+          (piece.scores || []).forEach(function (sc) {
+            if (sc && sc.id && sc.file) out.push({ id: sc.id, title: sc.title || piece.title, file: sc.file });
+          });
+        });
+      });
+    });
+    return out;
+  }
+  /* 목록 + 악보집 항목 → 찾아보기 트리 모델.
+     순서는 목록 그대로(역사 순·태어난 순·학습 순), 악보집 연결은 id 먼저 → 정규화 제목.
+     목록과 안 맞는 '클래식' 항목은 others(기타 클래식)로 — 절대 사라지지 않게. */
+  function classicalTree(cat, entries) {
+    var byId = {}, byTitle = {}, used = {};
+    (entries || []).forEach(function (e) {
+      if (!e) return;
+      if (e.id) byId[e.id] = e;
+      var nt = normTitle(e.title);
+      if (nt && !byTitle[nt]) byTitle[nt] = e;
+    });
+    function findEntry(sc) {
+      var e = (sc.id && byId[sc.id]) || byTitle[normTitle(sc.title)] || null;
+      if (e) used[e.id] = 1;
+      return e;
+    }
+    var levels = (cat && cat.levels && cat.levels.length) ? cat.levels : [];
+    var eras = ((cat && cat.eras) || []).map(function (era) {
+      var composers = (era.composers || []).map(function (comp) {
+        var pieces = (comp.pieces || []).map(function (piece) {
+          var slots = levels.map(function (lv) {
+            var sc = (piece.scores || []).filter(function (x) { return x && x.level === lv.id; })[0] || null;
+            return { level: lv.id, no: lv.no, name: lv.name, score: sc, entry: sc ? findEntry(sc) : null };
+          });
+          return { id: piece.id, title: piece.title, work: piece.work, year: piece.year, note: piece.note,
+                   collection: piece.collection, status: piece.status || 'planned', slots: slots,
+                   hasScore: slots.some(function (s) { return !!s.score; }) };
+        });
+        return { id: comp.id, name: comp.name, shortName: comp.shortName, years: comp.years,
+                 nickname: comp.nickname, status: comp.status || 'planned', pieces: pieces,
+                 scoreCount: pieces.filter(function (p) { return p.hasScore; }).length };
+      });
+      return { id: era.id, name: era.name, years: era.years, summary: era.summary, composers: composers };
+    });
+    var others = sortEntries((entries || []).filter(function (e) { return e && !used[e.id]; }));
+    return { eras: eras, others: others };
+  }
   var CATS = ['클래식', '뮤지컬', '영화음악', 'K-가요', '애니메이션', '팝', '재즈', '컨트리·포크', '록', '기타'];
   function normCat(c) { return CATS.indexOf(c) >= 0 ? c : '기타'; }
   // ABC 파일 → 곡 배열. 여러 곡(X: 블록)이면 각각 분리, T:를 제목으로(없으면 파일명)
@@ -269,7 +330,7 @@ var LibraryCore = (function () {
     });
     return added;
   }
-  return { indexKey: indexKey, sortEntries: sortEntries, indexOrder: indexOrder, group: group, serialize: serialize, parse: parse, parsePlaylists: parsePlaylists, mergePlaylists: mergePlaylists, BASE: BASE, CATS: CATS, normCat: normCat, splitAbcTunes: splitAbcTunes, mergeEntries: mergeEntries, albumDiff: albumDiff };
+  return { indexKey: indexKey, sortEntries: sortEntries, indexOrder: indexOrder, group: group, serialize: serialize, parse: parse, parsePlaylists: parsePlaylists, mergePlaylists: mergePlaylists, BASE: BASE, CATS: CATS, normCat: normCat, splitAbcTunes: splitAbcTunes, mergeEntries: mergeEntries, albumDiff: albumDiff, flattenCatalog: flattenCatalog, classicalTree: classicalTree };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = LibraryCore;
 if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
@@ -314,10 +375,90 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
   function renderCatBar() {
     var cnt = {}; entries.forEach(function (e) { var c = LibraryCore.normCat(e.cat); cnt[c] = (cnt[c] || 0) + 1; });
     var html = '<button data-cat="" class="' + (activeCat ? '' : 'on') + '">전체 ' + entries.length + '</button>';
-    LibraryCore.CATS.forEach(function (c) { if (cnt[c]) html += '<button data-cat="' + c + '" class="' + (activeCat === c ? 'on' : '') + '">' + c + ' ' + cnt[c] + '</button>'; });
+    LibraryCore.CATS.forEach(function (c) {
+      /* 클래식은 곡이 없어도 목록(목차)이 있으면 보여서 목표를 볼 수 있게 */
+      if (cnt[c] || (c === '클래식' && classicalCatalog)) html += '<button data-cat="' + c + '" class="' + (activeCat === c ? 'on' : '') + '">' + c + (cnt[c] ? ' ' + cnt[c] : '') + '</button>';
+    });
     $('catBar').innerHTML = html;
   }
   // ── 목록 렌더 ──
+  /* ── 🏛 클래식 찾아보기: 시대 → 작곡가 → 곡 → 단계 ── */
+  var classicalCatalog = null;
+  var clPath = { era: null, comp: null, piece: null, others: false };
+  function clReset() { clPath = { era: null, comp: null, piece: null, others: false }; }
+  function loadClassicalCatalog() {
+    fetch('classical/catalog.json?t=' + Date.now())
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (c) { if (c && Array.isArray(c.eras)) { classicalCatalog = c; render(); /* 칩·트리 갱신 */ } })
+      .catch(function () {});   /* 목록이 없으면 클래식도 일반 목록으로 */
+  }
+  function esc(t) { var d = document.createElement('span'); d.textContent = String(t == null ? '' : t); return d.innerHTML; }
+  function renderClassicalTree(shown) {
+    $('indexBar').innerHTML = '';
+    var model = LibraryCore.classicalTree(classicalCatalog, shown);
+    var list = $('list');
+    var era = clPath.era ? model.eras.filter(function (x) { return x.id === clPath.era; })[0] : null;
+    if (clPath.era && !era) clReset();
+    var comp = (era && clPath.comp) ? era.composers.filter(function (x) { return x.id === clPath.comp; })[0] : null;
+    if (clPath.comp && !comp) { clPath.comp = clPath.piece = null; }
+    var piece = (comp && clPath.piece) ? comp.pieces.filter(function (x) { return x.id === clPath.piece; })[0] : null;
+    if (clPath.piece && !piece) clPath.piece = null;
+    /* 경로 + 뒤로 */
+    var crumbs = (era || clPath.others) ? '<a data-tree="root">클래식</a>' : '<b>클래식</b>';
+    if (clPath.others) crumbs += ' › <b>기타 클래식</b>';
+    if (era) crumbs += ' › ' + (comp ? '<a data-tree="era">' + esc(era.name) + '</a>' : '<b>' + esc(era.name) + '</b>');
+    if (comp) crumbs += ' › ' + (piece ? '<a data-tree="comp">' + esc(comp.shortName || comp.name) + '</a>' : '<b>' + esc(comp.shortName || comp.name) + '</b>');
+    if (piece) crumbs += ' › <b>' + esc(piece.title) + '</b>';
+    var html = '<div class="cl-nav">' + ((era || clPath.others) ? '<button data-tree="back" class="ghost" style="padding:4px 10px">← 뒤로</button>' : '') + '<span>' + crumbs + '</span></div>';
+    var cardEntries = [];
+    if (clPath.others) {                                   /* 목록에 없는 클래식 곡들 — 가나다순 그대로 */
+      model.others.forEach(function (e) { html += entryCardHtml(e); cardEntries.push(e); });
+      if (!model.others.length) html += '<div class="empty">목록 밖의 클래식 곡이 없습니다.</div>';
+    } else if (piece) {                                    /* 4단계: 단계(레벨) */
+      piece.slots.forEach(function (sl) {
+        html += '<div class="cl-lv">' + sl.no + ' ' + esc(sl.name) + '</div>';
+        if (sl.entry) { html += entryCardHtml(sl.entry); cardEntries.push(sl.entry); }
+        else if (sl.score) html += '<div class="cl-row dim">' + esc(sl.score.title || piece.title) + '<span class="cl-tag">🎹 앨범 받기를 누르면 들어와요</span></div>';
+        else html += '<div class="cl-row dim">준비 중<span class="cl-tag">작곡 세션이 만들면 열려요</span></div>';
+      });
+      if (piece.note) html += '<p class="note">※ ' + esc(piece.note) + '</p>';
+    } else if (comp) {                                     /* 3단계: 곡 */
+      comp.pieces.forEach(function (p) {
+        var sub = [p.work, p.year, p.collection].filter(Boolean).map(esc).join(' · ');
+        if (p.hasScore) html += '<button class="cl-row" data-tree="piece-go" data-id="' + esc(p.id) + '"><b>' + esc(p.title) + '</b> <span class="cl-sub">' + sub + '</span>' + (p.note ? '<div class="cl-sub">' + esc(p.note) + '</div>' : '') + '</button>';
+        else html += '<div class="cl-row dim"><b>' + esc(p.title) + '</b> <span class="cl-sub">' + sub + '</span><span class="cl-tag">준비 중</span></div>';
+      });
+      if (!comp.pieces.length) html += '<div class="empty">아직 계획된 곡이 없습니다.</div>';
+    } else if (era) {                                      /* 2단계: 작곡가 (태어난 순) */
+      era.composers.forEach(function (c) {
+        var nick = c.nickname ? ' <span class="cl-sub">“' + esc(c.nickname) + '”</span>' : '';
+        var cnt = c.scoreCount ? '<span class="cl-tag">악보 ' + c.scoreCount + '곡</span>' : (c.pieces.length ? '<span class="cl-tag">목표 ' + c.pieces.length + '곡</span>' : '<span class="cl-tag">준비 중</span>');
+        if (c.pieces.length) html += '<button class="cl-row" data-tree="comp-go" data-id="' + esc(c.id) + '"><b>' + esc(c.name) + '</b> <span class="cl-sub">' + esc(c.years || '') + '</span>' + nick + cnt + '</button>';
+        else html += '<div class="cl-row dim"><b>' + esc(c.name) + '</b> <span class="cl-sub">' + esc(c.years || '') + '</span>' + nick + cnt + '</div>';
+      });
+    } else {                                               /* 1단계: 시대 (역사 순) */
+      model.eras.forEach(function (e2) {
+        html += '<button class="cl-row" data-tree="era-go" data-id="' + esc(e2.id) + '"><b>' + esc(e2.name) + '</b> <span class="cl-sub">' + esc(e2.years || '') + '</span>' + (e2.summary ? '<div class="cl-sub">' + esc(e2.summary) + '</div>' : '') + '</button>';
+      });
+      if (model.others.length) html += '<button class="cl-row" data-tree="others"><b>기타 클래식</b> <span class="cl-sub">목록 밖의 곡 ' + model.others.length + '곡</span></button>';
+    }
+    list.innerHTML = html;
+    fillEntryTitles(list, cardEntries);
+  }
+  $('list').addEventListener('click', function (ev) {
+    var t = ev.target.closest('[data-tree]'); if (!t) return;
+    var kind = t.getAttribute('data-tree'), id = t.getAttribute('data-id');
+    if (kind === 'root') clReset();
+    else if (kind === 'back') { if (clPath.piece) clPath.piece = null; else if (clPath.comp) clPath.comp = null; else clReset(); }
+    else if (kind === 'era') { clPath.comp = clPath.piece = null; }
+    else if (kind === 'comp') { clPath.piece = null; }
+    else if (kind === 'era-go') { clPath.era = id; clPath.comp = clPath.piece = null; clPath.others = false; }
+    else if (kind === 'comp-go') { clPath.comp = id; clPath.piece = null; }
+    else if (kind === 'piece-go') { clPath.piece = id; }
+    else if (kind === 'others') { clReset(); clPath.others = true; }
+    else return;
+    render();
+  });
   function render() {
     renderCatBar();
     var q = ($('search').value || '').trim().toLowerCase();
@@ -327,6 +468,8 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
       return true;
     });
     $('count').textContent = '(' + entries.length + '곡' + (activeCat ? ' · ' + activeCat + ' ' + shown.length : (q ? ' · 검색 ' + shown.length : '')) + ')';
+    /* 🏛 클래식: 가나다 대신 시대 → 작곡가 → 곡 → 단계로 찾아보기 (검색 중엔 일반 목록) */
+    if (activeCat === '클래식' && classicalCatalog && !q) { renderClassicalTree(shown); return; }
     var grouped = LibraryCore.group(shown);
     // 색인 바
     var order = LibraryCore.indexOrder(), present = {};
@@ -341,27 +484,31 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
     order.forEach(function (k) {
       var arr = grouped[k]; if (!arr || !arr.length) return;
       html += '<div class="grp" id="grp-' + k + '"><div class="grp-head">' + k + '</div>';
-      arr.forEach(function (e) {
-        html += '<div class="entry" data-id="' + e.id + '">' +
-          '<div class="entry-head"><span class="cat-badge">' + LibraryCore.normCat(e.cat) + '</span><span class="entry-title"></span><span class="entry-meta">' + fmtDate(e.added) + '</span>' +
-          '<button data-act="del" class="danger" style="padding:4px 9px" title="삭제">🗑</button><span class="note">▾</span></div>' +
-          '<div class="entry-body"><div class="sheet" id="sheet-' + e.id + '"></div>' +
-          '<div class="row" style="margin-top:9px">' +
-          '<button data-act="play" class="brass">▶ 재생</button>' +
-          '<button data-act="stop" class="alt">■ 정지</button>' +
-          '<button data-act="tab" class="alt">🎸 타브로</button>' +
-          '<button data-act="edit" class="ghost">✎ 수정</button>' +
-          '</div></div></div>';
-      });
+      arr.forEach(function (e) { html += entryCardHtml(e); });
       html += '</div>';
     });
     list.innerHTML = html;
     // 제목은 textContent로(HTML 이스케이프)
-    shown.forEach(function (e) {
-      var el = list.querySelector('.entry[data-id="' + e.id + '"] .entry-title'); if (el) el.textContent = e.title || '(제목 없음)';
-    });
+    fillEntryTitles(list, shown);
   }
   function fmtDate(ts) { if (!ts) return ''; try { var d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate(); } catch (e) { return ''; } }
+  function entryCardHtml(e) {
+    return '<div class="entry" data-id="' + e.id + '">' +
+      '<div class="entry-head"><span class="cat-badge">' + LibraryCore.normCat(e.cat) + '</span><span class="entry-title"></span><span class="entry-meta">' + fmtDate(e.added) + '</span>' +
+      '<button data-act="del" class="danger" style="padding:4px 9px" title="삭제">🗑</button><span class="note">▾</span></div>' +
+      '<div class="entry-body"><div class="sheet" id="sheet-' + e.id + '"></div>' +
+      '<div class="row" style="margin-top:9px">' +
+      '<button data-act="play" class="brass">▶ 재생</button>' +
+      '<button data-act="stop" class="alt">■ 정지</button>' +
+      '<button data-act="tab" class="alt">🎸 타브로</button>' +
+      '<button data-act="edit" class="ghost">✎ 수정</button>' +
+      '</div></div></div>';
+  }
+  function fillEntryTitles(scopeEl, list2) {
+    list2.forEach(function (e) {
+      var el = scopeEl.querySelector('.entry[data-id="' + e.id + '"] .entry-title'); if (el) el.textContent = e.title || '(제목 없음)';
+    });
+  }
 
   // ── 이벤트 위임 ──
   $('list').addEventListener('click', function (ev) {
@@ -390,7 +537,7 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
   });
   $('catBar').addEventListener('click', function (ev) {
     var btn = ev.target.closest('button[data-cat]'); if (!btn) return;
-    activeCat = btn.getAttribute('data-cat') || null; render();
+    activeCat = btn.getAttribute('data-cat') || null; clReset(); render();
   });
 
   // ── 폼 ──
@@ -508,7 +655,8 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
      하나가 없거나 실패해도 받은 목록만으로 진행하고, 전부 실패하면 안내만. */
   var ALBUM_SOURCES = [
     { url: 'scores/album.json', base: 'scores/' },
-    { url: 'remixes/album.json', base: 'remixes/' }
+    { url: 'remixes/album.json', base: 'remixes/' },
+    { url: 'classical/catalog.json', base: 'classical/', classical: true }   /* 시대→작곡가→곡→단계 목록 */
   ];
   $('btnAlbum').addEventListener('click', function () {
     setStatus(''); $('albumStatus').textContent = '';
@@ -516,8 +664,13 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
       return fetch(s.url + '?t=' + Date.now())
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function (al) {
+          var cat = LibraryCore.normCat(al && al.category || '기타');
+          if (s.classical) {   /* 클래식 목록: 트리를 평면 악보 목록으로 */
+            if (!al || !Array.isArray(al.eras)) throw new Error('형식 오류');
+            classicalCatalog = al;   /* 찾아보기 트리도 최신으로 */
+            al.tracks = LibraryCore.flattenCatalog(al);
+          }
           if (!al || !Array.isArray(al.tracks)) throw new Error('형식 오류');
-          var cat = LibraryCore.normCat(al.category || '기타');
           al.tracks.forEach(function (t) { if (t) { t._base = s.base; t._cat = cat; } });
           return al;
         })
@@ -679,6 +832,7 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
   initDrive();
 
   render();
+  loadClassicalCatalog();
 })();
 </script>
 </body>
