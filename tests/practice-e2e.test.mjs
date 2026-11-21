@@ -441,6 +441,73 @@ await check('연습할 손: 오른손만=왼손 자동 · 둘 다=드럼 박자 
   await page.check('#handR');          // 기본값 원복
 });
 
+await check('기다려주기: 자동 성부가 다음 목표와 같은 시점이면 한 박 먼저 나오지 않는다', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:타이밍\nM:4/4\nL:1/8\nK:C\n[V:1] C2 E2 G2 c2 |\n[V:2] C,4 G,4 |';
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.check('#handR'); await page.uncheck('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  const counts = await page.evaluate(() => {
+    const v = () => window.__practice.sampleStats().voices.length;
+    const out = [];
+    window.__practice.attempt(60); out.push(v());   // 도@0 → 베이스 C,(0) 함께
+    window.__practice.attempt(64); out.push(v());   // 미@2 → 다음 베이스(4)는 아직
+    window.__practice.attempt(67); out.push(v());   // 솔@4 → 이제 G,(4) 함께
+    return out;
+  });
+  assert.equal(counts[0], 1, '첫 음과 함께 베이스 1개: ' + counts.join(','));
+  assert.equal(counts[1], 1, '둘째 음에서 새 베이스 없음(한 박 먼저 ❌): ' + counts.join(','));
+  assert.equal(counts[2], 2, '같은 시점의 베이스는 그 음과 함께: ' + counts.join(','));
+  await page.click('#stopBtn');
+});
+
+await check('왼손 연습: 레인이 화음을 악보처럼 쌓아 그리고, 구성음 아무거나 정답', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:화음레인\nM:4/4\nL:1/8\nK:C\n[V:1] C2 E2 G2 c2 |\n[V:2] [C,E,G,]4 G,4 |';
+  });
+  await page.selectOption('#modeSel', 'timed');
+  await page.uncheck('#handR'); await page.check('#handL');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  const heads = await page.$$eval('#laneSvg .lnoteG', gs => gs.map(g => g.querySelectorAll('ellipse.nh').length));
+  assert.deepEqual(heads, [3, 1], '화음 블록은 머리 3개(악보와 같은 모양): ' + heads.join(','));
+  await page.click('#stopBtn');
+  await page.selectOption('#modeSel', 'wait');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  await page.evaluate(() => window.__practice.attempt(52, true));   // 화음 가운데 음(미3)
+  const st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.idx, 1, '구성음(미)으로도 진행: idx ' + st.idx);
+  await page.click('#stopBtn');
+  await page.check('#handR'); await page.uncheck('#handL');
+});
+
+if (abcjsSrc) await check('들어보기: 지금 나는 음이 악보에 노란색(pr-cur)으로 따라간다', async () => {
+  await page.waitForFunction(() => !!window.ABCJS, undefined, { timeout: 5000 });
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:듣기표시\nM:4/4\nL:1/8\nK:C\nC4 E4 | G4 c4 |';
+  });
+  await page.click('#listenBtn');
+  await page.waitForFunction(() => document.querySelectorAll('#score .abcjs-note.pr-cur').length === 1, undefined, { timeout: 4000 });
+  await page.waitForFunction(() => {
+    const cur = document.querySelector('#score .abcjs-note.pr-cur');
+    const all = Array.prototype.slice.call(document.querySelectorAll('#score .abcjs-note'));
+    return cur && all.indexOf(cur) >= 1;
+  }, undefined, { timeout: 6000 });
+  await page.click('#stopBtn');
+});
+
 await check('parseSong: 임시표가 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', async () => {
   const r = await page.evaluate(() => {
     const P = window.__practice.parseSong;
