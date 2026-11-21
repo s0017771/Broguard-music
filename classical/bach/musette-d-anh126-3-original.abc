@@ -1,0 +1,32 @@
+X:1
+T:바흐 · 뮈제트 D장조 [3 원곡]
+T:(Musette in D major, BWV Anh. 126 — Original)
+C:작곡자 미상 (안나 막달레나 바흐를 위한 음악 수첩)
+R:Musette
+M:2/4
+L:1/16
+Q:1/4=116
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:D
+% 3 원곡 — 저작권이 끝난 Mutopia 판(바흐 협회판 Bach-Gesellschaft, id=79)을 보고 옮김
+% 형식: A(8마디, 반복) → B(12마디, 반복) → 다시 A(D.C. al Fine). 뮤직랩이 D.C.를 재생하지 못해서 마지막 A를 풀어 적음
+% 왼손의 옥타브 오가기(D–D, A–A, E–E)가 백파이프의 지속음을 흉내 낸다
+% ===== A (1-8마디) =====
+[V:1] |:!mf!"D"a4 gfed | a4 gfed | FGA2 G2F2 | "A7"E2A2 "D"F2D2 |
+[V:2] |:D,,2D,2 D,,2D,2 | D,,2D,2 D,,2D,2 | F,G,A,2 G,2F,2 | E,2A,2 F,2D,2 |
+[V:1] "D"a4 gfed | a4 gfed | FGA2 G2F2 | "A7"E2A2 "D"D4 :|
+[V:2] D,,2D,2 D,,2D,2 | D,,2D,2 D,,2D,2 | F,G,A,2 G,2F,2 | E,2A,2 D,4 :|
+% ===== B (9-20마디) : A장조 쪽으로, E음 지속음 위에서 =====
+[V:1] |:!mp!"A"cde2 cde2 | a2e2 e4 | a2e2 a2e2 | dcBA "E"B2E2 |
+[V:2] |:A,,2A,2 A,,2A,2 | A,,2A,2 A,,2A,2 | A,,2A,2 A,,2A,2 | A,,2A,2 E,,2E,2 |
+[V:1] "E7"e2^d2 E2=d2- | d2c2 a2^g2 | e2^d2 E2=d2- | d2c2 a2^g2 |
+[V:2] E,,2E,2 E,,2E,2 | E,,2E,2 E,,2E,2 | E,,2E,2 E,,2E,2 | E,,2E,2 E,,2E,2 |
+[V:1] e^dc^d e^dc^d | e2^G2 "A"A2=d2 | cde2 "D"A2D2 | "A"CDE2 A,4 :|
+[V:2] E,,2E,2 E,,2E,2 | E,,2D,2 C,2D,2 | E,4 A,,2D,2 | C,D,E,2 A,,4 :|
+% ===== 다시 A (21-28마디) : D.C. al Fine =====
+[V:1] !mf!"D""_다시 처음 부분 (D.C.)"a4 gfed | a4 gfed | FGA2 G2F2 | "A7"E2A2 "D"F2D2 |
+[V:2] D,,2D,2 D,,2D,2 | D,,2D,2 D,,2D,2 | F,G,A,2 G,2F,2 | E,2A,2 F,2D,2 |
+[V:1] "D"a4 gfed | a4 gfed | FGA2 G2F2 | "A7"E2A2 "D"HD4 |]
+[V:2] D,,2D,2 D,,2D,2 | D,,2D,2 D,,2D,2 | F,G,A,2 G,2F,2 | E,2A,2 HD,4 |]
