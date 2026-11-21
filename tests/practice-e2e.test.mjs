@@ -412,9 +412,10 @@ await check('연습할 손: 왼손만 → 베이스가 연습 대상(화음은 �
   assert.equal(st.practiceVoice, 1, '하이라이트·레인도 왼손 성부');
   assert.deepEqual(st.song.seq.filter(n => !n.rest).map(n => n.midi), [48, 55], '연습 대상 = 베이스');
   assert.equal(st.song.autoSeq.filter(n => !n.rest).length, 4, '자동 성부 = 멜로디 4음');
-  await page.evaluate(() => window.__practice.attempt(48, true));   // 도(C) — 화음의 근음
+  await page.keyboard.press('a');   // 왼손 자판 '도' — '왼손 화음'이 켜져 있어도 왼손 연습 중엔 단일음 판정
   st = await page.evaluate(() => window.__practice.getState());
-  assert.equal(st.idx, 1, '근음을 치면 진행');
+  assert.equal(st.idx, 1, '왼손 자판으로 진행(왼손 화음 모드 우회): idx ' + st.idx);
+  assert.equal(st.autoTimers, 1, '오른손 멜로디는 원래 리듬대로 예약(한꺼번에 X): ' + st.autoTimers);
   await page.click('#stopBtn');
 });
 
@@ -531,12 +532,12 @@ await check('하이브리드: 놓친 음이 금색 선으로 돌아오고, 패�
   await page.selectOption('#modeSel', 'hybrid');
   await page.click('#startBtn');
   await page.waitForFunction(() => window.__practice.getState().paused, undefined, { timeout: 8000 });
-  const r = await page.evaluate(() => {
+  await page.waitForFunction(() => {   // 0.5초 되감기 애니메이션이 끝나기를 기다림
     const tf = document.getElementById('laneG').getAttribute('transform') || '';
     const m = tf.match(/translate\((-?[\d.]+)/);
-    return { x: m ? +m[1] : null, beat: document.getElementById('hitLine').classList.contains('beat') };
-  });
-  assert.ok(r.x !== null && Math.abs(r.x) < 1, '첫 음(시작 0)이 금색 선 위치로 되돌아옴: x=' + r.x);
+    return m && Math.abs(+m[1]) < 1;
+  }, undefined, { timeout: 3000 });
+  const r = await page.evaluate(() => ({ beat: document.getElementById('hitLine').classList.contains('beat') }));
   assert.ok(r.beat, '기준선이 박마다 두근(beat 클래스)');
   await page.click('#passBtn');
   const st = await page.evaluate(() => window.__practice.getState());
