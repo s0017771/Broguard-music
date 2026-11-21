@@ -466,6 +466,16 @@ await check('기다려주기: 자동 성부가 다음 목표와 같은 시점이
   await page.click('#stopBtn');
 });
 
+await check('레인: 음표 머리가 음의 시작 위치에 놓인다(길이 절반만큼 늦게 닿던 문제)', async () => {
+  const r = await page.evaluate(() => {
+    const out = window.__practice.renderLaneFor('X:1\nM:4/4\nL:1/8\nK:C\nC2 E2 G4 |');
+    const gs = document.querySelectorAll('#laneSvg .lnoteG');
+    return Array.prototype.map.call(gs, g => +g.querySelector('ellipse.nh').getAttribute('cx'));
+  });
+  // cellMs=200(훅 고정) · HIT_X=130 · 속도 0.13px/ms → 시작 0·2·4칸 = 130, 182, 234
+  assert.deepEqual(r, [130, 182, 234], '머리 x = 시작 위치: ' + r.join(','));
+});
+
 await check('왼손 연습: 레인이 화음을 악보처럼 쌓아 그리고, 구성음 아무거나 정답', async () => {
   await page.selectOption('#songSel', 'custom');
   await page.evaluate(() => {
@@ -479,6 +489,11 @@ await check('왼손 연습: 레인이 화음을 악보처럼 쌓아 그리고, �
   await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
   const heads = await page.$$eval('#laneSvg .lnoteG', gs => gs.map(g => g.querySelectorAll('ellipse.nh').length));
   assert.deepEqual(heads, [3, 1], '화음 블록은 머리 3개(악보와 같은 모양): ' + heads.join(','));
+  const clef = await page.textContent('#laneClef');
+  assert.equal(clef, '\u{1D122}', '왼손 레인은 낮은음자리표: ' + clef);
+  // 낮은음자리표: 도3(C3=48)은 보표 안(둘째 칸)에 — 높은음자리표 기준 아래로 밀리지 않음
+  const headY = await page.$eval('#laneSvg .lnoteG ellipse.nh', e => +e.getAttribute('cy'));
+  assert.ok(headY > 80 && headY < 168, '베이스 음이 보표 안쪽에 그려짐: y=' + headY);
   await page.click('#stopBtn');
   await page.selectOption('#modeSel', 'wait');
   await page.click('#startBtn');
