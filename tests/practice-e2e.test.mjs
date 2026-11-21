@@ -490,11 +490,14 @@ await check('왼손 연습: 레인이 화음을 악보처럼 쌓아 그리고, �
   await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
   const heads = await page.$$eval('#laneSvg .lnoteG', gs => gs.map(g => g.querySelectorAll('ellipse.nh').length));
   assert.deepEqual(heads, [3, 1], '화음 블록은 머리 3개(악보와 같은 모양): ' + heads.join(','));
-  const clef = await page.textContent('#laneClef');
-  assert.equal(clef, '\u{1D122}', '왼손 레인은 낮은음자리표: ' + clef);
-  // 낮은음자리표: 도3(C3=48)은 보표 안(둘째 칸)에 — 높은음자리표 기준 아래로 밀리지 않음
+  // 두 성부 악보: 레인이 두 보표(위 𝄞 멜로디 · 아래 𝄢 베이스)로 그려진다
+  const clefs = await page.$$eval('#laneSvg > text.laneClefSvg', ts => ts.map(t => t.textContent));
+  assert.ok(clefs.includes('\u{1D11E}') && clefs.includes('\u{1D122}'), '𝄞·𝄢 두 보표: ' + clefs.join(','));
+  const otherN = await page.$$eval('#laneSvg .lnoteO', gs => gs.length);
+  assert.equal(otherN, 4, '반대 손(멜로디 4음)도 옅은 색으로 함께 흐름: ' + otherN);
+  // 베이스 보표(y 240~328) 안쪽에 연습 음이 그려진다
   const headY = await page.$eval('#laneSvg .lnoteG ellipse.nh', e => +e.getAttribute('cy'));
-  assert.ok(headY > 80 && headY < 168, '베이스 음이 보표 안쪽에 그려짐: y=' + headY);
+  assert.ok(headY > 240 && headY < 340, '베이스 음이 아래 보표 안쪽에: y=' + headY);
   await page.click('#stopBtn');
   await page.selectOption('#modeSel', 'wait');
   await page.click('#startBtn');
@@ -504,6 +507,46 @@ await check('왼손 연습: 레인이 화음을 악보처럼 쌓아 그리고, �
   assert.equal(st.idx, 1, '다른 옥타브 구성음(미4)도 정답: idx ' + st.idx);
   await page.click('#stopBtn');
   await page.check('#handR'); await page.uncheck('#handL');
+});
+
+await check('두 손 연습(기다려주기): 왼손도 쳐야 진행 — 멜로디만 치면 멈춘다', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:양손곡\nM:4/4\nL:1/8\nK:C\n[V:1] C2 E2 G2 c2 |\n[V:2] [C,E,G,]4 G,4 |';
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.check('#handR'); await page.check('#handL');   // 둘 다
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  const S = () => page.evaluate(() => window.__practice.getState());
+  await page.evaluate(() => window.__practice.attempt(60));   // 멜로디 도4 (같은 시점이라 멜로디 먼저 가능)
+  let st = await S();
+  assert.equal(st.idx, 1, '멜로디 1 진행');
+  assert.equal(st.bassWaitIdx, 0, '왼손은 아직');
+  await page.evaluate(() => window.__practice.attempt(64));   // 왼손 차례 — 미는 도미솔 화음의 구성음(옥타브 무시)
+  st = await S();
+  assert.equal(st.idx, 1, '왼손 전엔 멜로디가 못 감');
+  assert.equal(st.bassWaitIdx, 1, '왼손 화음 통과');
+  await page.evaluate(() => window.__practice.attempt(64));   // 이제 멜로디 미4
+  st = await S();
+  assert.equal(st.idx, 2, '왼손을 치고 나서 멜로디 진행');
+  await page.click('#stopBtn');
+  await page.uncheck('#handL');
+});
+
+await check('옥타브 판정: 오른손 연습은 정확한 옥타브만 정답', async () => {
+  await page.click('#startBtn');   // 같은 곡, 오른손만
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  await page.evaluate(() => window.__practice.attempt(72));   // 도5 — 목표는 도4
+  let st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.idx, 0, '옥타브 다르면 오답: idx ' + st.idx);
+  assert.equal(st.mistakes, 1, '실수 1');
+  await page.evaluate(() => window.__practice.attempt(60));   // 도4
+  st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.idx, 1, '정확한 옥타브만 통과');
+  await page.click('#stopBtn');
 });
 
 await check('⏭ 패스: 기다려주기에서 자판에 없는 음을 건너뛴다(들려주고 노란색)', async () => {
