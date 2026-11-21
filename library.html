@@ -84,12 +84,24 @@
     </div>
   </div>
 
+  <div class="card" id="albumReview" style="display:none; border-color:var(--teal)">
+    <h2 style="color:var(--teal)">🎹 반딧불 앨범 — 새 곡 확인 <span id="albumCount" class="note" style="font-weight:400"></span></h2>
+    <p class="note" id="albumSkip"></p>
+    <ol id="albumList" style="max-height:230px; overflow:auto; margin:6px 0; padding-left:20px; font-size:.88rem"></ol>
+    <div class="row">
+      <button id="btnAlbumConfirm" class="brass">✅ 추가</button>
+      <button id="btnAlbumCancel" class="ghost">취소</button>
+      <span id="albumStatus" class="note"></span>
+    </div>
+  </div>
+
   <div class="card">
     <div class="row" style="justify-content:space-between">
       <h2 style="margin:0">📖 목록 <span id="count" class="count"></span></h2>
       <div class="backup">
         <input type="text" id="search" placeholder="🔎 제목 검색" style="width:150px; font-size:.82rem; padding:6px 10px">
         <button id="btnImportAbc" class="ghost">🎼 ABC 불러오기</button>
+        <button id="btnAlbum" class="ghost" title="작곡 세션이 만든 반딧불 앨범의 곡 중 악보집에 없는 것만 받아요">🎹 반딧불 앨범 받기</button>
         <button id="btnExport" class="ghost">⬇ 백업</button>
         <button id="btnImport" class="ghost">⬆ 백업 불러오기</button>
         <input type="file" id="importFile" accept=".json,application/json" style="display:none">
@@ -197,6 +209,25 @@ var LibraryCore = (function () {
     try { var o = JSON.parse(json); if (o && Array.isArray(o.entries)) return o.entries; if (Array.isArray(o)) return o; } catch (e) {}
     return null;
   }
+  // 앨범(저장소 곡 목록)과 악보집 비교 — 새 곡/이미 있는 곡 구분.
+  // id가 같으면 있음, 아니면 제목을 정규화(앞뒤 공백 제거·연속 공백 하나로)해 같으면 있음.
+  function normTitle(t) { return String(t || '').trim().replace(/\s+/g, ' '); }
+  function albumDiff(entries, tracks) {
+    var byId = {}, byTitle = {};
+    (entries || []).forEach(function (e) {
+      if (!e) return;
+      if (e.id) byId[e.id] = 1;
+      var nt = normTitle(e.title);
+      if (nt) byTitle[nt] = 1;
+    });
+    var fresh = [], present = [];
+    (tracks || []).forEach(function (t) {
+      if (!t) return;
+      if ((t.id && byId[t.id]) || byTitle[normTitle(t.title)]) present.push(t);
+      else fresh.push(t);
+    });
+    return { fresh: fresh, present: present };
+  }
   var CATS = ['클래식', '뮤지컬', '영화음악', 'K-가요', '애니메이션', '팝', '재즈', '컨트리·포크', '록', '기타'];
   function normCat(c) { return CATS.indexOf(c) >= 0 ? c : '기타'; }
   // ABC 파일 → 곡 배열. 여러 곡(X: 블록)이면 각각 분리, T:를 제목으로(없으면 파일명)
@@ -238,7 +269,7 @@ var LibraryCore = (function () {
     });
     return added;
   }
-  return { indexKey: indexKey, sortEntries: sortEntries, indexOrder: indexOrder, group: group, serialize: serialize, parse: parse, parsePlaylists: parsePlaylists, mergePlaylists: mergePlaylists, BASE: BASE, CATS: CATS, normCat: normCat, splitAbcTunes: splitAbcTunes, mergeEntries: mergeEntries };
+  return { indexKey: indexKey, sortEntries: sortEntries, indexOrder: indexOrder, group: group, serialize: serialize, parse: parse, parsePlaylists: parsePlaylists, mergePlaylists: mergePlaylists, BASE: BASE, CATS: CATS, normCat: normCat, splitAbcTunes: splitAbcTunes, mergeEntries: mergeEntries, albumDiff: albumDiff };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = LibraryCore;
 if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
@@ -460,6 +491,88 @@ if (typeof window !== 'undefined') window.LibraryCore = LibraryCore;
     pendingImport.forEach(function (t) { entries.push({ id: newId(), title: t.title, abc: t.abc, cat: cat, added: Date.now() }); n++; });
     pendingImport = []; renderImportReview(); save(); render();
     setStatus(n + '곡 불러와 저장했습니다 ✓ · 분류 「' + cat + '」');
+  });
+
+  // ── 🎹 반딧불 앨범 받기: 작곡 세션이 저장소(scores/)에 올린 곡 중 악보집에 없는 것만 추가 ──
+  //    이미 있는 곡(id 또는 제목 일치)은 절대 덮어쓰지 않는다 — 직접 고친 악보 보호.
+  var albumTracks = [], albumCat = '기타';
+  function renderAlbumList() {
+    $('albumList').innerHTML = albumTracks.map(function (t, i) {
+      return '<li style="margin:2px 0"><label><input type="checkbox" data-alb="' + i + '" checked> <span></span></label></li>';
+    }).join('');
+    Array.prototype.forEach.call($('albumList').querySelectorAll('li span'), function (s, i) {
+      s.textContent = (albumTracks[i].no != null ? albumTracks[i].no + '. ' : '') + (albumTracks[i].title || '(제목 없음)');
+    });
+  }
+  /* 앨범 목록들: 작곡 세션의 반딧불 앨범 + 원장님의 리믹스 앨범.
+     하나가 없거나 실패해도 받은 목록만으로 진행하고, 전부 실패하면 안내만. */
+  var ALBUM_SOURCES = [
+    { url: 'scores/album.json', base: 'scores/' },
+    { url: 'remixes/album.json', base: 'remixes/' }
+  ];
+  $('btnAlbum').addEventListener('click', function () {
+    setStatus(''); $('albumStatus').textContent = '';
+    Promise.all(ALBUM_SOURCES.map(function (s) {
+      return fetch(s.url + '?t=' + Date.now())
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (al) {
+          if (!al || !Array.isArray(al.tracks)) throw new Error('형식 오류');
+          var cat = LibraryCore.normCat(al.category || '기타');
+          al.tracks.forEach(function (t) { if (t) { t._base = s.base; t._cat = cat; } });
+          return al;
+        })
+        .catch(function (e) { return { _err: (e && e.message) || String(e) }; });
+    })).then(function (als) {
+      var tracks = [];
+      als.forEach(function (a) { if (!a._err) tracks = tracks.concat(a.tracks); });
+      if (!tracks.length) {
+        setStatus('앨범 목록을 받지 못했어요(' + als[0]._err + '). 인터넷 연결을 확인해 주세요 — 앨범이 아직 사이트에 올라오기 전일 수도 있어요.', true);
+        return;
+      }
+      var d = LibraryCore.albumDiff(entries, tracks);
+      if (!d.fresh.length) {
+        $('albumReview').style.display = 'none';
+        setStatus('새 곡이 없어요. ' + tracks.length + '곡이 모두 들어 있어요 ✓');
+        return;
+      }
+      albumTracks = d.fresh;
+      albumCat = d.fresh[0]._cat || '기타';
+      $('albumCount').textContent = '(새 곡 ' + d.fresh.length + '곡 · 분류 「' + albumCat + '」)';
+      $('albumSkip').textContent = (d.present.length ? '이미 있는 ' + d.present.length + '곡은 건너뜁니다. ' : '') + '추가할 곡을 확인하고 「추가」를 누르세요.';
+      renderAlbumList();
+      $('albumReview').style.display = '';
+      $('albumReview').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  });
+  $('btnAlbumCancel').addEventListener('click', function () { albumTracks = []; $('albumReview').style.display = 'none'; });
+  $('btnAlbumConfirm').addEventListener('click', function () {
+    var sel = [];
+    Array.prototype.forEach.call($('albumList').querySelectorAll('input[data-alb]'), function (cb) {
+      if (cb.checked) sel.push(albumTracks[+cb.getAttribute('data-alb')]);
+    });
+    if (!sel.length) { $('albumStatus').textContent = '선택된 곡이 없어요.'; return; }
+    $('btnAlbumConfirm').disabled = true;
+    $('albumStatus').textContent = '악보 받는 중…';
+    var got = [], fail = [];
+    Promise.all(sel.map(function (t) {
+      return fetch((t._base || 'scores/') + t.file + '?t=' + Date.now())
+        .then(function (r) { if (!r.ok) throw 0; return r.text(); })
+        .then(function (txt) {
+          var tunes = LibraryCore.splitAbcTunes(txt, t.title);
+          if (!tunes.length || !tunes[0].abc) throw 0;
+          got.push({ id: t.id, title: t.title, abc: tunes[0].abc, cat: t._cat || albumCat, added: Date.now() });
+        })
+        .catch(function () { fail.push(t.title); });
+    })).then(function () {
+      var d2 = LibraryCore.albumDiff(entries, got);   /* 받는 사이 바뀌었을 수 있어 한 번 더 중복 확인 */
+      d2.fresh.forEach(function (e) { entries.push(e); });
+      if (d2.fresh.length) { save(); render(); }
+      albumTracks = []; $('albumReview').style.display = 'none';
+      $('btnAlbumConfirm').disabled = false;
+      var msg = d2.fresh.length + '곡을 추가했어요 ✓ · 분류 「' + albumCat + '」 — 드라이브에 저장하면 다른 기기에도 들어가요';
+      if (fail.length) msg += ' · 못 받은 곡 ' + fail.length + ': ' + fail.join(', ');
+      setStatus(msg, !d2.fresh.length && fail.length > 0);
+    });
   });
 
   // ── 구글 드라이브 동기화 (drive.file: 이 앱이 만든 파일 1개, 드라이브에 보임) ──

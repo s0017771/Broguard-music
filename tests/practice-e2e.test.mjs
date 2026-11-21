@@ -193,6 +193,18 @@ await check('악보집(broguard_library)에서 불러오기 목록이 생긴다'
   await page.click('#stopBtn');
 });
 
+await check('악보집이 다른 탭에서 바뀌면(storage 이벤트) 목록이 즉시 갱신된다', async () => {
+  await page.evaluate(() => {
+    localStorage.setItem('broguard_library', JSON.stringify({ entries: [
+      { id: 'st1', title: '앨범으로 새로 받은 곡', abc: 'X:1\nT:앨범으로 새로 받은 곡\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |', added: 50 }
+    ] }));
+    /* 다른 탭이 바꿨을 때 브라우저가 쏘는 이벤트를 그대로 재현 */
+    window.dispatchEvent(new StorageEvent('storage', { key: 'broguard_library' }));
+  });
+  const opts = await page.$$eval('#songSel optgroup[data-lib] option', els => els.map(o => o.textContent));
+  assert.deepEqual(opts, ['앨범으로 새로 받은 곡'], '포커스 없이도 목록 갱신: ' + opts.join(','));
+});
+
 await check('악보집이 나중에 바뀌어도(동기화로 id 변경) 곡을 제목으로 다시 찾아 시작한다', async () => {
   await page.evaluate(() => {
     localStorage.setItem('broguard_library', JSON.stringify({ entries: [
@@ -253,6 +265,117 @@ await check('레인이 일정한 속도로 흐른다(rAF 등속 구동)', async 
   assert.ok(Math.abs(v2 - 0.13) < 0.02, '2구간 속도 ≈ 0.13px/ms: ' + v2.toFixed(4));
   assert.ok(Math.abs(v1 - v2) < 0.01, '두 구간 속도 일치(등속): ' + v1.toFixed(4) + ' vs ' + v2.toFixed(4));
   await page.click('#stopBtn');
+});
+
+await check('parseSong: 베이스 성부(bassSeq)도 읽는다 — 어떤 성부 표기든', async () => {
+  const r = await page.evaluate(() => {
+    const P = window.__practice.parseSong;
+    const midis = sq => (sq || []).filter(x => !x.rest).map(x => x.midi);
+    const two = P('X:1\nM:4/4\nL:1/8\n%%score { 1 | 2 }\nV:1 clef=treble\nV:2 clef=bass\nK:C\n[V:1] "C"C2 E2 G2 c2 |\n[V:2] C,4 G,4 |');
+    const blk = P('X:1\nM:4/4\nL:1/8\nK:C\nV:RH\nC4 E4 |\nV:LH\nC,4 G,4 |');
+    const solo = P('X:1\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |');
+    return { two: midis(two.bassSeq), twoStarts: (two.bassSeq || []).map(x => x.start), blk: midis(blk.bassSeq), solo: solo.bassSeq };
+  });
+  assert.deepEqual(r.two, [48, 55], '인라인 2성부의 베이스');
+  assert.deepEqual(r.twoStarts, [0, 4], '베이스 위치(cell)');
+  assert.deepEqual(r.blk, [48, 55], 'V: 블록 형식도');
+  assert.equal(r.solo, null, '단선율은 bassSeq 없음');
+});
+
+if (abcjsSrc) await check('2성부 악보: 하이라이트가 베이스로 새지 않는다 (멜로디 성부만 추적)', async () => {
+  await page.waitForFunction(() => !!window.ABCJS, undefined, { timeout: 5000 });
+  await page.evaluate(() => {
+    localStorage.setItem('broguard_library', JSON.stringify({ entries: [
+      { id: 'tv1', title: '두성부곡', added: 99, abc: 'X:1\nT:두성부곡\nM:4/4\nL:1/8\n%%score { 1 | 2 }\nV:1 clef=treble\nV:2 clef=bass\nK:C\n[V:1] "C"C2 E2 G2 c2 | "G"d2 B2 G2 A2 |\n[V:2] C,4 G,4 | G,4 D4 |' }
+    ] }));
+    window.__practice.populateLibrary();
+  });
+  await page.selectOption('#songSel', 'lib:tv1');
+  await page.selectOption('#modeSel', 'wait');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 5000 });
+  const r = await page.evaluate(() => {
+    const all = document.querySelectorAll('#score .abcjs-note').length;
+    const v0 = document.querySelectorAll('#score .abcjs-note.abcjs-v0').length;
+    const st = window.__practice.getState();
+    return { all, v0, melodyNotes: st.song.seq.filter(n => !n.rest).length, bass: (st.song.bassSeq || []).filter(n => !n.rest).length };
+  });
+  assert.ok(r.all > r.v0, '화면엔 두 성부 음표가 모두 있음: ' + r.all + ' > ' + r.v0);
+  assert.equal(r.v0, r.melodyNotes, '추적 대상 = 멜로디 성부 음표 수 (베이스 제외)');
+  assert.equal(r.bass, 4, '베이스도 읽어 둠(들어보기·박자 모드에서 연주)');
+  await page.click('#stopBtn');
+});
+
+await check('윗줄 숫자키: 8=높은라, 9=높은시, 0=더높은도, 7=높은솔(/와 중복)', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:고음역\nM:4/4\nL:1/8\nK:C\na2 b2 c\'2 g2 | d\'2 e\'2 f\'2 z2 |';   // 높은라~더높은파
+  });
+  await page.selectOption('#modeSel', 'wait');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 4000 });
+  for (const key of ['8', '9', '0', '7', '-', '=', '\\']) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(80);
+  }
+  const st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.correctFirst, 7, '일곱 음 모두 첫 시도 정답: ' + st.correctFirst + ' (idx ' + st.idx + ')');
+  await page.click('#stopBtn');
+});
+
+if (abcjsSrc) await check('조옮김: 옥타브·반음 내리면 음과 조표가 함께 바뀐다', async () => {
+  await page.waitForFunction(() => !!(window.ABCJS && window.ABCJS.strTranspose), undefined, { timeout: 5000 });
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:조옮김곡\nM:4/4\nL:1/8\nK:C\nc2 e2 g2 c\'2 |';
+  });
+  await page.selectOption('#modeSel', 'wait');
+  // -1옥타브 버튼: 높은도(72) → 가온도(60)
+  await page.click('#transOctDn');
+  assert.equal(await page.textContent('#transVal'), '-12', '버튼 표시');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 5000 });
+  let st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.song.seq[0].midi, 60, '-1옥타브: c→가온도');
+  assert.equal(st.song.transposed, -12, '조옮김 적용 표시');
+  await page.click('#stopBtn');
+  // ♭ 버튼 두 번(원조에서 -2): K:C → K:Bb, 첫 음 70
+  await page.click('#transReset');
+  await page.click('#transFlat');
+  await page.click('#transFlat');
+  assert.equal(await page.textContent('#transVal'), '-2', '♭ 누적 표시');
+  await page.click('#startBtn');
+  await page.waitForFunction(() => window.__practice.getState().playing, undefined, { timeout: 5000 });
+  st = await page.evaluate(() => window.__practice.getState());
+  assert.equal(st.song.seq[0].midi, 70, '-2반음: c→시b');
+  assert.equal(st.song.keyName, 'Bb', '조표도 함께 바뀜(K:Bb)');
+  await page.click('#stopBtn');
+  await page.click('#transReset');
+});
+
+await check('자동 반주(소리) 체크가 원곡 베이스 연주의 토글이다', async () => {
+  await page.selectOption('#songSel', 'custom');
+  await page.evaluate(() => {
+    const ta = document.getElementById('abcInput');
+    ta.style.display = 'block';
+    ta.value = 'X:1\nT:토글곡\nM:4/4\nL:1/8\nK:C\n[V:1] C2 E2 G2 c2 |\n[V:2] C,4 G,4 |';
+  });
+  const chk = await page.$eval('#autoComp', el => el.checked);
+  if (chk) await page.uncheck('#autoComp');
+  await page.click('#listenBtn');
+  let stText = await page.textContent('#status');
+  assert.ok(!/원곡 베이스와 함께/.test(stText), '꺼짐: 베이스 안내 없음');
+  await page.click('#stopBtn');
+  await page.check('#autoComp');
+  await page.click('#listenBtn');
+  stText = await page.textContent('#status');
+  assert.ok(/원곡 베이스와 함께/.test(stText), '켜짐: 원곡 베이스와 함께 — ' + stText);
+  await page.click('#stopBtn');
+  await page.uncheck('#autoComp');
 });
 
 await check('parseSong: 임시표가 마디 안에서 유지되고 제자리표(=)는 조표를 취소한다', async () => {

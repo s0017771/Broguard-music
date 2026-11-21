@@ -129,11 +129,16 @@ try {
         window.__testWavBlob = new Blob([ab], { type: 'audio/wav' });
         window.__testWav = URL.createObjectURL(window.__testWavBlob);
       })();
-      window.AudioContext = function () { this.state = 'running'; this.resume = function () { return Promise.resolve(); }; };
+      // resume()은 영원히 끝나지 않는 Promise — 화면 꺼짐에서 resume이 보류되는 폰을 모사.
+      // 재생 파이프라인이 resume 완료를 기다리면 안 된다는 회귀 방지(기다리면 전체 검사가 멈춤).
+      window.AudioContext = function () { this.state = 'suspended'; this.resume = function () { return new Promise(function () {}); }; };
       window.webkitAudioContext = window.AudioContext;
       ABCJS.synth.CreateSynth = function () {
         return {
-          init: function (o) { window.__inits.push({ chordsOff: !!o.options.chordsOff, sf: o.options.soundFontUrl || 'default' }); return Promise.resolve(); },
+          init: function (o) {
+            window.__inits.push({ chordsOff: !!o.options.chordsOff, sf: o.options.soundFontUrl || 'default' });
+            return window.__initDelay ? new Promise(r => setTimeout(r, window.__initDelay)) : Promise.resolve();
+          },
           prime: function () { return Promise.resolve(); },
           download: function () { return URL.createObjectURL(window.__testWavBlob); },   // 실제처럼 매번 새 URL
           start: function () {}, stop: function () {}
@@ -143,6 +148,8 @@ try {
     });
     // ✨ 공간감(리버브)은 전용 검사에서만 켠다 — 60초 오프라인 렌더로 다른 검사가 느려지지 않게
     await page.selectOption('#reverbSel', 'off');
+    // 🔮 자동 미리 준비는 꺼서 검사 흐름을 결정적으로 — 전용 검사에서 수동 호출로 검증
+    await page.evaluate(() => window.__player.setPrefetchDelay(0));
 
     // 5) 재생 → 첫 곡이 <audio>로 실제 재생됨, 기본 음질, 코드 반주 켬
     await page.click('#playBtn');
@@ -157,11 +164,45 @@ try {
     assert.ok(/곡 하나/.test(await page.textContent('#nowTitle')), '지금 재생 표시');
     ok('▶ 재생: 곡이 통째 음원으로 만들어져 <audio>로 재생된다');
 
-    // 6) 곡 끝(ended) → 자동 다음 곡 (다음 곡은 미리 준비된 캐시 사용 가능)
-    await page.evaluate(() => window.__ended());
-    await page.waitForFunction(() => window.__player.getState().curIdx === 1 && window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
+    // 6) 곡 끝(ended) → 즉시 무음 브리지로 '재생 중' 유지(화면 꺼짐 보호) → 다음 곡
+    await page.evaluate(() => { window.__initDelay = 400; });   // 준비 시간을 만들어 브리지를 관찰
+    const bridgeSt = await page.evaluate(() => { window.__ended(); return window.__player.getState(); });
+    assert.ok(bridgeSt.bridge, '곡 사이에 무음 브리지 재생(백그라운드 얼림 방지)');
+    assert.ok(bridgeSt.loop, '브리지는 반복 재생');
+    assert.ok(bridgeSt.audioPlaying, '소리가 끊기지 않고 이어짐');
+    await page.waitForFunction(() => {
+      const s = window.__player.getState();
+      return s.curIdx === 1 && s.audioPlaying && !s.bridge;   /* 브리지가 실제 곡으로 바뀔 때까지 */
+    }, undefined, { timeout: 6000 });
+    st = await page.evaluate(() => window.__player.getState());
+    assert.ok(!st.loop, '다음 곡으로 바뀌면 반복(브리지) 해제');
     assert.ok(/곡 둘/.test(await page.textContent('#nowTitle')));
-    ok('곡이 끝나면 자동으로 다음 곡이 이어진다');
+    await page.evaluate(() => { window.__initDelay = 0; });
+    ok('곡이 끝나면 무음 브리지를 거쳐 자동으로 다음 곡이 이어진다');
+
+    // 6.5) 🔮 다음 곡 미리 준비: 재생 중에 만들어 두면, 곡이 끝났을 때 합성 없이 즉시 교체
+    //       (화면 꺼짐·배터리 절약으로 곡 사이 작업이 멈추는 폰에서도 끊김 없이 이어지는 핵심)
+    await page.evaluate(() => window.__player.prefetchNext());
+    await page.waitForFunction(() => window.__player.hasNextCache(), undefined, { timeout: 6000 });
+    const initsBeforeCache = await page.evaluate(() => window.__inits.length);
+    await page.evaluate(() => window.__ended());
+    await page.waitForFunction(() => {
+      const s = window.__player.getState();
+      return s.curIdx === 2 && s.audioPlaying && !s.bridge;
+    }, undefined, { timeout: 6000 });
+    const initsAfterCache = await page.evaluate(() => window.__inits.length);
+    assert.equal(initsAfterCache, initsBeforeCache, '곡 끝에 새 합성 없음 — 미리 만든 음원으로 즉시 교체');
+    assert.ok(!(await page.evaluate(() => window.__player.hasNextCache())), '캐시는 한 번 쓰고 비움');
+    ok('🔮 다음 곡 미리 준비: 곡이 끝나면 합성 없이 즉시 다음 곡');
+    // 흐름 복구: 둘째 곡으로 되돌아간다 (다음 검사는 마지막 곡 이동부터 시작)
+    await page.click('#prevBtn');
+    await page.waitForFunction(() => window.__player.getState().curIdx === 1 && window.__player.getState().audioPlaying, undefined, { timeout: 6000 });
+
+    // 6.6) ⏱ 재생 위치(timeupdate) 기반 자동 미리 준비 — 백그라운드에서 타이머가 묶여도 동작
+    await page.evaluate(() => window.__player.setPrefetchDelay(600000, 0.1));   // 타이머는 멀리 두고 위치 트리거만
+    await page.waitForFunction(() => window.__player.hasNextCache(), undefined, { timeout: 8000 });
+    ok('⏱ 재생 위치(timeupdate)로도 다음 곡이 자동으로 미리 준비된다');
+    await page.evaluate(() => window.__player.setPrefetchDelay(0));   // 이후 검사 결정성 유지
 
     // 7) 마지막 곡 끝 + 🔁 꺼짐 → 정지 / 🔁 켬 → 처음으로
     await page.click('#nextBtn');   // 3번째(마지막) 곡
@@ -328,6 +369,21 @@ try {
     st = await page.evaluate(() => window.__player.getState());
     assert.ok(st.audioDur > 59 && st.audioDur < 61, '끄기: 원본 60초 그대로(' + st.audioDur.toFixed(1) + 's)');
     ok('✨ 공간감(리버브) 단계 선택: 깊게는 잔향이 길어지고, 끄면 원본 그대로');
+
+    // 8.20) 💾 MP3 저장: 지금 들리는 음원을 디코드→인코드해 파일로 (인코더는 스텁)
+    await page.evaluate(() => {
+      window.lamejs = { Mp3Encoder: function () {
+        this.encodeBuffer = function () { return new Int8Array([1, 2, 3]); };
+        this.flush = function () { return new Int8Array([4]); };
+      } };
+    });
+    const dlPromise = page.waitForEvent('download', { timeout: 15000 });
+    await page.click('#mp3Btn');
+    const dl = await dlPromise;   // (이 헤드리스 빌드는 blob 파일명을 'download'로 보고 — 실제 브라우저에선 제목.mp3)
+    const dlPath = await dl.path();
+    assert.ok(dlPath && (await import('node:fs')).statSync(dlPath).size > 0, '내려받은 MP3에 내용이 있다');
+    await page.waitForFunction(() => /MP3 저장 완료/.test(document.getElementById('status').textContent), undefined, { timeout: 15000 });
+    ok('💾 MP3 저장: 들리는 그대로 디코드·인코드해 파일로 내보낸다');
 
     // 8.2) ⏸ 일시정지 — 가짜 '곡 끝' 이벤트가 와도 다음 곡으로 튀지 않는다
     await page.waitForFunction(() => window.__player.getState().audioPlaying, undefined, { timeout: 6000 });

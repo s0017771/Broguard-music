@@ -16,6 +16,12 @@ const server = createServer((req, res) => {
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
+const ABCJS_CANDIDATES = [
+  join(root, 'node_modules/abcjs/dist/abcjs-basic-min.js'),
+  '/tmp/claude-0/-home-user-Broguard-music/c040e24c-4a69-5b46-9c8e-25ca04c1bca0/scratchpad/node_modules/abcjs/dist/abcjs-basic-min.js'
+];
+const abcjsPath = ABCJS_CANDIDATES.find(existsSync);
+const abcjsSrc = abcjsPath ? readFileSync(abcjsPath, 'utf8') : null;
 const browser = await chromium.launch();
 let fail = 0;
 const ok = n => console.log('ok - ' + n);
@@ -24,6 +30,7 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
 {
   const page = await browser.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
+  if (abcjsSrc) await page.route(/abcjs.*\.js/, r => r.fulfill({ contentType: 'application/javascript', body: abcjsSrc }));
   page.on('console', m => { if (m.type() === 'error' && !/abcjs|ABCJS|cdnjs|Failed to load/.test(m.text())) errors.push('C:' + m.text()); });
   try {
     await page.goto(`${base}/mixer.html?autotest=1`, { waitUntil: 'domcontentloaded' });
@@ -63,7 +70,67 @@ const bad = (n, e) => { fail++; console.error('NOT OK - ' + n + '\n  ' + (e && e
     assert.ok(/반마디 교차/.test(await page.textContent('#mixInfo')), '반마디 교차 안내');
     assert.ok(/T:곡 믹서 \(반마디 교차\)/.test(await page.textContent('#resultAbc')), '결과 제목');
     ok('반마디 교차 모드가 마디마다 역할을 교차한다');
-    // 다시 마디 모드로 복귀(이후 테스트 영향 없게)
+    // 2.7) 👔 리듬 옷 입히기: A(2성부 리듬곡)의 리듬·템포·베이스 + B의 멜로디·코드·조성
+    await page.evaluate(() => {
+      document.getElementById('abcA').value = 'X:1\nT:리듬곡\nM:4/4\nL:1/16\nQ:1/4=104\nK:C\n[V:1] "C"C2C2 C2D2 E2E2 G4 | "G"D2D2 D2E2 F2F2 A4 |\n[V:2] C,2[CE]2C,2[CE]2 C,2[CE]2C,2[CE]2 | G,2[B,D]2G,2[B,D]2 G,2[B,D]2G,2[B,D]2 |';
+      document.getElementById('abcB').value = 'X:1\nT:멜로디곡\nM:4/4\nL:1/8\nQ:1/4=70\nK:Am\n"Am"A2 c2 e2 a2 | "Em"g2 e2 B2 e2 | "F"f2 a2 c2 f2 | "E"e2 ^g2 b2 e2 |';
+    });
+    await page.click('.gran[data-g="suit"]');
+    await page.waitForTimeout(200);
+    assert.ok(await page.$eval('#ratio', el => el.classList.contains('ratio-off')), '리듬옷 모드도 비율 비활성');
+    const suitAbc = await page.textContent('#resultAbc');
+    assert.ok(/K:Am/.test(suitAbc), '조성은 B(멜로디 곡)');
+    assert.ok(/Q:1\/4=104/.test(suitAbc) && /L:1\/16/.test(suitAbc), '템포·단위는 A(리듬 곡)');
+    assert.ok(/\[V:2\]/.test(suitAbc) && /%%score/.test(suitAbc), 'A 베이스 패턴으로 2성부');
+    assert.ok(/"Em"/.test(suitAbc), 'B 코드 그대로');
+    assert.ok(/리듬 옷 입히기/.test(await page.textContent('#mixInfo')), '안내 문구');
+    ok('👔 리듬 옷 입히기: B 멜로디·코드·조성 + A 리듬·템포·베이스');
+
+    // 2.8) 🎲 변주 1·2·3: 리듬옷 모드에서만 보이고, 누르면 결과가 바뀌며, 기본으로 돌아오면 원래대로
+    assert.ok(await page.$eval('#suitVariRow', el => el.style.display !== 'none'), '리듬옷 모드에서 변주 버튼 표시');
+    await page.click('.svari[data-v="1"]');
+    await page.waitForTimeout(200);
+    const v1Abc = await page.textContent('#resultAbc');
+    assert.notEqual(v1Abc, suitAbc, '변주 1은 기본과 다른 결과');
+    assert.ok(/변주 1/.test(v1Abc), '제목에 변주 번호');
+    assert.ok(/변주 1/.test(await page.textContent('#mixInfo')), '안내에도 변주 번호');
+    await page.click('.svari[data-v="0"]');
+    await page.waitForTimeout(200);
+    assert.equal(await page.textContent('#resultAbc'), suitAbc, '기본으로 돌아오면 완전히 동일(재현성)');
+    await page.click('.gran[data-g="rm"]');
+    await page.waitForTimeout(150);
+    assert.ok(await page.$eval('#suitVariRow', el => el.style.display === 'none'), '다른 모드에선 변주 버튼 숨김');
+    ok('🎲 변주 1·2·3: 리듬옷 전용 · 결과가 바뀌고 되돌리면 재현된다');
+    // 2.9) ▶ 믹서 안에서 바로 듣기 — 고음질(MusyngKite) 우선 전달 + 정지
+    if (abcjsSrc) {
+      await page.waitForFunction(() => !!(window.ABCJS && window.ABCJS.synth), undefined, { timeout: 5000 });
+      await page.evaluate(() => {
+        window.__inits = [];
+        window.AudioContext = function () { this.state = 'running'; this.resume = function () { return Promise.resolve(); }; };
+        window.webkitAudioContext = window.AudioContext;
+        ABCJS.synth.supportsAudio = function () { return true; };
+        ABCJS.synth.CreateSynth = function () {
+          return {
+            init: function (o) { window.__inits.push({ sf: (o.options && o.options.soundFontUrl) || 'default' }); return Promise.resolve(); },
+            prime: function () { return Promise.resolve(); },
+            start: function () { window.__started = (window.__started || 0) + 1; },
+            stop: function () { window.__stopped = (window.__stopped || 0) + 1; }
+          };
+        };
+      });
+      assert.ok(!(await page.$eval('#playBtn', el => el.disabled)), '결과가 있으면 듣기 가능');
+      await page.click('#playBtn');
+      await page.waitForFunction(() => window.__started > 0, undefined, { timeout: 5000 });
+      const inits = await page.evaluate(() => window.__inits);
+      assert.ok(/MusyngKite/.test(inits[0].sf), '고음질 음원 우선: ' + inits[0].sf);
+      assert.ok(!(await page.$eval('#stopBtn', el => el.disabled)), '정지 버튼 활성');
+      await page.click('#stopBtn');
+      assert.ok((await page.evaluate(() => window.__stopped)) > 0, '정지 동작');
+      assert.ok(/듣기/.test(await page.textContent('#playBtn')), '버튼 복구');
+      ok('▶ 믹서 안에서 바로 듣기(고음질 우선)·정지가 동작한다');
+    }
+    // 원래 샘플·마디 모드로 복귀(이후 테스트 영향 없게)
+    await page.click('#sampleBtn');
     await page.click('.gran[data-g="bar"]');
     await page.waitForTimeout(150);
 

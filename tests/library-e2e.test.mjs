@@ -1,100 +1,161 @@
-// 내 악보집 E2E — 추가·가나다 색인·검색·영속성·백업(브라우저)
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+// 악보집 E2E — 🎹 반딧불 앨범 받기 (scores/album.json → 없는 곡만 '기타'로 추가)
+// 실행: node tests/library-e2e.test.mjs
+import { createServer } from 'node:http';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, extname } from 'node:path';
+import { createRequire } from 'node:module';
+import assert from 'node:assert/strict';
+
+const require = createRequire(import.meta.url);
+const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const url = 'file://' + join(root, 'library.html');
-let pass = 0, fail = 0;
-const ok = (m) => { pass++; console.log('ok - ' + m); };
-const bad = (m, e) => { fail++; console.log('NOT OK - ' + m + ' :: ' + (e && e.message || e)); };
+const MIME = { '.html': 'text/html; charset=utf-8' };
+const server = createServer((req, res) => {
+  const path = join(root, req.url.split('?')[0].replace(/^\//, '') || 'index.html');
+  if (!existsSync(path)) { res.writeHead(404); res.end('nf'); return; }
+  res.writeHead(200, { 'Content-Type': MIME[extname(path)] || 'text/plain' });
+  res.end(readFileSync(path));
+});
+await new Promise(r => server.listen(0, '127.0.0.1', r));
+const base = `http://127.0.0.1:${server.address().port}`;
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const p = await b.newPage({ acceptDownloads: true });
-const errs = []; p.on('pageerror', e => errs.push(e.message));
-await p.goto(url);
-await p.evaluate(() => localStorage.removeItem('broguard_library'));
-await p.reload();
-
-async function add(title, abc) {
-  await p.fill('#title', title); await p.fill('#abc', abc);
-  await p.click('#btnSave'); await p.waitForTimeout(120);
+const browser = await chromium.launch();
+const page = await browser.newPage();
+let failures = 0;
+async function check(name, fn) {
+  try { await fn(); console.log(`ok - ${name}`); }
+  catch (e) { failures++; console.error(`NOT OK - ${name}\n  ${e.message}`); }
 }
+const errors = [];
+page.on('pageerror', e => errors.push(e.message));
 
-try {
-  await add('학교종', 'X:1\nK:C\nGGA A|GGE2|');
-  await add('나비야', 'X:1\nK:C\nGEE2|FDD2|');
-  await add('가을', 'X:1\nK:C\nCDEF|G2G2|');
-  await add('Amazing Grace', 'X:1\nK:C\nG2 c2|');
-  const titles = await p.$$eval('.entry-title', els => els.map(e => e.textContent));
-  // 가나다 → 영문 순서: 가을, 나비야, 학교종, Amazing Grace
-  if (JSON.stringify(titles) === JSON.stringify(['가을', '나비야', '학교종', 'Amazing Grace'])) ok('가나다→영문 정렬 목록');
-  else bad('정렬 목록', new Error(JSON.stringify(titles)));
+// 가짜 앨범: 3곡 — 1곡은 사용자가 제목만 같게(무작위 id로) 이미 넣어둔 곡
+const ALBUM = {
+  album: '반딧불 앨범', category: '기타', updated: '2026-11-15', count: 3,
+  tracks: [
+    { no: 1, id: 'fireflies-album-001', title: '퇴근길의 반딧불', file: 'fireflies-way-home.abc' },
+    { no: 2, id: 'fireflies-album-002', title: '별빛 왈츠', file: 'starlight-waltz.abc' },
+    { no: 3, id: 'fireflies-album-003', title: '아침 이슬 연습곡', file: 'morning-dew.abc' }
+  ]
+};
+const ABC = {
+  'fireflies-way-home.abc': 'X:1\nT:퇴근길의 반딧불\nM:4/4\nL:1/8\nK:C\nC2 E2 G2 c2 |',
+  'starlight-waltz.abc': 'X:1\nT:별빛 왈츠\nM:3/4\nL:1/8\nK:G\nG2 B2 d2 |',
+  'morning-dew.abc': 'X:1\nT:아침 이슬 연습곡\nM:4/4\nL:1/8\nK:F\nF2 A2 c2 f2 |'
+};
+// 원장님 리믹스 앨범(두 번째 목록) — 폴더가 달라 경로 해석도 함께 검증된다
+const REMIX = {
+  album: '반딧불 리믹스', category: '기타', updated: '2026-11-18', count: 1,
+  tracks: [{ no: 1, id: 'fireflies-remix-901', title: '리믹스 테스트곡', file: 'remix-test.abc' }]
+};
+const REMIX_ABC = { 'remix-test.abc': 'X:1\nT:리믹스 테스트곡\nM:4/4\nL:1/8\nK:D\nD2 F2 A2 d2 |' };
+let scoresDown = false, remixDown = false;
+await page.route(/scores\/album\.json/, r => {
+  if (scoresDown) return r.abort();
+  r.fulfill({ contentType: 'application/json', body: JSON.stringify(ALBUM) });
+});
+await page.route(/remixes\/album\.json/, r => {
+  if (remixDown) return r.abort();
+  r.fulfill({ contentType: 'application/json', body: JSON.stringify(REMIX) });
+});
+await page.route(/scores\/.*\.abc/, r => {
+  const name = decodeURIComponent(r.request().url().split('/').pop().split('?')[0]);
+  if (ABC[name]) r.fulfill({ contentType: 'text/plain', body: ABC[name] });
+  else r.fulfill({ status: 404, body: 'nf' });
+});
+await page.route(/remixes\/.*\.abc/, r => {
+  const name = decodeURIComponent(r.request().url().split('/').pop().split('?')[0]);
+  if (REMIX_ABC[name]) r.fulfill({ contentType: 'text/plain', body: REMIX_ABC[name] });
+  else r.fulfill({ status: 404, body: 'nf' });
+});
 
-  const idx = await p.$$eval('#indexBar a[data-jump]', els => els.map(e => e.textContent));
-  if (['ㄱ', 'ㄴ', 'ㅎ', 'A'].every(k => idx.includes(k))) ok('색인 바(ㄱ·ㄴ·ㅎ·A)'); else bad('색인 바', new Error(idx.join(',')));
+await page.goto(`${base}/library.html`, { waitUntil: 'domcontentloaded' });
+// 기존 악보집: '퇴근길의 반딧불'은 무작위 id + 사용자가 고친 abc(템포 추가), 그 외 무관한 곡 1개
+const EDITED_ABC = 'X:1\nT:퇴근길의 반딧불\nM:4/4\nL:1/8\nQ:1/4=72\nK:C\nC2 E2 G2 c2 |';
+await page.evaluate(abc => localStorage.setItem('broguard_library', JSON.stringify({
+  app: 'broguard-library', v: 1, entries: [
+    { id: 'rnd123', title: '퇴근길의 반딧불', abc: abc, cat: '기타', added: 1 },
+    { id: 'rnd456', title: '내 다른 곡', abc: 'X:1\nK:C\nCDEF|', cat: 'K-가요', added: 2 }
+  ]
+})), EDITED_ABC);
+await page.reload({ waitUntil: 'domcontentloaded' });
 
-  const count = await p.$eval('#count', e => e.textContent);
-  if (/4곡/.test(count)) ok('곡 수 표시'); else bad('곡 수', new Error(count));
+const lib = () => page.evaluate(() => JSON.parse(localStorage.getItem('broguard_library')).entries);
 
-  // 검색
-  await p.fill('#search', '나비'); await p.waitForTimeout(120);
-  const s = await p.$$eval('.entry-title', els => els.map(e => e.textContent));
-  if (JSON.stringify(s) === JSON.stringify(['나비야'])) ok('제목 검색'); else bad('검색', new Error(JSON.stringify(s)));
-  await p.fill('#search', ''); await p.waitForTimeout(80);
+await check('버튼 → 확인 화면: 두 앨범(반딧불+리믹스) 합쳐 없는 곡만, 건너뛰는 곡 수 표시', async () => {
+  await page.click('#btnAlbum');
+  await page.waitForSelector('#albumReview', { state: 'visible', timeout: 5000 });
+  assert.match(await page.textContent('#albumCount'), /새 곡 3곡/, '제목이 같은 1곡은 제외, 리믹스 포함');
+  assert.match(await page.textContent('#albumSkip'), /이미 있는 1곡은 건너뜁니다/);
+  const boxes = await page.$$eval('#albumList input[data-alb]', els => els.map(c => c.checked));
+  assert.deepEqual(boxes, [true, true, true], '기본 전체 선택');
+  const items = await page.$$eval('#albumList li span', els => els.map(s => s.textContent));
+  assert.deepEqual(items, ['2. 별빛 왈츠', '3. 아침 이슬 연습곡', '1. 리믹스 테스트곡'], '번호·제목 표시(리믹스는 뒤에)');
+});
 
-  // 영속성: 리로드 후에도 유지
-  await p.reload(); await p.waitForTimeout(150);
-  const after = await p.$$eval('.entry-title', els => els.length);
-  if (after === 4) ok('새로고침 후 영속(localStorage)'); else bad('영속성', new Error('개수 ' + after));
+await check('추가 → 기타 분류로 저장, 기존 곡은 그대로', async () => {
+  await page.click('#btnAlbumConfirm');
+  await page.waitForFunction(() => /곡을 추가했어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
+  const es = await lib();
+  assert.equal(es.length, 5, '2 + 새 3곡(리믹스 포함)');
+  const w = es.find(e => e.id === 'fireflies-album-002');
+  const d = es.find(e => e.id === 'fireflies-album-003');
+  const x = es.find(e => e.id === 'fireflies-remix-901');
+  assert.ok(w && d && x, '고정 id로 저장(리믹스 포함)');
+  assert.equal(w.cat, '기타'); assert.equal(d.cat, '기타'); assert.equal(x.cat, '기타');
+  assert.ok(/별빛 왈츠/.test(w.abc), 'abc 본문 저장');
+  assert.ok(/리믹스 테스트곡/.test(x.abc), '리믹스는 remixes/ 폴더에서 받아옴');
+  const old = es.find(e => e.id === 'rnd123');
+  assert.equal(old.abc, EDITED_ABC, '사용자가 고친 기존 곡은 덮어쓰지 않음');
+  assert.ok(!(await page.isVisible('#albumReview')), '확인 화면 닫힘');
+});
 
-  // 삭제 (먼저 항목을 펼쳐 버튼을 보이게)
-  await p.click('.entry[data-id] .entry-head');
-  await p.waitForTimeout(120);
-  p.once('dialog', d => d.accept());
-  await p.click('.entry.open button[data-act="del"]');
-  await p.waitForTimeout(150);
-  const left = await p.$$eval('.entry-title', els => els.length);
-  if (left === 3) ok('삭제'); else bad('삭제', new Error('남은 ' + left));
+await check('다시 눌러도 중복 없음 — "새 곡이 없어요"', async () => {
+  await page.click('#btnAlbum');
+  await page.waitForFunction(() => /새 곡이 없어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
+  assert.match(await page.textContent('#formStatus'), /4곡이 모두 들어 있어요/);
+  assert.equal((await lib()).length, 5, '중복 0');
+});
 
-  // 백업 내보내기
-  const dl = p.waitForEvent('download', { timeout: 8000 });
-  await p.click('#btnExport');
-  const file = await dl;
-  if (/\.json$/.test(file.suggestedFilename()) || file.suggestedFilename()) ok('백업 내보내기(JSON 다운로드)'); else bad('백업', new Error('no download'));
+await check('체크 해제한 곡은 추가되지 않는다', async () => {
+  await page.evaluate(() => localStorage.setItem('broguard_library', JSON.stringify({
+    app: 'broguard-library', v: 1, entries: []
+  })));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.click('#btnAlbum');
+  await page.waitForSelector('#albumReview', { state: 'visible', timeout: 5000 });
+  await page.uncheck('#albumList input[data-alb="0"]');   // 1번 곡 제외
+  await page.click('#btnAlbumConfirm');
+  await page.waitForFunction(() => /곡을 추가했어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
+  const es = await lib();
+  assert.equal(es.length, 3, '선택한 3곡만');
+  assert.ok(!es.some(e => e.id === 'fireflies-album-001'), '해제한 곡 제외');
+});
 
-  // 분류: 저장 시 선택한 분류가 배지로, 필터가 동작
-  await p.selectOption('#cat', '클래식');
-  await add('소나타', 'X:1\nK:C\nCEGc|');
-  const cats = await p.$$eval('#catBar button', els => els.map(e => e.textContent.trim()));
-  if (cats.some(c => /전체/.test(c)) && cats.some(c => /클래식/.test(c))) ok('분류 필터 칩'); else bad('분류 칩', new Error(cats.join('|')));
-  await p.click('#catBar button[data-cat="클래식"]'); await p.waitForTimeout(120);
-  const only = await p.$$eval('.entry-title', els => els.map(e => e.textContent));
-  if (JSON.stringify(only) === JSON.stringify(['소나타'])) ok('분류로 필터'); else bad('분류 필터', new Error(JSON.stringify(only)));
-  await p.click('#catBar button[data-cat=""]'); await p.waitForTimeout(80);
+await check('한쪽 목록만 실패 → 받은 목록만으로 진행', async () => {
+  scoresDown = true;   // 반딧불 앨범만 실패 — 리믹스(이미 보유)만 남아 '새 곡 없음'
+  await page.click('#btnAlbum');
+  await page.waitForFunction(() => /새 곡이 없어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
+  assert.match(await page.textContent('#formStatus'), /1곡이 모두 들어 있어요/, '리믹스 목록만으로 판정');
+  scoresDown = false;
+});
 
-  // ABC 파일 불러오기 → 확인 단계(바로 저장 안 됨) → 확정
-  const before = await p.$$eval('.entry-title', els => els.length);
-  await p.setInputFiles('#importAbcFile', { name: 'test.abc', mimeType: 'text/plain', buffer: Buffer.from('X:1\nT:재즈테스트\nK:C\nCDEF|') });
-  await p.waitForTimeout(200);
-  const reviewOn = await p.$eval('#importReview', e => getComputedStyle(e).display !== 'none');
-  const midCount = await p.$$eval('.entry-title', els => els.length);
-  if (reviewOn && midCount === before) ok('ABC 불러오기 확인 단계(즉시 저장 안 함)'); else bad('불러오기 확인단계', new Error('review=' + reviewOn + ' count=' + midCount + '/' + before));
-  await p.selectOption('#importCat', '재즈');
-  await p.click('#btnImportConfirm'); await p.waitForTimeout(200);
-  const afterCount = await p.$$eval('.entry-title', els => els.length);
-  const jazzBadge = await p.$$eval('.cat-badge', els => els.map(e => e.textContent).filter(t => t === '재즈').length);
-  if (afterCount === before + 1 && jazzBadge >= 1) ok('확정 후 저장 + 지정 분류(재즈)'); else bad('확정 저장', new Error('count=' + afterCount + ' jazz=' + jazzBadge));
+await check('오프라인(목록 전부 실패) → 안내만, 악보집은 그대로', async () => {
+  const before = (await lib()).length;
+  scoresDown = true; remixDown = true;
+  await page.click('#btnAlbum');
+  await page.waitForFunction(() => /앨범 목록을 받지 못했어요/.test(document.getElementById('formStatus').textContent), undefined, { timeout: 5000 });
+  assert.equal((await lib()).length, before, '악보집 변화 없음');
+  scoresDown = false; remixDown = false;
+});
 
-  // 목록 줄에서 바로 삭제(펼치지 않고)
-  p.once('dialog', d => d.accept());
-  await p.click('.entry[data-id] .entry-head button[data-act="del"]');
-  await p.waitForTimeout(150);
-  const afterDel = await p.$$eval('.entry-title', els => els.length);
-  if (afterDel === afterCount - 1) ok('목록 줄에서 바로 삭제'); else bad('줄 삭제', new Error('남은 ' + afterDel));
+await check('심각한 JS 오류가 없다', async () => {
+  assert.deepEqual(errors, []);
+});
 
-  if (!errs.length) ok('심각한 JS 오류 없음'); else bad('JS 오류', new Error(errs.slice(0, 2).join(' | ')));
-} catch (e) { bad('E2E', e); }
-
-await b.close();
-console.log(fail ? ('\n' + fail + '개 실패') : '\n내 악보집 E2E 전체 통과');
-process.exit(fail ? 1 : 0);
+await browser.close();
+server.close();
+console.log(failures ? `\n${failures}개 실패` : '\n악보집(반딧불 앨범) E2E 전체 통과');
+process.exit(failures ? 1 : 0);

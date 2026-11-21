@@ -125,6 +125,13 @@
       </select>
     </label>
     <label class="fld">BPM <input type="number" id="bpmInput" min="30" max="220" value="90"></label>
+    <span class="fld" title="곡 전체를 올리거나 내려서 연습해요 — 악보의 조표도 함께 바뀌어요" style="display:inline-flex; align-items:center; gap:4px;">조옮김
+      <button type="button" id="transFlat" class="btn-ghost" style="padding:4px 9px;">♭ -1</button>
+      <button type="button" id="transSharp" class="btn-ghost" style="padding:4px 9px;">♯ +1</button>
+      <button type="button" id="transOctDn" class="btn-ghost" style="padding:4px 9px;">-1옥타브</button>
+      <button type="button" id="transReset" class="btn-ghost" style="padding:4px 9px;">원조</button>
+      <b id="transVal" style="min-width:2em; text-align:center;">0</b>
+    </span>
     <button id="startBtn" class="btn-brass" type="button">&#9654; 연습 시작</button>
     <button id="stopBtn" class="btn-ghost" type="button">&#9632; 중지</button>
     <button id="listenBtn" class="btn-ghost" type="button">&#128266; 곡 들어보기</button>
@@ -171,7 +178,7 @@
 
 <details>
   <summary style="cursor:pointer; font-weight:700; color:var(--brass-deep);">&#9000;&#65039; 키 안내 (BKP와 동일)</summary>
-  <p><b>오른손(판정 대상)</b> &mdash; 우측 자판: <b>H=도</b> T&middot;J=레 K=미 L=파 ;&middot;U=솔 '&middot;I=라 O=시 P=높은도 [&middot;M=높은레 ,=높은미 .=높은파 /=높은솔. 숫자패드: 0=도 1=레&hellip;6=시 +=높은도 7 8 9=높은레미파 &minus;=높은솔 /=높은라 *=높은시. 방향키: Del End PgDn ←↓→=낮은레~낮은시, ↑=높높은도.</p>
+  <p><b>오른손(판정 대상)</b> &mdash; 우측 자판: <b>H=도</b> T&middot;J=레 K=미 L=파 ;&middot;U=솔 '&middot;I=라 O=시 P=높은도 [&middot;M=높은레 ,=높은미 .=높은파 /=높은솔. <b>윗줄 숫자키</b>: 7=높은솔(/와 같음) <b>8=높은라</b> 9=높은시 0=더높은도 &minus;=더높은레 ==더높은미 \=더높은파. 숫자패드: 0=도 1=레&hellip;6=시 +=높은도 7 8 9=높은레미파 &minus;=높은솔 /=높은라 *=높은시. 방향키: Del End PgDn ←↓→=낮은레~낮은시, ↑=높높은도.</p>
   <p><b>검은건반: Shift+음키 = #, 왼쪽 Alt+음키 = ♭</b> &mdash; 예: Shift+J=레#, Alt+K=미♭. 오른쪽 Alt 자리는 한/영 키라 <b>왼쪽 Alt</b>를 쓰세요. 엘리제의 레#은 Shift+M!</p>
   <p><span class="lh-tag">왼손 자판 (A=도 S=레 D=미 F=파 W=솔 E=라 R=시, Z X C=낮은솔라시, Space=높은도)</span> &mdash; 한 옥타브 아래 소리가 나고 <b>계이름이 맞으면 판정 인정</b>. <b>"왼손 화음" 체크</b> 시 <b>근음 자판이 화음</b>이 돼요: A(도)=C, S(레)=Dm, D(미)=Em, F(파)=F, G(솔)=G, E(라)=Am, R(시)=Bdim (자유 반주·판정 제외). <b>체크 해제</b> 시 단일 베이스음으로 판정에 참여해요. 조성 있는 곡은 양손 모두 샵/플랫 자동 반영.</p>
   <p><b>박자+기다려주기(하이브리드)</b> &mdash; 예비박 후 <b>아래 레인의 음 블록이 금색 선에 닿는 순간</b> 치세요. 블록 길이가 곧 음 길이라 리듬이 눈에 보여요. 제때 치면 초록, 놓치면 멈춰서 기다려주고(노랑), 치면 이어서 가요. <b>박자(안 멈춤)</b>는 놓쳐도 계속 흘러가는 도전 모드예요.</p>
@@ -333,6 +340,20 @@
     function allMusicLines() {
       return bodyLines.filter(function (l) { var t = l.trim(); return t && !/^%/.test(t) && !/^[A-Za-z]:/.test(t); });
     }
+    /* 둘째 성부(왼손·베이스) — 멜로디와 같은 방식으로, 두 번째로 등장하는 성부를 모은다 */
+    function bassLines() {
+      var seen = [], cur = null, parts = [];
+      bodyLines.forEach(function (l) {
+        var t = l.trim();
+        var m = t.match(/^\[V:([^\]]+)\]\s*(.*)$/);
+        if (m) { cur = m[1]; if (seen.indexOf(cur) < 0) seen.push(cur); if (seen.length > 1 && cur === seen[1] && m[2]) parts.push(m[2]); return; }
+        var m2 = t.match(/^V:\s*(\S+)/);
+        if (m2) { cur = m2[1]; if (seen.indexOf(cur) < 0) seen.push(cur); return; }
+        if (!t || /^%/.test(t) || /^[A-Za-z]:/.test(t)) return;
+        if (seen.length > 1 && cur === seen[1]) parts.push(l);
+      });
+      return parts;
+    }
     function parseBody(useLines) {
       var body = useLines.join(" ").replace(/\[V:[^\]]*\]/g, "").replace(/%[^\n]*/g, "");
       var seq = [];
@@ -378,9 +399,16 @@
       if (fb) parsed = { seq: fb.seq, abcChords: [], cells: fb.cells };
     }
     var seq = parsed.seq, abcChords = parsed.abcChords, cellCursor = parsed.cells;
+    /* 베이스 성부가 있으면 함께 읽는다 — 들어보기·박자 모드에서 원곡 왼손을 그대로 연주 */
+    var bassSeq = null;
+    var bl = bassLines();
+    if (bl.length) {
+      var bp = parseBody(bl);
+      if (bp.seq.some(function (n) { return !n.rest; })) bassSeq = bp.seq;
+    }
     /* 박자 계산: beatCells = L분모/M분모 (예 L:1/8 M:4/4 → 2칸=1박) */
     var beatCells = Math.max(1, Math.round(lden / mden));
-    return { title: title, keyName: keyName, bpm: bpm, seq: seq, abc: abc, acc: acc, abcChords: abcChords,
+    return { title: title, keyName: keyName, bpm: bpm, seq: seq, bassSeq: bassSeq, abc: abc, acc: acc, abcChords: abcChords,
              mnum: mnum, mden: mden, lden: lden, beatCells: beatCells, totalCells: cellCursor };
   }
 
@@ -488,6 +516,7 @@
   var paused = false, pausedAt = 0;
   var autoCompNextIdx = 0;
   var lastCompBar = -1;
+  var bassPtr = 0;         /* 원곡 베이스 자동 연주 위치 (박자 모드) */
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -555,6 +584,7 @@
     if (!s) return;
     var ms = [];
     (s.seq || []).forEach(function (n) { if (!n.rest) ms.push(n.midi); });
+    (s.bassSeq || []).forEach(function (n) { if (!n.rest) ms.push(n.midi); });
     (s.chords || []).forEach(function (c) {
       ms.push(36 + c.rootPc, 48 + c.rootPc);
       if (c.tones) ms.push(48 + (c.tones[1] % 12), 48 + (c.tones[2] % 12));
@@ -602,7 +632,7 @@
     delete voices[handle];
     try {
       var now = audioCtx.currentTime;
-      var rel = $("sustainChk").checked ? 1.7 : 0.3;
+      var rel = $("sustainChk").checked ? 3.0 : 0.3;   /* 연음을 더 길게 */
       if (vc.sample) {   /* 샘플 음: 자연스러운 릴리즈 후 정지 */
         vc.g.gain.cancelScheduledValues(now);
         vc.g.gain.setValueAtTime(Math.max(0.0001, vc.v), now);
@@ -680,7 +710,11 @@
     }
     try {
       ABCJS.renderAbc("score", abcToRender, { responsive: "resize", add_classes: true });
-      noteEls = Array.prototype.slice.call(document.querySelectorAll("#score .abcjs-note"));
+      /* 2성부 악보는 화면에 멜로디·베이스 음표가 줄마다 번갈아 나온다 —
+         첫 성부(abcjs-v0)만 추적해야 하이라이트가 둘째 줄에서 베이스로 새지 않는다 */
+      var allNotes = document.querySelectorAll("#score .abcjs-note");
+      var v0Notes = document.querySelectorAll("#score .abcjs-note.abcjs-v0");
+      noteEls = Array.prototype.slice.call((v0Notes.length && v0Notes.length < allNotes.length) ? v0Notes : allNotes);
     } catch (e) { noteEls = []; }
   }
   /* 각 마디 첫 음 앞에 "코드" 기호 삽입 (표시 전용, 원본 song.abc는 불변) */
@@ -1021,7 +1055,11 @@
     "NumpadSubtract": 11, "NumpadDivide": 12, "NumpadMultiply": 13,
     "KeyH": 0, "KeyT": 1, "KeyJ": 1, "KeyK": 2, "KeyL": 3, "Semicolon": 4, "KeyU": 4,
     "Quote": 5, "KeyI": 5, "KeyO": 6, "KeyP": 7, "BracketLeft": 8, "KeyM": 8,
-    "Comma": 9, "Period": 10, "Slash": 11
+    "Comma": 9, "Period": 10, "Slash": 11,
+    /* 윗줄 숫자키: /(높은솔) 위로 손이 안 닿는 음들을 바로 위 숫자키로 —
+       7=높은솔('/'과 중복) 8=높은라 9=높은시 0=더높은도 -=더높은레 ==더높은미 \=더높은파 */
+    "Digit7": 11, "Digit8": 12, "Digit9": 13, "Digit0": 14,
+    "Minus": 15, "Equal": 16, "Backslash": 17
   };
   var LEFT_SCALE = {
     "KeyZ": -3, "KeyX": -2, "KeyC": -1,
@@ -1237,10 +1275,19 @@
     var b = Math.floor(el / beatMs);
     if (b !== lastBeat) {
       lastBeat = b; click(b % song.mnum === 0); showBeat(b % song.mnum);
-      /* 자동 반주: 매 마디 첫박에 쿵짝 패턴 */
-      if ($("autoComp").checked && song.chords && b % song.mnum === 0) {
+      /* 자동 반주: 악보에 베이스 성부가 있으면 쿵짝 추정 대신 원곡 왼손은 아래 bassPtr가 연주 */
+      if ($("autoComp").checked && !song.bassSeq && song.chords && b % song.mnum === 0) {
         var barNo = Math.floor(b / song.mnum);
         if (song.chords[barNo]) playChordPattern(song.chords[barNo], beatMs, song.mnum);
+      }
+    }
+    /* 🎹 원곡 베이스(왼손) 자동 연주 — '자동 반주(소리)' 체크가 토글.
+       꺼져 있어도 위치는 따라가서, 중간에 켜도 밀린 음이 한꺼번에 쏟아지지 않는다 */
+    if (song.bassSeq) {
+      var playBass = $("autoComp").checked;
+      while (bassPtr < song.bassSeq.length && song.bassSeq[bassPtr].start * cellMs <= el) {
+        var bn = song.bassSeq[bassPtr++];
+        if (playBass && !bn.rest) playShort(bn.midi, Math.min(1400, bn.len * cellMs * 0.92));
       }
     }
     /* 지나간 음 처리 */
@@ -1338,6 +1385,33 @@
     }
     return SONGS[sel];
   }
+  /* ── 조옮김: 악보 문자열 자체를 옮긴다(조표·임시표까지 abcjs가 정확히 다시 적음).
+     주의: strTranspose는 '방금 렌더한 바로 그 문자열'에만 좌표가 맞는다(연구소에서 배운 교훈). ── */
+  var transN = 0;   /* 조옮김 (반음 단위, ♭/♯ 버튼으로 누적) */
+  function applyTranspose(abc) {
+    var n = transN;
+    if (!n || !abc) return { abc: abc, n: n, done: !n };
+    if (window.ABCJS && ABCJS.strTranspose) {
+      try {
+        var holder = document.getElementById("transHolder");
+        if (!holder) { holder = document.createElement("div"); holder.id = "transHolder"; holder.style.display = "none"; document.body.appendChild(holder); }
+        var vo = ABCJS.renderAbc("transHolder", abc, { add_classes: false });
+        return { abc: ABCJS.strTranspose(abc, vo, n), n: n, done: true };
+      } catch (e) {}
+    }
+    return { abc: abc, n: n, done: false };   /* 엔진이 없으면 옥타브 단위만 아래 폴백으로 */
+  }
+  function prepareSong(abc) {
+    var t = applyTranspose(abc);
+    var s = parseSong(t.abc);
+    if (!t.done && t.n && t.n % 12 === 0) {   /* abcjs 없이도 옥타브는 가능: 파싱된 음만 이동 */
+      s.seq.forEach(function (x) { if (!x.rest) x.midi += t.n; });
+      if (s.bassSeq) s.bassSeq.forEach(function (x) { if (!x.rest) x.midi += t.n; });
+      t.done = true;
+    }
+    s.transposed = t.done ? t.n : 0;
+    return s;
+  }
   /* ── 악보집(broguard_library)에서 불러오기 ── */
   var libMap = {};
   function libEntries() {
@@ -1386,6 +1460,8 @@
     stopLaneAnim();
     if (timedTimer) { clearInterval(timedTimer); timedTimer = null; }
     if (listenTimer) { clearTimeout(listenTimer); listenTimer = null; }
+    listenBassTimers.forEach(function (t) { clearTimeout(t); });
+    listenBassTimers = [];
     allNotesOff();
     showBeat(-1);
     $("countIn").textContent = "";
@@ -1403,7 +1479,7 @@
         : "악보가 비어 있어요. 곡을 고르거나 ABC를 붙여넣어주세요.");
       return;
     }
-    song = parseSong(abc);
+    song = prepareSong(abc);
     song.seq.forEach(function (n) { n.hit = false; });
     totalNotes = song.seq.filter(function (n) { return !n.rest; }).length;
     if (!totalNotes) { setStatus("음표를 찾지 못했어요. ABC 형식을 확인해주세요."); return; }
@@ -1414,6 +1490,7 @@
     /* 코드: 악보에 적힌 코드가 있으면 그대로, 없으면(체크 시) 자동 추정 */
     autoCompNextIdx = 0;
     lastCompBar = -1;
+    bassPtr = 0;
     applyChords(song);
     prefetchSong(song);   /* 🎹 필요한 피아노 샘플 미리 받기 */
     playing = true;
@@ -1431,7 +1508,7 @@
       $("laneWrap").style.display = "none";
       idx = 0; skipRests();
       updateGuideWait();
-      setStatus("'" + (song.title || "곡") + "' — 기다려주기 모드. 다음 음을 치면 진행돼요." + (song.keyName !== "C" && song.keyName !== "Am" ? " (조성 " + song.keyName + " 자동 반영)" : ""));
+      setStatus("'" + (song.title || "곡") + "' — 기다려주기 모드. 다음 음을 치면 진행돼요." + (song.keyName !== "C" && song.keyName !== "Am" ? " (조성 " + song.keyName + " 자동 반영)" : "") + (song.transposed ? " · 조옮김 " + (song.transposed > 0 ? "+" : "") + song.transposed : ""));
     } else {
       timedIdx = 0;
       countInMs = beatMs * song.mnum;
@@ -1447,7 +1524,7 @@
       startLaneAnim();
     }
   }
-  var listenTimer = null;
+  var listenTimer = null, listenBassTimers = [];
   function listen() {
     stopAll();
     var abc = currentAbc();
@@ -1457,18 +1534,27 @@
         : "들려드릴 악보가 없어요.");
       return;
     }
-    song = parseSong(abc);
+    song = prepareSong(abc);
     renderScore(); buildKeyboard();
     var bpm = parseInt($("bpmInput").value, 10) || song.bpm;
     var cMs = (60000 / bpm) / song.beatCells;
     applyChords(song);
     prefetchSong(song);
+    /* 🎹 원곡 베이스(왼손): '자동 반주(소리)' 체크가 토글 — 켜면 쿵짝 추정 대신 원곡 연주 */
+    if (song.bassSeq && $("autoComp").checked) {
+      song.bassSeq.forEach(function (bn) {
+        if (bn.rest) return;
+        listenBassTimers.push(setTimeout(function () {
+          playShort(bn.midi, Math.min(1400, bn.len * cMs * 0.92));
+        }, bn.start * cMs));
+      });
+    }
     var compBar = -1, cellsPerBar = song.mnum * song.beatCells;
     var i = 0;
     function step() {
       if (i >= song.seq.length) { listenTimer = null; setStatus("연주 끝! 이제 '연습 시작'으로 직접 쳐보세요."); return; }
       var n = song.seq[i];
-      if ($("autoComp").checked && song.chords) {
+      if ($("autoComp").checked && !song.bassSeq && song.chords) {
         var barNo = Math.floor(n.start / cellsPerBar);
         if (barNo !== compBar) { compBar = barNo; if (song.chords[barNo]) playChordPattern(song.chords[barNo], cMs * song.beatCells, song.mnum); }
       }
@@ -1476,7 +1562,7 @@
       listenTimer = setTimeout(step, n.len * cMs);
       i++;
     }
-    setStatus("곡을 들려드릴게요… (BPM " + bpm + ")");
+    setStatus("곡을 들려드릴게요… (BPM " + bpm + ")" + (song.bassSeq && $("autoComp").checked ? " — 원곡 베이스와 함께 🎹" : ""));
     step();
   }
   function flash(kind) {
@@ -1633,7 +1719,11 @@
   });
   /* 악보집 목록: 처음 + 창으로 돌아올 때(다른 탭에서 저장했을 수 있음) 갱신 */
   populateLibrary();
-  window.addEventListener("focus", populateLibrary);
+  /* 악보집이 다른 탭(앨범 받기·드라이브 동기화 등)에서 바뀌면 즉시 갱신 —
+     모바일은 탭 전환에 focus가 안 올 때가 많아 storage·visibilitychange·pageshow도 함께 듣는다 */
+  ["focus", "pageshow"].forEach(function (ev) { window.addEventListener(ev, populateLibrary); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) populateLibrary(); });
+  window.addEventListener("storage", function (e) { if (!e || !e.key || e.key === "broguard_library") populateLibrary(); });
   $("modeSel").addEventListener("change", function () { $("modeSel").blur(); });
   $("loadFileBtn").addEventListener("click", function () { $("fileInput").click(); });
   $("fileInput").addEventListener("change", function (e) {
@@ -1650,6 +1740,17 @@
     e.target.value = "";
   });
   $("octaveFree").addEventListener("change", function () { $("octaveFree").blur(); wakeAudio(); });
+  function setTranspose(n) {
+    transN = Math.max(-24, Math.min(24, n | 0));
+    $("transVal").textContent = (transN > 0 ? "+" : "") + transN;
+    wakeAudio();
+    if (song && playing) { stopAll(); start(); }   /* 새 조로 즉시 다시 시작 */
+    else if (song) setStatus("조옮김 " + (transN > 0 ? "+" : "") + transN + " — ▶ 연습 시작을 누르면 적용돼요.");
+  }
+  $("transFlat").addEventListener("click", function () { setTranspose(transN - 1); });
+  $("transSharp").addEventListener("click", function () { setTranspose(transN + 1); });
+  $("transOctDn").addEventListener("click", function () { setTranspose(transN - 12); });
+  $("transReset").addEventListener("click", function () { setTranspose(0); });
   $("sustainChk").addEventListener("change", function () { $("sustainChk").blur(); wakeAudio(); });
   $("chordMode").addEventListener("change", function () { $("chordMode").blur(); wakeAudio(); });
   /* 🎹 피아노 음색: 선택 저장 + 켜면 현재 곡 샘플 미리 받기 */
@@ -1686,7 +1787,7 @@
   /* 테스트 훅 */
   if (typeof window !== "undefined") window.__practice = {
     parseSong: parseSong, attempt: attempt, generateChords: generateChords, chordAtCell: chordAtCell, staffY: staffY, injectChordsIntoAbc: injectChordsIntoAbc, wakeAudio: wakeAudio,
-    abcjsFallback: abcjsFallback, smfTracks: smfTracks, loadSample: loadSample, noteOn: noteOn, noteOff: noteOff,
+    abcjsFallback: abcjsFallback, smfTracks: smfTracks, loadSample: loadSample, noteOn: noteOn, noteOff: noteOff, setTranspose: setTranspose,
     sampleStats: function () { return { loaded: Object.keys(sampleBuf).length, voices: Object.keys(voices).map(function (k) { return !!voices[k].sample; }) }; },
     parseChordSym: parseChordSym, chordsFromAbc: chordsFromAbc, populateLibrary: populateLibrary,
     midiToAbcToken: midiToAbcToken, buildRecAbc: buildRecAbc, classifyDur: classifyDur,

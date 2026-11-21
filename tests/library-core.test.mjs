@@ -153,3 +153,35 @@ test('mergePlaylists: 이름 기준 — 새 이름 추가, 같은 이름은 최�
   assert.equal(local[1].saved, 300);
   assert.equal(local[2].name, '댄스곡', '새 이름 추가');
 });
+
+test('albumDiff: id 일치·제목 일치(공백 차이 포함)는 있음, 나머지는 새 곡', () => {
+  const entries = [
+    { id: 'rand1', title: '퇴근길의 반딧불', abc: 'X:1' },           // 제목으로만 일치(무작위 id)
+    { id: 'fireflies-album-073', title: '다른 제목으로 고침', abc: 'X:1' }, // id로 일치
+    { id: 'rand2', title: '  별빛   왈츠 ', abc: 'X:1' }             // 공백 정규화 후 일치
+  ];
+  const tracks = [
+    { no: 1, id: 'fireflies-album-001', title: '퇴근길의 반딧불', file: 'a.abc' },
+    { no: 73, id: 'fireflies-album-073', title: '가을 창가', file: 'b.abc' },
+    { no: 74, id: 'fireflies-album-074', title: '별빛 왈츠', file: 'c.abc' },
+    { no: 75, id: 'fireflies-album-075', title: '새로 온 곡', file: 'd.abc' }
+  ];
+  const d = LibraryCore.albumDiff(entries, tracks);
+  assert.deepEqual(d.present.map(t => t.no), [1, 73, 74], 'id·제목·공백정규화 일치는 있음');
+  assert.deepEqual(d.fresh.map(t => t.no), [75], '나머지만 새 곡');
+});
+
+test('albumDiff: 빈 악보집은 전부 새 곡, 빈 목록은 둘 다 빈 배열', () => {
+  const tracks = [{ id: 'x', title: 'T', file: 'x.abc' }];
+  const d1 = LibraryCore.albumDiff([], tracks);
+  assert.equal(d1.fresh.length, 1); assert.equal(d1.present.length, 0);
+  const d2 = LibraryCore.albumDiff([{ id: 'a', title: 'A' }], []);
+  assert.deepEqual(d2, { fresh: [], present: [] });
+  const d3 = LibraryCore.albumDiff(null, null);
+  assert.deepEqual(d3, { fresh: [], present: [] });
+});
+
+test('albumDiff: 제목 없는 항목이 제목 있는 트랙과 잘못 매칭되지 않는다', () => {
+  const d = LibraryCore.albumDiff([{ id: 'a', title: '' }], [{ id: 'x', title: '새 곡', file: 'x.abc' }]);
+  assert.equal(d.fresh.length, 1, '빈 제목은 무시');
+});
