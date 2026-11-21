@@ -1,0 +1,373 @@
+{
+  "collection": "클래식 악보집",
+  "category": "클래식",
+  "updated": "2026-11-21",
+  "levels": [
+    {
+      "id": "intermediate",
+      "no": 1,
+      "name": "인터미디어트"
+    },
+    {
+      "id": "advanced",
+      "no": 2,
+      "name": "어드밴스"
+    },
+    {
+      "id": "original",
+      "no": 3,
+      "name": "원곡"
+    }
+  ],
+  "eras": [
+    {
+      "id": "baroque",
+      "name": "바로크",
+      "years": "1600–1750",
+      "summary": "여러 선율이 맞물리는 대위법과 일정한 박. 피아노 이전, 하프시코드와 오르간의 시대",
+      "composers": [
+        {
+          "id": "pachelbel",
+          "name": "요한 파헬벨",
+          "shortName": "파헬벨",
+          "years": "1653–1706",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "vivaldi",
+          "name": "안토니오 비발디",
+          "shortName": "비발디",
+          "years": "1678–1741",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "bach",
+          "name": "요한 제바스티안 바흐",
+          "shortName": "바흐",
+          "years": "1685–1750",
+          "nickname": "음악의 아버지",
+          "status": "in-progress",
+          "pieces": [
+            {
+              "id": "bach-anh114",
+              "title": "미뉴에트 G장조",
+              "work": "BWV Anh. 114",
+              "year": "1725",
+              "collection": "안나 막달레나 바흐를 위한 음악 수첩",
+              "note": "실제 작곡가는 크리스티안 페촐트",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-anh115",
+              "title": "미뉴에트 G단조",
+              "work": "BWV Anh. 115",
+              "year": "1725",
+              "collection": "안나 막달레나 바흐를 위한 음악 수첩",
+              "note": "실제 작곡가는 크리스티안 페촐트",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-anh126",
+              "title": "뮈제트 D장조",
+              "work": "BWV Anh. 126",
+              "year": "1725",
+              "collection": "안나 막달레나 바흐를 위한 음악 수첩",
+              "note": "작곡자 미상",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-939",
+              "title": "작은 전주곡 C장조",
+              "work": "BWV 939",
+              "year": "1720년대",
+              "collection": "작은 전주곡",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-772",
+              "title": "2성 인벤션 1번 C장조",
+              "work": "BWV 772",
+              "year": "1723",
+              "collection": "인벤션과 신포니아",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-779",
+              "title": "2성 인벤션 8번 F장조",
+              "work": "BWV 779",
+              "year": "1723",
+              "collection": "인벤션과 신포니아",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-784",
+              "title": "2성 인벤션 13번 A단조",
+              "work": "BWV 784",
+              "year": "1723",
+              "collection": "인벤션과 신포니아",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-846",
+              "title": "평균율 1권 1번 전주곡 C장조",
+              "work": "BWV 846",
+              "year": "1722",
+              "collection": "평균율 클라비어곡집 1권",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-847",
+              "title": "평균율 1권 2번 전주곡 C단조",
+              "work": "BWV 847",
+              "year": "1722",
+              "collection": "평균율 클라비어곡집 1권",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-816",
+              "title": "프랑스 모음곡 5번 중 가보트",
+              "work": "BWV 816",
+              "year": "1722–1725",
+              "collection": "프랑스 모음곡",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-988",
+              "title": "골드베르크 변주곡 아리아",
+              "work": "BWV 988",
+              "year": "1741",
+              "collection": "골드베르크 변주곡",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-971",
+              "title": "이탈리아 협주곡 1악장",
+              "work": "BWV 971",
+              "year": "1735",
+              "collection": "클라비어 연습곡집 2권",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-1068",
+              "title": "G선상의 아리아",
+              "work": "BWV 1068",
+              "year": "1730년 무렵",
+              "collection": "관현악 모음곡 3번",
+              "note": "원곡은 관현악. 원곡 단계는 피아노로 옮긴 판",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-147",
+              "title": "예수, 인간 소망의 기쁨",
+              "work": "BWV 147",
+              "year": "1723",
+              "collection": "칸타타 「마음과 입과 행동과 삶으로」",
+              "note": "원곡은 합창과 관현악. 원곡 단계는 피아노로 옮긴 판",
+              "status": "planned",
+              "scores": []
+            },
+            {
+              "id": "bach-565",
+              "title": "토카타와 푸가 D단조 도입부",
+              "work": "BWV 565",
+              "year": "연도 미상",
+              "collection": "오르간곡",
+              "note": "원곡은 오르간. 바흐 작품인지 논란",
+              "status": "planned",
+              "scores": []
+            }
+          ]
+        },
+        {
+          "id": "handel",
+          "name": "게오르크 프리드리히 헨델",
+          "shortName": "헨델",
+          "years": "1685–1759",
+          "nickname": "음악의 어머니",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "scarlatti",
+          "name": "도메니코 스카를라티",
+          "shortName": "스카를라티",
+          "years": "1685–1757",
+          "status": "planned",
+          "pieces": []
+        }
+      ]
+    },
+    {
+      "id": "classical",
+      "name": "고전",
+      "years": "1750–1820",
+      "summary": "피아노의 탄생, 균형 잡힌 형식(소나타)과 명료한 멜로디",
+      "composers": [
+        {
+          "id": "haydn",
+          "name": "프란츠 요제프 하이든",
+          "shortName": "하이든",
+          "years": "1732–1809",
+          "nickname": "교향곡의 아버지",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "clementi",
+          "name": "무치오 클레멘티",
+          "shortName": "클레멘티",
+          "years": "1752–1832",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "mozart",
+          "name": "볼프강 아마데우스 모차르트",
+          "shortName": "모차르트",
+          "years": "1756–1791",
+          "nickname": "음악의 신동",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "beethoven",
+          "name": "루트비히 판 베토벤",
+          "shortName": "베토벤",
+          "years": "1770–1827",
+          "nickname": "악성",
+          "status": "planned",
+          "pieces": []
+        }
+      ]
+    },
+    {
+      "id": "romantic",
+      "name": "낭만",
+      "years": "1820–1900",
+      "summary": "감정 표현과 화려한 기교, 페달의 풍부한 울림",
+      "composers": [
+        {
+          "id": "schubert",
+          "name": "프란츠 슈베르트",
+          "shortName": "슈베르트",
+          "years": "1797–1828",
+          "nickname": "가곡의 왕",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "mendelssohn",
+          "name": "펠릭스 멘델스존",
+          "shortName": "멘델스존",
+          "years": "1809–1847",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "chopin",
+          "name": "프레데리크 쇼팽",
+          "shortName": "쇼팽",
+          "years": "1810–1849",
+          "nickname": "피아노의 시인",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "schumann",
+          "name": "로베르트 슈만",
+          "shortName": "슈만",
+          "years": "1810–1856",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "liszt",
+          "name": "프란츠 리스트",
+          "shortName": "리스트",
+          "years": "1811–1886",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "brahms",
+          "name": "요하네스 브람스",
+          "shortName": "브람스",
+          "years": "1833–1897",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "tchaikovsky",
+          "name": "표트르 일리치 차이콥스키",
+          "shortName": "차이콥스키",
+          "years": "1840–1893",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "grieg",
+          "name": "에드바르 그리그",
+          "shortName": "그리그",
+          "years": "1843–1907",
+          "status": "planned",
+          "pieces": []
+        }
+      ]
+    },
+    {
+      "id": "modern",
+      "name": "근현대",
+      "years": "1900–",
+      "summary": "인상주의와 새로운 화성",
+      "composers": [
+        {
+          "id": "debussy",
+          "name": "클로드 드뷔시",
+          "shortName": "드뷔시",
+          "years": "1862–1918",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "satie",
+          "name": "에릭 사티",
+          "shortName": "사티",
+          "years": "1866–1925",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "rachmaninoff",
+          "name": "세르게이 라흐마니노프",
+          "shortName": "라흐마니노프",
+          "years": "1873–1943",
+          "status": "planned",
+          "pieces": []
+        },
+        {
+          "id": "ravel",
+          "name": "모리스 라벨",
+          "shortName": "라벨",
+          "years": "1875–1937",
+          "status": "planned",
+          "pieces": []
+        }
+      ]
+    }
+  ]
+}
