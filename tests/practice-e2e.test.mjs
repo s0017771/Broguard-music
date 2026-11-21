@@ -417,6 +417,23 @@ await check('파서: 꾸밈음 {cB}는 박자에서 제외·[K:] 조 바꿈 적�
   ], '16분음표는 반 칸: ' + JSON.stringify(r.shortInfo));
 });
 
+await check('슬러 ( ): 같은 음 2개만 묶으면 이음줄로 — 한 번만 친다', async () => {
+  const r = await page.evaluate(() => {
+    const P = window.__practice.parseSong;
+    const show = s2 => s2.seq.filter(n => !n.rest).map(n => n.midi + 'x' + n.len);
+    return {
+      tie: show(P('X:1\nM:4/4\nL:1/8\nK:C\n(E2 E2) G2 c2 |')),
+      diff: show(P('X:1\nM:4/4\nL:1/8\nK:C\n(E2 F2) G2 c2 |')),
+      phrase: show(P('X:1\nM:4/4\nL:1/8\nK:C\n(C2 C2 C2) C2 |')),
+      bar: show(P('X:1\nM:4/4\nL:1/8\nK:C\nz4 (E4 | E4) z4 |'))
+    };
+  });
+  assert.deepEqual(r.tie, ['64x4', '67x2', '72x2'], '같은 음 2개 슬러 = 이음줄(병합): ' + r.tie.join(' '));
+  assert.deepEqual(r.diff, ['64x2', '65x2', '67x2', '72x2'], '다른 음 슬러는 그대로');
+  assert.deepEqual(r.phrase, ['60x2', '60x2', '60x2', '60x2'], '셋 이상 프레이즈 슬러의 반복음은 다시 친다');
+  assert.deepEqual(r.bar, ['64x8'], '마디를 넘는 같은 음 슬러도 병합');
+});
+
 await check('회귀: 저장소의 두 성부 악보 전체에서 오른손·왼손 끝 위치가 같다', async () => {
   const dirs = ['scores', 'classical/bach'];
   const files = [];

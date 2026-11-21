@@ -374,9 +374,10 @@
       /* !mf! 같은 기호와 꾸밈음 {cB}는 음표가 아니므로 건너뛴다(박자 계산에서도 제외).
          [K:D] 같은 인라인 필드는 조를 바꾸고, [D,G,B,]6 같은 화음은 한 번 치는 한 덩어리,
          이음줄(C2- C2)은 길이만 이어 붙여 한 번만 친다. c/ 같은 짧은 음표는 분수 칸으로 센다. */
-      var re = /"([^"]*)"|!([^!\s]*)!|\{[^}]*\}|(\|)|\[([A-Za-z]):([^\]]*)\]|\[([^\]\[:]+)\]((?:\d+)?(?:\/\d*)?)(-?)|([_^=]?)([A-Ga-gz])([,']*)((?:\d+)?(?:\/\d*)?)(-?)/g, m;
+      var re = /"([^"]*)"|!([^!\s]*)!|\{[^}]*\}|(\|)|\[([A-Za-z]):([^\]]*)\]|\[([^\]\[:]+)\]((?:\d+)?(?:\/\d*)?)(-?)|([_^=]?)([A-Ga-gz])([,']*)((?:\d+)?(?:\/\d*)?)(-?)|(\((?!\d))|(\))/g, m;
       var cellCursor = 0, measureAcc = {};   /* 마디 안 임시표: 같은 글자·옥타브에 계속 적용, 마디선에서 초기화 */
       var tieOpen = null;                    /* 직전 음이 이음줄(-)로 끝났으면 그 항목 */
+      var slurStack = [];                    /* 슬러 ( ) — 같은 음 2개만 묶으면 이음줄로 본다 */
       var curKey = keyName, curAcc = acc;    /* [K:]를 만나면 그 지점부터 새 조표 적용 */
       function parseLen(tok) {               /* "2"→2, ""→1, "/"→0.5, "3/2"→1.5, "/4"→0.25 */
         if (!tok) return 1;
@@ -440,6 +441,21 @@
           var clen = innerLen * parseLen(m[7]);
           midis.sort(function (a, b2) { return a - b2; });
           pushNote(midis[midis.length - 1], midis, clen, !!m[8]);
+          continue;
+        }
+        if (m[14]) { slurStack.push(seq.length); continue; }   /* 슬러 열림 — (3 잇단음표는 제외 */
+        if (m[15]) {                                            /* 슬러 닫힘 */
+          var from = slurStack.pop();
+          if (from != null) {
+            var added = seq.slice(from);
+            /* 정확히 같은 음 2개만 묶은 슬러 = 사실상 이음줄 → 한 번만 치게 병합.
+               (셋 이상 묶은 프레이즈 슬러는 반복음도 다시 쳐야 하므로 건드리지 않음) */
+            if (added.length === 2 && !added[0].rest && !added[1].rest && added[0].midi === added[1].midi) {
+              added[0].len += added[1].len;
+              if (tieOpen === added[1]) tieOpen = added[0];
+              seq.pop();
+            }
+          }
           continue;
         }
         var len = parseLen(m[12]);
