@@ -1,0 +1,33 @@
+X:1
+T:바흐 · 미뉴에트 G단조 [3 원곡]
+T:(Minuet in G minor, BWV Anh. 115 — Original)
+C:크리스티안 페촐트 (오랫동안 J.S. 바흐 작품으로 알려짐)
+R:Minuet
+M:3/4
+L:1/8
+Q:1/4=108
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:Gm
+% 3 원곡 — 안나 막달레나 바흐를 위한 음악 수첩(1725). 사용자가 보내 준 저작권이 끝난 옛 악보에서 옮겨 씀
+% 앞부분은 B♭장조(나란한조)로 가서 끝나고, 뒷부분은 F장조를 거쳐 G단조로 돌아온다. 각 부분 반복
+% 꾸밈음: 원본의 짧은 트릴 중 반음 위로 떠는 A(8, 9마디)는 !trillh!로, 온음 위로 떠는 곳은 !uppermordent!로 적어 뮤직랩이 맞는 음으로 재생하게 함
+% ===== 앞부분 (1-16마디) =====
+[V:1] |:!mf!"Gm"b2 a2 g2 | "Dm/F"a2 d2 d2 | "Eb"g2 GABc | "D"d6 |
+[V:2] |:G,6 | F,6 | E,6 | D,2 DCB,A, |
+[V:1] "Eb/G"e2 fe"F/A"dc | "Bb"d2 ed"Gm"cB | "Cm"c2 "D7"dc"Gm"Bc | "D"!trillh!A6 |
+[V:2] [G,B,]4 A,2 | B,4 G,2 | A,2 ^F,2 G,2 | D,2 DCB,A, |
+[V:1] "Gm"b2 !trillh!a2 g2 | "Dm/F"a2 d2 d2 | "Eb"g2 GABc | "D"d6 |
+[V:2] G,6 | F,6 | E,6 | D,2 DC=B,A, |
+[V:1] "G7"!uppermordent!f2 gfed | "Cm"e2 "F7"fedc | "Bb"d2 "Eb"g2 "F7"!uppermordent!c2 | "Bb"[DFB]6 :|
+[V:2] [=B,D]4 G,2 | C2 A,2 F,2 | B,2 E,2 [F,A,]2 | B,2 B,,4 :|
+% ===== 뒷부분 (17-32마디) =====
+[V:1] |:!mp!"Bb"d2 Bcd=e | "F"f2 g2 a2 | "Gm"b2 "C7"gabg | "F"a2 ga f2 |
+[V:2] |:B,6 | A,2 G,2 F,2 | G,2 =E,2 C,2 | F,4 z2 |
+[V:1] "F"FGABcd | "Cm"e2 "Bb"d2 "F7"c2 | "Bb/D"f2 "Eb"B2 "F"A2 | "Bb"B6 |
+[V:2] A,2 G,2 F,2 | G,2 F,2 E,2 | D,2 E,2 F,2 | B,,2 D2 C2 |
+[V:1] !mf!"G"G2 dc d2 | "Cm"G2 ed e2 | "Gm"Gd"D7"^Fc"Gm"GB | "D"A4 z2 |
+[V:2] [=B,D]6 | C6 | B,2 A,2 G,2 | D2 A,G,^F,=E, |
+[V:1] "D7"D=E^FGAB | "Cm"c2 "Gm"B2 "D7"A2 | "Gm"!uppermordent!B c/d/ "Cm"G2 "D7"^F2 | "Gm"H[B,DG]6 :|
+[V:2] D,4 z2 | E,2 D,2 C,2 | B,,2 C,2 D,2 | G,2 HG,,4 :|
