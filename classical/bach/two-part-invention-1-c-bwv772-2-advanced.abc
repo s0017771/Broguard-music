@@ -1,0 +1,34 @@
+X:1
+T:바흐 · 2성 인벤션 1번 C장조 [2 어드밴스]
+T:(Two-Part Invention No. 1 in C major, BWV 772 — Advanced)
+C:요한 제바스티안 바흐 (인벤션과 신포니아, 1723)
+R:Invention
+M:4/4
+L:1/16
+Q:1/4=63
+%%score { 1 | 2 }
+V:1 clef=treble name="Piano"
+V:2 clef=bass
+K:C
+% 2 어드밴스 — 두 손 모두 원곡의 음과 흐름 그대로. 가장 어려운 곳만 줄임:
+% 꾸밈음(트릴, 모르덴트)과 6마디의 32분음표를 뺌, 두 손이 함께 16분음표로 달리는 13-14마디와 21마디 왼손은 8분음표로. ♩=63
+% ===== 1-4마디: 주제(도레미파레미도)를 오른손이 먼저, 왼손이 반 마디 뒤에 따라 한다 =====
+[V:1] !mf!"C"z C D E F D E C G2 c2 B2 c2 | "G"d G A B c A B G "G7"d2 g2 f2 g2 | "C"e a g f e g f a g f e d c e d f | "Am"e d c B A c B d "D7"c B A G ^F A G B |
+[V:2] z8 z C, D, E, F, D, E, C, | G,2 G,,2 z4 z G, A, B, C A, B, G, | C2 B,2 C2 D2 E2 G,2 A,2 B,2 | C2 E,2 ^F,2 G,2 A,2 B,2 C4- |
+% ===== 5-8마디: G장조로 가서 마침, 주제를 왼손이 이끈다 =====
+[V:1] A2 D2 c3 d "G"B A G ^F E G ^F A | "Em"G B A c B d c e "G/B"d B d g "D7"B2 A G | "G"G2 z2 z4 z G A B c A B G | "D"^F2 z2 z4 "D7"z A B c d B c A |
+[V:2] C D, E, ^F, G, E, ^F, D, G,2 B,,2 C,2 D,2 | E,2 ^F,2 G,2 E,2 B,,3 C, D,2 D,,2 | z G,, A,, B,, C, A,, B,, G,, D,2 G,2 ^F,2 G,2 | A, D, E, ^F, G, E, ^F, D, A,2 D2 C2 D2 |
+% ===== 9-12마디: 왼손이 높은 음역으로 올라가 높은음자리표로 바뀐다, D단조 → A단조 =====
+[V:1] "G7"B2 z2 z4 z d c B A c B d | "C"c2 z2 z4 "A7"z e d c B d ^c e | "Dm"d2 ^c2 d2 e2 f2 A2 "A7"B2 ^c2 | "Dm"d2 ^F2 "E7"^G2 A2 B2 c2 d4- |
+V:2 clef=treble
+[V:2] G, G F E D F E G F2 E2 F2 D2 | E A G F E G F A G2 F2 G2 E2 | F _B A G F A G _B A G F E D F E G | F E D C B, D C E D C B, A, ^G, B, A, C |
+% ===== 13-16마디: A단조로 마침, 주제가 긴 음 위에서 이어진다 =====
+[V:1] d E ^F ^G A ^F ^G E "Am"e d c e "E7"d c B d | "Am"c a ^g b "Dm"a e f d "E7"^G f e d c2 B A | "Am"A a g f e g f a "A7"g8- | "Dm"g e f g a f g e f8- |
+V:2 clef=bass
+[V:2] B,2 E,2 D3 E C2 A,2 ^G,2 B,2 | A,2 B,2 C2 D2 E2 A,2 E2 E,2 | A,2 A,,2 z4 z E D C B, D ^C E | D8- D A, B, C D B, C A, |
+% ===== 17-20마디: 다시 C장조로 =====
+[V:1] "G7"f g f e d f e g f8- | "C"f d e f g e f d "C7"e8- | "F"e c d e f d e c "Dm"d e f g "C7"a f g e | "F"f g a b c' a b g "C/E"c'2 g2 "G7"e2 d c |
+[V:2] B,8- B, D C B, A, C B, D | C8- C G, A, _B, C A, _B, G, | A,2 _B,2 A,2 G,2 F,2 D2 C2 _B,2 | A,2 F2 E2 D2 E D, E, F, G, E, F, D, |
+% ===== 21-22마디: 마침 =====
+[V:1] "C7"c _B A G "F"F A G _B "Dm"A =B c E "G7"D c F =B | "C"H[EGc]16 |]
+[V:2] E,2 C,2 D,2 E,2 F,2 D,2 G,2 G,,2 | H[C,,C,]16 |]

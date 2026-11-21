@@ -171,8 +171,27 @@
               "work": "BWV 772",
               "year": "1723",
               "collection": "인벤션과 신포니아",
-              "status": "planned",
-              "scores": []
+              "status": "done",
+              "scores": [
+                {
+                  "level": "intermediate",
+                  "id": "classical-bach-772-1",
+                  "title": "바흐 · 2성 인벤션 1번 C장조 [1 인터미디어트]",
+                  "file": "bach/two-part-invention-1-c-bwv772-1-intermediate.abc"
+                },
+                {
+                  "level": "advanced",
+                  "id": "classical-bach-772-2",
+                  "title": "바흐 · 2성 인벤션 1번 C장조 [2 어드밴스]",
+                  "file": "bach/two-part-invention-1-c-bwv772-2-advanced.abc"
+                },
+                {
+                  "level": "original",
+                  "id": "classical-bach-772-3",
+                  "title": "바흐 · 2성 인벤션 1번 C장조 [3 원곡]",
+                  "file": "bach/two-part-invention-1-c-bwv772-3-original.abc"
+                }
+              ]
             },
             {
               "id": "bach-779",
