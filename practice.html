@@ -52,7 +52,7 @@
   }
   #laneSvg { position: absolute; top: 0; left: 0; height: 100%; width: auto; }
   #laneClef { position: absolute; left: 16px; top: 45%; transform: translateY(-58%); font-size: 7rem; color: var(--ink); z-index: 2; pointer-events: none; line-height: 1; }
-  #laneKey { position: absolute; left: 92px; top: 12px; font-size: .9rem; color: var(--brass-deep); font-weight: 700; z-index: 2; }
+  #laneKey { position: absolute; left: 148px; top: 10px; font-size: .88rem; color: var(--brass-deep); font-weight: 700; z-index: 2; }
 
   #guide { display: flex; align-items: center; gap: 16px; justify-content: center; padding: 14px; flex-wrap: wrap; }
   #nextNote { font-size: 2.2rem; font-weight: 800; color: var(--brass-deep); min-width: 120px; text-align: center;
@@ -929,8 +929,8 @@
     var topT = twoStaff ? 46 : STAFF_TOP;
     var topB = 240;
     var H = twoStaff ? 430 : LANE_H;
-    var labelYT = twoStaff ? topT + 4 * STAFF_GAP + 38 : LABEL_Y;
-    var labelYB = topB + 4 * STAFF_GAP + 38;
+    var labelYT = topT + 4 * STAFF_GAP + 34;
+    var labelYB = topB + 4 * STAFF_GAP + 34;
     try {
       $("laneWrap").style.height = H + "px";
       if (twoStaff) $("laneClef").style.display = "none";
@@ -943,13 +943,25 @@
     laneWidth = HIT_X + lastEnd * cellMs * LANE_SPEED + 200;
     svg.setAttribute("viewBox", "0 0 " + laneWidth + " " + H);
     svg.setAttribute("width", laneWidth);
+    /* 미감: 지난 구간 페이드용 그라데이션 + 보표 뒤 배경 밴드 */
+    var defs = svgEl("defs", {});
+    defs.innerHTML = '<linearGradient id="pastFade" x1="0" y1="0" x2="1" y2="0">'
+      + '<stop offset="0" stop-color="#fdfbf5" stop-opacity="0.94"/>'
+      + '<stop offset="0.75" stop-color="#fdfbf5" stop-opacity="0.6"/>'
+      + '<stop offset="1" stop-color="#fdfbf5" stop-opacity="0"/></linearGradient>';
+    svg.appendChild(defs);
+    function staffBand(topY) {
+      svg.appendChild(svgEl("rect", { x: 0, y: topY - 16, width: laneWidth, height: 4 * STAFF_GAP + 32, rx: 12, fill: "#fbf7ec" }));
+    }
+    staffBand(topT);
+    if (twoStaff) staffBand(topB);
     var g = svgEl("g", { id: "laneG" });
     laneG = g;
     /* 오선 */
     function staffLines(topY) {
       for (var s2 = 0; s2 < 5; s2++) {
         var y = topY + s2 * STAFF_GAP;
-        g.appendChild(svgEl("line", { x1: 0, y1: y, x2: laneWidth, y2: y, stroke: "#cfc6b0", "stroke-width": 1 }));
+        g.appendChild(svgEl("line", { x1: 0, y1: y, x2: laneWidth, y2: y, stroke: "#b1a179", "stroke-width": 1.2 }));
       }
     }
     staffLines(topT);
@@ -959,7 +971,7 @@
     var barBot = (twoStaff ? topB : topT) + 4 * STAFF_GAP + 2;
     for (var bar = 0; bar * cellsPerBar <= lastEnd; bar++) {
       var bx = HIT_X + bar * cellsPerBar * cellMs * LANE_SPEED;
-      g.appendChild(svgEl("line", { x1: bx, y1: topT - 2, x2: bx, y2: barBot, stroke: "#b9ae94", "stroke-width": 1.5 }));
+      g.appendChild(svgEl("line", { x1: bx, y1: topT - 2, x2: bx, y2: barBot, stroke: "#c4b89c", "stroke-width": 1.2 }));
     }
     /* 코드명 — 음표와 같은 레인에 얹어 함께 흐름.
        악보에 코드가 적혀 있으면 적힌 위치 그대로(마디 중간 포함), 없으면 자동 코드(마디 단위) */
@@ -990,7 +1002,9 @@
         var cyTop = Math.min.apply(null, cys), cyBot = Math.max.apply(null, cys);
         var ng = svgEl("g", { class: isPractice ? "lnoteG" : "lnoteO", "data-state": "" });
         var wpx = n.len * cellMs * LANE_SPEED;
-        ng.appendChild(svgEl("rect", { x: cx, y: cy - 5, width: Math.max(6, wpx - 8), height: 10, rx: 5, fill: "rgba(176,138,46,.14)" }));
+        /* 지속 캡슐: 음(화음 전체)을 감싸는 둥근 띠 — 길이가 곧 음길이 */
+        ng.appendChild(svgEl("rect", { x: cx - 4, y: cyTop - 10, width: Math.max(10, wpx - 6), height: (cyBot - cyTop) + 20, rx: 10,
+          fill: isPractice ? "rgba(176,138,46,.10)" : "rgba(160,150,120,.08)", stroke: isPractice ? "rgba(176,138,46,.22)" : "rgba(160,150,120,.15)", "stroke-width": 1 }));
         addLedgers(ng, cx, cyTop, topY);
         if (cyBot !== cyTop) addLedgers(ng, cx, cyBot, topY);
         /* 임시표 */
@@ -1030,7 +1044,7 @@
             ng.appendChild(svgEl("path", { d: fd, stroke: ink, "stroke-width": 4, fill: "none", "stroke-linecap": "round", class: "nflag" }));
           }
         }
-        var lbl = svgEl("text", { x: cx, y: labelY, "font-size": 16, fill: isPractice ? "var(--ink-soft)" : "#b2a98f", "text-anchor": "middle", class: "nlabel" });
+        var lbl = svgEl("text", { x: cx + 1, y: labelY, "font-size": 14.5, "font-weight": 700, fill: isPractice ? "var(--ink-soft)" : "#c0b79e", "text-anchor": "middle", class: "nlabel" });
         lbl.textContent = n.name;
         ng.appendChild(lbl);
         g.appendChild(ng);
@@ -1045,10 +1059,14 @@
       drawSeq(song.seq, topT, practiceVoice === 1 ? "bass" : "treble", labelYT, true);
     }
     svg.appendChild(g);
+    /* 판정 창: 금색 선 직전(살짝 일찍 쳐도 되는 구간)을 옅은 금빛 띠로 */
+    svg.appendChild(svgEl("rect", { x: HIT_X - 26, y: topT - 16, width: 26, height: barBot - topT + 32, fill: "rgba(176,138,46,.07)", "pointer-events": "none" }));
+    /* 지난 구간은 부드럽게 흐려지게 */
+    svg.appendChild(svgEl("rect", { x: 0, y: 0, width: HIT_X, height: H, fill: "url(#pastFade)", "pointer-events": "none" }));
     if (twoStaff) {   /* 음자리표는 흐르지 않게 svg에 고정 */
-      var c1 = svgEl("text", { x: 8, y: topT + 4 * STAFF_GAP + 10, "font-size": 92, fill: "var(--ink)", class: "laneClefSvg" });
+      var c1 = svgEl("text", { x: 6, y: topT + 4 * STAFF_GAP + 12, "font-size": 96, fill: "var(--ink)", opacity: ".9", class: "laneClefSvg" });
       c1.textContent = "\uD834\uDD1E";
-      var c2 = svgEl("text", { x: 14, y: topB + 3 * STAFF_GAP + 8, "font-size": 58, fill: "var(--ink)", class: "laneClefSvg" });
+      var c2 = svgEl("text", { x: 12, y: topB + 3 * STAFF_GAP + 10, "font-size": 64, fill: "var(--ink)", opacity: ".9", class: "laneClefSvg" });
       c2.textContent = "\uD834\uDD22";
       svg.appendChild(c1); svg.appendChild(c2);
     }
